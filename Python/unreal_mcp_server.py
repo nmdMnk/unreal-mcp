@@ -270,13 +270,15 @@ from tools.blueprint_tools import register_blueprint_tools
 from tools.node_tools import register_blueprint_node_tools
 from tools.project_tools import register_project_tools
 from tools.umg_tools import register_umg_tools
+from tools.rag_tools import register_rag_tools
 
 # Register tools
 register_editor_tools(mcp)
 register_blueprint_tools(mcp)
 register_blueprint_node_tools(mcp)
 register_project_tools(mcp)
-register_umg_tools(mcp)  
+register_umg_tools(mcp)
+register_rag_tools(mcp)  
 
 @mcp.prompt()
 def info():
@@ -333,7 +335,13 @@ def info():
     
     ## Project Tools
     - `create_input_mapping(action_name, key, input_type)` - Create input mappings
-    
+
+    ## RAG Knowledge Tools
+    - `search_knowledge(query, n_results=3, category=None)` - Search the RAG knowledge base
+    - `add_knowledge(document, category, tags=None, doc_id=None)` - Add knowledge to RAG server
+    - `list_knowledge()` - List all knowledge entries
+    - `delete_knowledge(doc_id)` - Delete a knowledge entry by ID
+
     ## Best Practices
     
     ### UMG Widget Development
