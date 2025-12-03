@@ -63,6 +63,15 @@
 |--------|------|------|
 | `create_input_mapping` | 🔲 未確認 | |
 
+### RAG連携
+
+| ツール | 状態 | 備考 |
+|--------|------|------|
+| `search_knowledge` | ✅ 動作OK | RAGサーバー連携、意味検索対応 |
+| `add_knowledge` | ✅ 動作OK | ナレッジ追加、カテゴリ・タグ対応 |
+| `list_knowledge` | ✅ 動作OK | 登録済みナレッジ一覧取得 |
+| `delete_knowledge` | ✅ 動作OK | ID指定でナレッジ削除 |
+
 ---
 
 ## 確認された制限事項
@@ -85,15 +94,16 @@
 | `explain_node` | ノード/クラスの詳細解説 | 📋 計画中 |
 | `scan_project_classes` | プロジェクト内のクラス/BP一覧取得 | 📋 計画中 |
 
-### Phase 2: RAG統合（優先度中）
+### Phase 2: RAG統合（完了）
 
 目的: プロジェクト固有のナレッジ蓄積と検索
 
 | ツール | 説明 | 状態 |
 |--------|------|------|
-| `record_decision` | 設計判断の記録 | 📋 計画中 |
-| `record_issue` | 問題と解決策の記録 | 📋 計画中 |
-| `search_knowledge` | 蓄積されたナレッジの検索 | 📋 計画中 |
+| `search_knowledge` | 蓄積されたナレッジの検索 | ✅ 完了 |
+| `add_knowledge` | ナレッジの追加（カテゴリ・タグ対応） | ✅ 完了 |
+| `list_knowledge` | 全ナレッジの一覧表示 | ✅ 完了 |
+| `delete_knowledge` | ナレッジの削除 | ✅ 完了 |
 
 ### Phase 3: 既存機能の改善（優先度中）
 
@@ -116,6 +126,9 @@
 
 - **Unreal Engine**: 5.5+
 - **プロジェクト**: TrapxTrapCpp
+- **RAGサーバー**: AIサーバー :8100
+- **Embedding**: BGE-M3
+- **ベクトルDB**: ChromaDB
 - **確認日**: 2024-12-03
 
 ---
