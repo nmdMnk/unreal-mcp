@@ -9,7 +9,7 @@ dependencies = [
   "fastmcp>=0.2.0",
   "uvicorn",
   "fastapi",
-  "pydantic>=2.6.1",
+  "pydantic>=2.10.0",
   "requests"
 ]
 
