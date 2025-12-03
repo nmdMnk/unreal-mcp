@@ -1,119 +1,141 @@
 <div align="center">
 
-# Model Context Protocol for Unreal Engine
-<span style="color: #555555">unreal-mcp</span>
+# Spirrow-UnrealWise
+<span style="color: #555555">Unreal Engine 5 ナレッジアシスタント MCP サーバー</span>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Unreal Engine](https://img.shields.io/badge/Unreal%20Engine-5.5%2B-orange)](https://www.unrealengine.com)
 [![Python](https://img.shields.io/badge/Python-3.12%2B-yellow)](https://www.python.org)
-[![Status](https://img.shields.io/badge/Status-Experimental-red)](https://github.com/chongdashu/unreal-mcp)
+[![Status](https://img.shields.io/badge/Status-Experimental-red)](https://github.com/SpirrowGames/spirrow-unrealwise)
 
 </div>
 
-This project enables AI assistant clients like Cursor, Windsurf and Claude Desktop to control Unreal Engine through natural language using the Model Context Protocol (MCP).
+このプロジェクトは、Cursor、Windsurf、Claude DesktopなどのAIアシスタントクライアントが、Model Context Protocol (MCP)を通じて自然言語でUnreal Engineを制御できるようにします。
 
-## ⚠️ Experimental Status
+## ⚠️ 実験的ステータス
 
-This project is currently in an **EXPERIMENTAL** state. The API, functionality, and implementation details are subject to significant changes. While we encourage testing and feedback, please be aware that:
+このプロジェクトは現在**実験段階**です。API、機能、実装の詳細は大きく変更される可能性があります。テストやフィードバックは歓迎しますが、以下の点にご注意ください：
 
-- Breaking changes may occur without notice
-- Features may be incomplete or unstable
-- Documentation may be outdated or missing
-- Production use is not recommended at this time
+- 予告なく破壊的変更が発生する可能性があります
+- 機能が不完全または不安定な場合があります
+- ドキュメントが古いまたは欠けている可能性があります
+- 現時点では本番環境での使用は推奨されません
 
-## 🌟 Overview
+## 🎯 プロジェクトの目標
 
-The Unreal MCP integration provides comprehensive tools for controlling Unreal Engine through natural language:
+Spirrow-UnrealWiseは、単なるBlueprint生成ツールではなく、**UE5ナレッジアシスタント**として機能することを目指します。
 
-| Category | Capabilities |
+### 解決する課題
+- 「実現したい機能に対して、UE5でどのノード/クラス/APIを使えばいいかわからない」
+- 選択肢の存在自体を知らない問題
+
+### 3層アーキテクチャ（予定）
+```
+Layer 1: ナレッジアシスタント
+  - 目的からの逆引き検索
+  - ノード/クラスの解説
+  - プロジェクトコンテキストを考慮した提案
+
+Layer 2: RAGサーバー
+  - プロジェクト固有のナレッジ蓄積
+  - 過去の意思決定・失敗の記録
+  - 使うほど賢くなる
+
+Layer 3: Blueprint生成（オプション）
+  - 確定したノード構成をBlueprintに生成
+  - 対話的に構成を決めてから生成
+```
+
+## 🌟 概要
+
+Unreal MCP統合は、自然言語を通じてUnreal Engineを制御するための包括的なツールを提供します：
+
+| カテゴリ | 機能 |
 |----------|-------------|
-| **Actor Management** | • Create and delete actors (cubes, spheres, lights, cameras, etc.)<br>• Set actor transforms (position, rotation, scale)<br>• Query actor properties and find actors by name<br>• List all actors in the current level |
-| **Blueprint Development** | • Create new Blueprint classes with custom components<br>• Add and configure components (mesh, camera, light, etc.)<br>• Set component properties and physics settings<br>• Compile Blueprints and spawn Blueprint actors<br>• Create input mappings for player controls |
-| **Blueprint Node Graph** | • Add event nodes (BeginPlay, Tick, etc.)<br>• Create function call nodes and connect them<br>• Add variables with custom types and default values<br>• Create component and self references<br>• Find and manage nodes in the graph |
-| **Editor Control** | • Focus viewport on specific actors or locations<br>• Control viewport camera orientation and distance |
+| **アクター管理** | • アクターの作成と削除（キューブ、球体、ライト、カメラなど）<br>• アクターのトランスフォーム設定（位置、回転、スケール）<br>• アクタープロパティのクエリと名前による検索<br>• 現在のレベル内の全アクターをリスト表示 |
+| **Blueprint開発** | • カスタムコンポーネントを持つ新しいBlueprintクラスの作成<br>• コンポーネントの追加と設定（メッシュ、カメラ、ライトなど）<br>• コンポーネントプロパティと物理設定の設定<br>• Blueprintのコンパイルとアクターのスポーン<br>• プレイヤーコントロール用の入力マッピング作成 |
+| **Blueprint ノードグラフ** | • イベントノードの追加（BeginPlay、Tickなど）<br>• 関数呼び出しノードの作成と接続<br>• カスタム型とデフォルト値を持つ変数の追加<br>• コンポーネントと自己参照の作成<br>• グラフ内のノードの検索と管理 |
+| **エディタコントロール** | • 特定のアクターまたは位置へのビューポートフォーカス<br>• ビューポートカメラの向きと距離の制御 |
 
-All these capabilities are accessible through natural language commands via AI assistants, making it easy to automate and control Unreal Engine workflows.
+これらすべての機能は、AIアシスタントを介した自然言語コマンドでアクセスでき、Unreal Engineワークフローの自動化と制御を簡単にします。
 
-## 🧩 Components
+## 🧩 コンポーネント
 
-### Sample Project (MCPGameProject) `MCPGameProject`
-- Based off the Blank Project, but with the UnrealMCP plugin added.
+### サンプルプロジェクト (MCPGameProject) `MCPGameProject`
+- Blank Projectをベースに、UnrealMCPプラグインを追加したもの。
 
-### Plugin (UnrealMCP) `MCPGameProject/Plugins/UnrealMCP`
-- Native TCP server for MCP communication
-- Integrates with Unreal Editor subsystems
-- Implements actor manipulation tools
-- Handles command execution and response handling
+### プラグイン (UnrealMCP) `MCPGameProject/Plugins/UnrealMCP`
+- MCP通信用のネイティブTCPサーバー
+- Unreal Editorサブシステムとの統合
+- アクター操作ツールの実装
+- コマンド実行とレスポンス処理
 
-### Python MCP Server `Python/unreal_mcp_server.py`
-- Implemented in `unreal_mcp_server.py`
-- Manages TCP socket connections to the C++ plugin (port 55557)
-- Handles command serialization and response parsing
-- Provides error handling and connection management
-- Loads and registers tool modules from the `tools` directory
-- Uses the FastMCP library to implement the Model Context Protocol
+### Python MCPサーバー `Python/unreal_mcp_server.py`
+- `unreal_mcp_server.py`に実装
+- C++プラグインへのTCPソケット接続管理（ポート55557）
+- コマンドのシリアライズとレスポンスのパース
+- エラーハンドリングと接続管理
+- `tools`ディレクトリからツールモジュールのロードと登録
+- FastMCPライブラリを使用してModel Context Protocolを実装
 
-## 📂 Directory Structure
+## 📂 ディレクトリ構造
 
-- **MCPGameProject/** - Example Unreal project
-  - **Plugins/UnrealMCP/** - C++ plugin source
-    - **Source/UnrealMCP/** - Plugin source code
-    - **UnrealMCP.uplugin** - Plugin definition
+- **MCPGameProject/** - サンプルUnrealプロジェクト
+  - **Plugins/UnrealMCP/** - C++プラグインソース
+    - **Source/UnrealMCP/** - プラグインソースコード
+    - **UnrealMCP.uplugin** - プラグイン定義
 
-- **Python/** - Python server and tools
-  - **tools/** - Tool modules for actor, editor, and blueprint operations
-  - **scripts/** - Example scripts and demos
+- **Python/** - Pythonサーバーとツール
+  - **tools/** - アクター、エディタ、Blueprint操作用ツールモジュール
+  - **scripts/** - サンプルスクリプトとデモ
 
-- **Docs/** - Comprehensive documentation
-  - See [Docs/README.md](Docs/README.md) for documentation index
+- **Docs/** - 包括的なドキュメント
+  - ドキュメントインデックスは [Docs/README.md](Docs/README.md) を参照
 
-## 🚀 Quick Start Guide
+## 🚀 クイックスタートガイド
 
-### Prerequisites
+### 前提条件
 - Unreal Engine 5.5+
 - Python 3.12+
-- MCP Client (e.g., Claude Desktop, Cursor, Windsurf)
+- MCPクライアント（例：Claude Desktop、Cursor、Windsurf）
 
-### Sample project
+### サンプルプロジェクト
 
-For getting started quickly, feel free to use the starter project in `MCPGameProject`. This is a UE 5.5 Blank Starter Project with the `UnrealMCP.uplugin` already configured. 
+すぐに始めるには、`MCPGameProject`のスタータープロジェクトを使用してください。これは`UnrealMCP.uplugin`が既に設定されたUE 5.5 Blank Starter Projectです。
 
-1. **Prepare the project**
-   - Right-click your .uproject file
-   - Generate Visual Studio project files
-2. **Build the project (including the plugin)**
-   - Open solution (`.sln`)
-   - Choose `Development Editor` as your target.
-   - Build
+1. **プロジェクトの準備**
+   - .uprojectファイルを右クリック
+   - Visual Studioプロジェクトファイルを生成
+2. **プロジェクトのビルド（プラグインを含む）**
+   - ソリューション（`.sln`）を開く
+   - ターゲットとして`Development Editor`を選択
+   - ビルド
 
-### Plugin
-Otherwise, if you want to use the plugin in your existing project:
+### プラグイン
+既存のプロジェクトでプラグインを使用したい場合：
 
-1. **Copy the plugin to your project**
-   - Copy `MCPGameProject/Plugins/UnrealMCP` to your project's Plugins folder
+1. **プラグインをプロジェクトにコピー**
+   - `MCPGameProject/Plugins/UnrealMCP`をプロジェクトのPluginsフォルダにコピー
 
-2. **Enable the plugin**
+2. **プラグインを有効化**
    - Edit > Plugins
-   - Find "UnrealMCP" in Editor category
-   - Enable the plugin
-   - Restart editor when prompted
+   - Editorカテゴリで「UnrealMCP」を検索
+   - プラグインを有効化
+   - プロンプトが表示されたらエディタを再起動
 
-3. **Build the plugin**
-   - Right-click your .uproject file
-   - Generate Visual Studio project files
-   - Open solution (`.sln)
-   - Build with your target platform and output settings
+3. **プラグインのビルド**
+   - .uprojectファイルを右クリック
+   - Visual Studioプロジェクトファイルを生成
+   - ソリューション（`.sln`）を開く
+   - ターゲットプラットフォームと出力設定でビルド
 
-### Python Server Setup
+### Pythonサーバーのセットアップ
 
-See [Python/README.md](Python/README.md) for detailed Python setup instructions, including:
-- Setting up your Python environment
-- Running the MCP server
-- Using direct or server-based connections
+Python環境のセットアップ、MCPサーバーの実行、直接またはサーバーベースの接続の使用など、詳細な手順は [Python/README.md](Python/README.md) を参照してください。
 
-### Configuring your MCP Client
+### MCPクライアントの設定
 
-Use the following JSON for your mcp configuration based on your MCP client.
+MCPクライアントに応じて、以下のJSONをmcp設定に使用してください。
 
 ```json
 {
@@ -131,25 +153,38 @@ Use the following JSON for your mcp configuration based on your MCP client.
 }
 ```
 
-An example is found in `mcp.json`
+例は`mcp.json`にあります。
 
-### MCP Configuration Locations
+### MCP設定ファイルの場所
 
-Depending on which MCP client you're using, the configuration file location will differ:
+使用するMCPクライアントによって、設定ファイルの場所が異なります：
 
-| MCP Client | Configuration File Location | Notes |
+| MCPクライアント | 設定ファイルの場所 | 備考 |
 |------------|------------------------------|-------|
-| Claude Desktop | `~/.config/claude-desktop/mcp.json` | On Windows: `%USERPROFILE%\.config\claude-desktop\mcp.json` |
-| Cursor | `.cursor/mcp.json` | Located in your project root directory |
-| Windsurf | `~/.config/windsurf/mcp.json` | On Windows: `%USERPROFILE%\.config\windsurf\mcp.json` |
+| Claude Desktop | `~/.config/claude-desktop/mcp.json` | Windows: `%USERPROFILE%\.config\claude-desktop\mcp.json` |
+| Cursor | `.cursor/mcp.json` | プロジェクトルートディレクトリに配置 |
+| Windsurf | `~/.config/windsurf/mcp.json` | Windows: `%USERPROFILE%\.config\windsurf\mcp.json` |
 
-Each client uses the same JSON format as shown in the example above. 
-Simply place the configuration in the appropriate location for your MCP client.
+各クライアントは上記の例と同じJSON形式を使用します。
+MCPクライアントに応じて、適切な場所に設定を配置してください。
 
+## 📝 ライセンス
 
-## License
-MIT
+このプロジェクトはMITライセンスの下で公開されています。
 
-## Questions
+### 帰属表示
 
-For questions, you can reach me on X/Twitter: [@chongdashu](https://www.x.com/chongdashu)
+このプロジェクトは [chongdashu/unreal-mcp](https://github.com/chongdashu/unreal-mcp) （MIT License）をベースに、SpirrowGames向けに拡張したものです。
+
+```
+Original work Copyright (c) 2024 Chong-U Lim (chongdashu)
+Modified work Copyright (c) 2025 SpirrowGames
+```
+
+オリジナルプロジェクトの作者に感謝します。
+
+## 💡 質問・問い合わせ
+
+このプロジェクトに関する質問は、以下までお願いします：
+- **オリジナルプロジェクト**: [@chongdashu](https://www.x.com/chongdashu)
+- **このフォーク**: SpirrowGames
