@@ -7,24 +7,51 @@ Write-Host "  Unreal MCP Server Launcher" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Change to Python directory
+# Get script directory
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+# Load local configuration if it exists
+Write-Host "[1/4] Loading configuration..." -ForegroundColor Yellow
+$configLocalPath = Join-Path $scriptDir "config.local.ps1"
+if (Test-Path $configLocalPath) {
+    . $configLocalPath
+    Write-Host "      Loaded: config.local.ps1" -ForegroundColor Gray
+} else {
+    Write-Host "      No config.local.ps1 found (using defaults)" -ForegroundColor Gray
+    Write-Host "      Tip: Copy config.example.ps1 to config.local.ps1 to customize" -ForegroundColor DarkGray
+    # Set default values
+    if (-not $env:RAG_SERVER_URL) {
+        $env:RAG_SERVER_URL = "http://localhost:8100"
+    }
+}
+Write-Host "      RAG_SERVER_URL: $env:RAG_SERVER_URL" -ForegroundColor Gray
+Write-Host "      OK" -ForegroundColor Green
+Write-Host ""
+
+# Change to Python directory
 $pythonDir = Join-Path $scriptDir "Python"
-Write-Host "[1/3] Changing to Python directory..." -ForegroundColor Yellow
+Write-Host "[2/4] Changing to Python directory..." -ForegroundColor Yellow
 Set-Location $pythonDir
 Write-Host "      Directory: $pythonDir" -ForegroundColor Gray
 Write-Host "      OK" -ForegroundColor Green
 Write-Host ""
 
-# Optional: Set RAG server URL (uncomment and modify if needed)
-Write-Host "[2/3] Setting up environment..." -ForegroundColor Yellow
-# $env:RAG_SERVER_URL = "http://localhost:8100"
-Write-Host "      RAG_SERVER_URL: $env:RAG_SERVER_URL" -ForegroundColor Gray
-Write-Host "      OK" -ForegroundColor Green
+# Verify uv is installed
+Write-Host "[3/4] Checking environment..." -ForegroundColor Yellow
+try {
+    $uvVersion = uv --version 2>&1
+    Write-Host "      uv: $uvVersion" -ForegroundColor Gray
+    Write-Host "      OK" -ForegroundColor Green
+} catch {
+    Write-Host "      ERROR: uv is not installed" -ForegroundColor Red
+    Write-Host "      Please install uv: https://docs.astral.sh/uv/" -ForegroundColor Red
+    Read-Host "Press Enter to exit"
+    exit 1
+}
 Write-Host ""
 
 # Run the MCP server using uv
-Write-Host "[3/3] Starting MCP Server..." -ForegroundColor Yellow
+Write-Host "[4/4] Starting MCP Server..." -ForegroundColor Yellow
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Green
 Write-Host "  MCP SERVER IS NOW RUNNING" -ForegroundColor Green
