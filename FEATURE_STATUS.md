@@ -26,11 +26,11 @@
 |--------|------|------|
 | `create_blueprint` | ✅ 動作OK | pathパラメータで保存先指定可能（デフォルト: /Game/Blueprints） |
 | `spawn_blueprint_actor` | ❌ タイムアウト | 通信問題の可能性、要調査 |
-| `add_component_to_blueprint` | ✅ 動作OK | |
+| `add_component_to_blueprint` | ✅ 動作OK | pathパラメータで検索先指定可能（デフォルト: /Game/Blueprints） |
 | `set_static_mesh_properties` | ✅ 動作OK | Engine標準メッシュで確認 |
 | `set_component_property` | 🔲 未確認 | |
 | `set_physics_properties` | 🔲 未確認 | |
-| `compile_blueprint` | ✅ 動作OK | |
+| `compile_blueprint` | ✅ 動作OK | pathパラメータで検索先指定可能（デフォルト: /Game/Blueprints） |
 | `set_blueprint_property` | 🔲 未確認 | |
 
 ### BPノードグラフ操作

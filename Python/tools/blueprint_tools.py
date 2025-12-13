@@ -68,11 +68,12 @@ def register_blueprint_tools(mcp: FastMCP):
         location: List[float] = [],
         rotation: List[float] = [],
         scale: List[float] = [],
-        component_properties: Dict[str, Any] = {}
+        component_properties: Dict[str, Any] = {},
+        path: str = "/Game/Blueprints"
     ) -> Dict[str, Any]:
         """
         Add a component to a Blueprint.
-        
+
         Args:
             blueprint_name: Name of the target Blueprint
             component_type: Type of component to add (use component class name without U prefix)
@@ -81,7 +82,8 @@ def register_blueprint_tools(mcp: FastMCP):
             rotation: [Pitch, Yaw, Roll] values for component's rotation
             scale: [X, Y, Z] values for component's scale
             component_properties: Additional properties to set on the component
-        
+            path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+
         Returns:
             Information about the added component
         """
@@ -95,7 +97,8 @@ def register_blueprint_tools(mcp: FastMCP):
                 "component_name": component_name,
                 "location": location or [0.0, 0.0, 0.0],
                 "rotation": rotation or [0.0, 0.0, 0.0],
-                "scale": scale or [1.0, 1.0, 1.0]
+                "scale": scale or [1.0, 1.0, 1.0],
+                "path": path
             }
             
             # Add component_properties if provided
@@ -265,19 +268,30 @@ def register_blueprint_tools(mcp: FastMCP):
     @mcp.tool()
     def compile_blueprint(
         ctx: Context,
-        blueprint_name: str
+        blueprint_name: str,
+        path: str = "/Game/Blueprints"
     ) -> Dict[str, Any]:
-        """Compile a Blueprint."""
+        """
+        Compile a Blueprint.
+
+        Args:
+            blueprint_name: Name of the blueprint to compile
+            path: Content browser path where the blueprint is located (e.g., "/Game/TrapxTrap/Blueprints/Characters")
+
+        Returns:
+            Dict containing compilation result
+        """
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             unreal = get_unreal_connection()
             if not unreal:
                 logger.error("Failed to connect to Unreal Engine")
                 return {"success": False, "message": "Failed to connect to Unreal Engine"}
-            
+
             params = {
-                "blueprint_name": blueprint_name
+                "blueprint_name": blueprint_name,
+                "path": path
             }
             
             logger.info(f"Compiling blueprint: {blueprint_name}")
