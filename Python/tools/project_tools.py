@@ -211,4 +211,45 @@ def register_project_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    @mcp.tool()
+    def delete_asset(
+        ctx: Context,
+        asset_path: str
+    ) -> Dict[str, Any]:
+        """
+        Delete an asset from the Content Browser.
+
+        Args:
+            asset_path: Full path to the asset (e.g., "/Game/Input/IA_TestJump")
+
+        Returns:
+            Dict containing the deleted asset path or error
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "asset_path": asset_path
+            }
+
+            logger.info(f"Deleting asset '{asset_path}'")
+            response = unreal.send_command("delete_asset", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Asset deletion response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error deleting asset: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("Project tools registered successfully") 

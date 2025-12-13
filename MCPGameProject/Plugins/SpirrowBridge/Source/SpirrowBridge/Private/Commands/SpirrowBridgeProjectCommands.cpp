@@ -9,6 +9,7 @@
 #include "AssetToolsModule.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "UObject/SavePackage.h"
+#include "EditorAssetLibrary.h"
 
 FSpirrowBridgeProjectCommands::FSpirrowBridgeProjectCommands()
 {
@@ -31,6 +32,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleCommand(const FStri
     else if (CommandType == TEXT("add_action_to_mapping_context"))
     {
         return HandleAddActionToMappingContext(Params);
+    }
+    else if (CommandType == TEXT("delete_asset"))
+    {
+        return HandleDeleteAsset(Params);
     }
 
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown project command: %s"), *CommandType));
@@ -335,5 +340,34 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleAddActionToMappingC
     ResultObj->SetStringField(TEXT("action"), ActionName);
     ResultObj->SetStringField(TEXT("key"), KeyName);
     ResultObj->SetStringField(TEXT("trigger"), TriggerType);
+    return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleDeleteAsset(const TSharedPtr<FJsonObject>& Params)
+{
+    FString AssetPath;
+    if (!Params->TryGetStringField(TEXT("asset_path"), AssetPath))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'asset_path' parameter"));
+    }
+
+    // アセットが存在するか確認
+    if (!UEditorAssetLibrary::DoesAssetExist(AssetPath))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Asset not found: %s"), *AssetPath));
+    }
+
+    // アセット削除
+    bool bDeleted = UEditorAssetLibrary::DeleteAsset(AssetPath);
+
+    if (!bDeleted)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Failed to delete asset: %s"), *AssetPath));
+    }
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetStringField(TEXT("deleted"), AssetPath);
     return ResultObj;
 } 

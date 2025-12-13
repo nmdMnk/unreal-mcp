@@ -267,7 +267,8 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
             else if (CommandType == TEXT("create_input_mapping") ||
                      CommandType == TEXT("create_input_action") ||
                      CommandType == TEXT("create_input_mapping_context") ||
-                     CommandType == TEXT("add_action_to_mapping_context"))
+                     CommandType == TEXT("add_action_to_mapping_context") ||
+                     CommandType == TEXT("delete_asset"))
             {
                 ResultJson = ProjectCommands->HandleCommand(CommandType, Params);
             }
