@@ -20,6 +20,9 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/Character.h"
+#include "Misc/App.h"
+#include "UObject/UObjectIterator.h"
 
 FSpirrowBridgeBlueprintCommands::FSpirrowBridgeBlueprintCommands()
 {
@@ -103,10 +106,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleCreateBlueprint(c
     // Handle parent class
     FString ParentClass;
     Params->TryGetStringField(TEXT("parent_class"), ParentClass);
-    
+
     // Default to Actor if no parent class specified
     UClass* SelectedParentClass = AActor::StaticClass();
-    
+
     // Try to find the specified parent class
     if (!ParentClass.IsEmpty())
     {
@@ -115,40 +118,90 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleCreateBlueprint(c
         {
             ClassName = TEXT("A") + ClassName;
         }
-        
-        // First try direct StaticClass lookup for common classes
+
         UClass* FoundClass = nullptr;
+
+        // Method 1: Direct StaticClass lookup for common engine classes
         if (ClassName == TEXT("APawn"))
         {
             FoundClass = APawn::StaticClass();
+            UE_LOG(LogTemp, Log, TEXT("[Method 1] Found parent class via StaticClass: APawn"));
         }
         else if (ClassName == TEXT("AActor"))
         {
             FoundClass = AActor::StaticClass();
+            UE_LOG(LogTemp, Log, TEXT("[Method 1] Found parent class via StaticClass: AActor"));
         }
-        else
+        else if (ClassName == TEXT("ACharacter"))
         {
-            // Try loading the class using LoadClass which is more reliable than FindObject
-            const FString ClassPath = FString::Printf(TEXT("/Script/Engine.%s"), *ClassName);
+            FoundClass = ACharacter::StaticClass();
+            UE_LOG(LogTemp, Log, TEXT("[Method 1] Found parent class via StaticClass: ACharacter"));
+        }
+
+        // Method 2: Search through all loaded classes using TObjectIterator
+        if (!FoundClass)
+        {
+            UE_LOG(LogTemp, Log, TEXT("[Method 2] Searching for class '%s' using TObjectIterator..."), *ClassName);
+            for (TObjectIterator<UClass> It; It; ++It)
+            {
+                UClass* Class = *It;
+                if (Class->GetName() == ClassName)
+                {
+                    FoundClass = Class;
+                    UE_LOG(LogTemp, Log, TEXT("[Method 2] Found parent class via TObjectIterator: %s (Path: %s)"),
+                        *ClassName, *Class->GetPathName());
+                    break;
+                }
+            }
+        }
+
+        // Method 3: Try LoadClass with various module paths
+        if (!FoundClass)
+        {
+            UE_LOG(LogTemp, Log, TEXT("[Method 3] Attempting LoadClass for '%s'..."), *ClassName);
+
+            // Try /Script/Engine
+            FString ClassPath = FString::Printf(TEXT("/Script/Engine.%s"), *ClassName);
             FoundClass = LoadClass<AActor>(nullptr, *ClassPath);
-            
+            if (FoundClass)
+            {
+                UE_LOG(LogTemp, Log, TEXT("[Method 3] Found parent class via LoadClass: %s"), *ClassPath);
+            }
+
+            // Try /Script/Game
             if (!FoundClass)
             {
-                // Try alternate paths if not found
-                const FString GameClassPath = FString::Printf(TEXT("/Script/Game.%s"), *ClassName);
-                FoundClass = LoadClass<AActor>(nullptr, *GameClassPath);
+                ClassPath = FString::Printf(TEXT("/Script/Game.%s"), *ClassName);
+                FoundClass = LoadClass<AActor>(nullptr, *ClassPath);
+                if (FoundClass)
+                {
+                    UE_LOG(LogTemp, Log, TEXT("[Method 3] Found parent class via LoadClass: %s"), *ClassPath);
+                }
+            }
+
+            // Try /Script/{ProjectName}
+            if (!FoundClass)
+            {
+                FString ProjectName = FApp::GetProjectName();
+                ClassPath = FString::Printf(TEXT("/Script/%s.%s"), *ProjectName, *ClassName);
+                FoundClass = LoadClass<AActor>(nullptr, *ClassPath);
+                if (FoundClass)
+                {
+                    UE_LOG(LogTemp, Log, TEXT("[Method 3] Found parent class via LoadClass: %s"), *ClassPath);
+                }
             }
         }
 
         if (FoundClass)
         {
             SelectedParentClass = FoundClass;
-            UE_LOG(LogTemp, Log, TEXT("Successfully set parent class to '%s'"), *ClassName);
+            UE_LOG(LogTemp, Log, TEXT("Successfully set parent class to '%s' (Final Path: %s)"),
+                *ClassName, *FoundClass->GetPathName());
         }
         else
         {
-            UE_LOG(LogTemp, Warning, TEXT("Could not find specified parent class '%s' at paths: /Script/Engine.%s or /Script/Game.%s, defaulting to AActor"), 
-                *ClassName, *ClassName, *ClassName);
+            UE_LOG(LogTemp, Warning, TEXT("Could not find specified parent class '%s' after trying all methods, defaulting to AActor"),
+                *ClassName);
         }
     }
     
