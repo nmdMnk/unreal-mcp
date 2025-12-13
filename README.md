@@ -53,8 +53,9 @@ Unreal MCP統合は、自然言語を通じてUnreal Engineを制御するため
 | カテゴリ | 機能 |
 |----------|-------------|
 | **アクター管理** | • アクターの作成と削除（キューブ、球体、ライト、カメラなど）<br>• アクターのトランスフォーム設定（位置、回転、スケール）<br>• アクタープロパティのクエリと名前による検索<br>• 現在のレベル内の全アクターをリスト表示 |
-| **Blueprint開発** | • カスタムコンポーネントを持つ新しいBlueprintクラスの作成<br>• コンポーネントの追加と設定（メッシュ、カメラ、ライトなど）<br>• コンポーネントプロパティと物理設定の設定<br>• Blueprintのコンパイルとアクターのスポーン<br>• プレイヤーコントロール用の入力マッピング作成 |
+| **Blueprint開発** | • カスタムコンポーネントを持つ新しいBlueprintクラスの作成<br>• コンポーネントの追加と設定（メッシュ、カメラ、ライトなど）<br>• コンポーネントプロパティと物理設定の設定<br>• Blueprintのコンパイルとアクターのスポーン |
 | **Blueprint ノードグラフ** | • イベントノードの追加（BeginPlay、Tickなど）<br>• 関数呼び出しノードの作成と接続<br>• カスタム型とデフォルト値を持つ変数の追加<br>• コンポーネントと自己参照の作成<br>• グラフ内のノードの検索と管理 |
+| **入力システム** | • Enhanced Input Actionアセットの作成（Digital/Axis1D/2D/3D対応）<br>• Input Mapping Contextアセットの作成<br>• アクションマッピングの追加（トリガー、モディファイア対応）<br>• レガシー入力マッピングの作成（Action/Axis） |
 | **エディタコントロール** | • 特定のアクターまたは位置へのビューポートフォーカス<br>• ビューポートカメラの向きと距離の制御 |
 | **RAGナレッジ管理** | • プロジェクト固有のナレッジをRAGサーバーに保存・検索<br>• カテゴリとタグによる整理<br>• 過去の設計判断や問題解決策を蓄積<br>• 使うほど賢くなるナレッジベース |
 
@@ -63,9 +64,9 @@ Unreal MCP統合は、自然言語を通じてUnreal Engineを制御するため
 ## 🧩 コンポーネント
 
 ### サンプルプロジェクト (MCPGameProject) `MCPGameProject`
-- Blank Projectをベースに、UnrealMCPプラグインを追加したもの。
+- Blank Projectをベースに、SpirrowBridgeプラグインを追加したもの。
 
-### プラグイン (UnrealMCP) `MCPGameProject/Plugins/UnrealMCP`
+### プラグイン (SpirrowBridge) `MCPGameProject/Plugins/SpirrowBridge`
 - MCP通信用のネイティブTCPサーバー
 - Unreal Editorサブシステムとの統合
 - アクター操作ツールの実装
@@ -94,9 +95,9 @@ Unreal MCP統合は、自然言語を通じてUnreal Engineを制御するため
 ## 📂 ディレクトリ構造
 
 - **MCPGameProject/** - サンプルUnrealプロジェクト
-  - **Plugins/UnrealMCP/** - C++プラグインソース
-    - **Source/UnrealMCP/** - プラグインソースコード
-    - **UnrealMCP.uplugin** - プラグイン定義
+  - **Plugins/SpirrowBridge/** - C++プラグインソース
+    - **Source/SpirrowBridge/** - プラグインソースコード
+    - **SpirrowBridge.uplugin** - プラグイン定義
 
 - **Python/** - Pythonサーバーとツール
   - **tools/** - アクター、エディタ、Blueprint操作用ツールモジュール
@@ -114,7 +115,7 @@ Unreal MCP統合は、自然言語を通じてUnreal Engineを制御するため
 
 ### サンプルプロジェクト
 
-すぐに始めるには、`MCPGameProject`のスタータープロジェクトを使用してください。これは`UnrealMCP.uplugin`が既に設定されたUE 5.5 Blank Starter Projectです。
+すぐに始めるには、`MCPGameProject`のスタータープロジェクトを使用してください。これは`SpirrowBridge.uplugin`が既に設定されたUE 5.5 Blank Starter Projectです。
 
 1. **プロジェクトの準備**
    - .uprojectファイルを右クリック
@@ -128,11 +129,11 @@ Unreal MCP統合は、自然言語を通じてUnreal Engineを制御するため
 既存のプロジェクトでプラグインを使用したい場合：
 
 1. **プラグインをプロジェクトにコピー**
-   - `MCPGameProject/Plugins/UnrealMCP`をプロジェクトのPluginsフォルダにコピー
+   - `MCPGameProject/Plugins/SpirrowBridge`をプロジェクトのPluginsフォルダにコピー
 
 2. **プラグインを有効化**
    - Edit > Plugins
-   - Editorカテゴリで「UnrealMCP」を検索
+   - Editorカテゴリで「SpirrowBridge」を検索
    - プラグインを有効化
    - プロンプトが表示されたらエディタを再起動
 

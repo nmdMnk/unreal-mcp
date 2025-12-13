@@ -9,7 +9,7 @@ from typing import Dict, List, Any
 from mcp.server.fastmcp import FastMCP, Context
 
 # Get logger
-logger = logging.getLogger("UnrealMCP")
+logger = logging.getLogger("SpirrowBridge")
 
 def register_umg_tools(mcp: FastMCP):
     """Register UMG tools with the MCP server."""

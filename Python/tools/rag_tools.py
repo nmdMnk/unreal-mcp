@@ -12,7 +12,7 @@ import requests
 from mcp.server.fastmcp import FastMCP, Context
 
 # Get logger
-logger = logging.getLogger("UnrealMCP")
+logger = logging.getLogger("SpirrowBridge")
 
 # Get RAG server URL from environment variable or use default
 RAG_SERVER_URL = os.environ.get("RAG_SERVER_URL", "http://localhost:8100")

@@ -8,10 +8,10 @@
  * Responsible for creating and modifying UMG Widget Blueprints,
  * adding widget components, and managing widget instances in the viewport.
  */
-class UNREALMCP_API FUnrealMCPUMGCommands
+class SPIRROWBRIDGE_API FSpirrowBridgeUMGCommands
 {
 public:
-    FUnrealMCPUMGCommands();
+    FSpirrowBridgeUMGCommands();
 
     /**
      * Handle UMG-related commands

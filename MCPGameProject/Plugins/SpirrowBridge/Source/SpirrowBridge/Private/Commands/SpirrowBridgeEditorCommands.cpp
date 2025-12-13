@@ -1,5 +1,5 @@
-#include "Commands/UnrealMCPEditorCommands.h"
-#include "Commands/UnrealMCPCommonUtils.h"
+#include "Commands/SpirrowBridgeEditorCommands.h"
+#include "Commands/SpirrowBridgeCommonUtils.h"
 #include "Editor.h"
 #include "EditorViewportClient.h"
 #include "LevelEditorViewport.h"
@@ -21,11 +21,11 @@
 #include "Engine/Blueprint.h"
 #include "Engine/BlueprintGeneratedClass.h"
 
-FUnrealMCPEditorCommands::FUnrealMCPEditorCommands()
+FSpirrowBridgeEditorCommands::FSpirrowBridgeEditorCommands()
 {
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params)
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params)
 {
     // Actor manipulation commands
     if (CommandType == TEXT("get_actors_in_level"))
@@ -75,10 +75,10 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleCommand(const FString& C
         return HandleTakeScreenshot(Params);
     }
     
-    return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown editor command: %s"), *CommandType));
+    return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown editor command: %s"), *CommandType));
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleGetActorsInLevel(const TSharedPtr<FJsonObject>& Params)
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleGetActorsInLevel(const TSharedPtr<FJsonObject>& Params)
 {
     TArray<AActor*> AllActors;
     UGameplayStatics::GetAllActorsOfClass(GWorld, AActor::StaticClass(), AllActors);
@@ -88,7 +88,7 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleGetActorsInLevel(const T
     {
         if (Actor)
         {
-            ActorArray.Add(FUnrealMCPCommonUtils::ActorToJson(Actor));
+            ActorArray.Add(FSpirrowBridgeCommonUtils::ActorToJson(Actor));
         }
     }
     
@@ -98,12 +98,12 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleGetActorsInLevel(const T
     return ResultObj;
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleFindActorsByName(const TSharedPtr<FJsonObject>& Params)
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleFindActorsByName(const TSharedPtr<FJsonObject>& Params)
 {
     FString Pattern;
     if (!Params->TryGetStringField(TEXT("pattern"), Pattern))
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'pattern' parameter"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'pattern' parameter"));
     }
     
     TArray<AActor*> AllActors;
@@ -114,7 +114,7 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleFindActorsByName(const T
     {
         if (Actor && Actor->GetName().Contains(Pattern))
         {
-            MatchingActors.Add(FUnrealMCPCommonUtils::ActorToJson(Actor));
+            MatchingActors.Add(FSpirrowBridgeCommonUtils::ActorToJson(Actor));
         }
     }
     
@@ -124,20 +124,20 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleFindActorsByName(const T
     return ResultObj;
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSpawnActor(const TSharedPtr<FJsonObject>& Params)
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSpawnActor(const TSharedPtr<FJsonObject>& Params)
 {
     // Get required parameters
     FString ActorType;
     if (!Params->TryGetStringField(TEXT("type"), ActorType))
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'type' parameter"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'type' parameter"));
     }
 
     // Get actor name (required parameter)
     FString ActorName;
     if (!Params->TryGetStringField(TEXT("name"), ActorName))
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
     }
 
     // Get optional transform parameters
@@ -147,15 +147,15 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSpawnActor(const TShared
 
     if (Params->HasField(TEXT("location")))
     {
-        Location = FUnrealMCPCommonUtils::GetVectorFromJson(Params, TEXT("location"));
+        Location = FSpirrowBridgeCommonUtils::GetVectorFromJson(Params, TEXT("location"));
     }
     if (Params->HasField(TEXT("rotation")))
     {
-        Rotation = FUnrealMCPCommonUtils::GetRotatorFromJson(Params, TEXT("rotation"));
+        Rotation = FSpirrowBridgeCommonUtils::GetRotatorFromJson(Params, TEXT("rotation"));
     }
     if (Params->HasField(TEXT("scale")))
     {
-        Scale = FUnrealMCPCommonUtils::GetVectorFromJson(Params, TEXT("scale"));
+        Scale = FSpirrowBridgeCommonUtils::GetVectorFromJson(Params, TEXT("scale"));
     }
 
     // Create the actor based on type
@@ -164,7 +164,7 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSpawnActor(const TShared
 
     if (!World)
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to get editor world"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get editor world"));
     }
 
     // Check if an actor with this name already exists
@@ -174,7 +174,7 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSpawnActor(const TShared
     {
         if (Actor && Actor->GetName() == ActorName)
         {
-            return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor with name '%s' already exists"), *ActorName));
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor with name '%s' already exists"), *ActorName));
         }
     }
 
@@ -203,7 +203,7 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSpawnActor(const TShared
     }
     else
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown actor type: %s"), *ActorType));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown actor type: %s"), *ActorType));
     }
 
     if (NewActor)
@@ -214,18 +214,18 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSpawnActor(const TShared
         NewActor->SetActorTransform(Transform);
 
         // Return the created actor's details
-        return FUnrealMCPCommonUtils::ActorToJsonObject(NewActor, true);
+        return FSpirrowBridgeCommonUtils::ActorToJsonObject(NewActor, true);
     }
 
-    return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to create actor"));
+    return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create actor"));
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleDeleteActor(const TSharedPtr<FJsonObject>& Params)
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleDeleteActor(const TSharedPtr<FJsonObject>& Params)
 {
     FString ActorName;
     if (!Params->TryGetStringField(TEXT("name"), ActorName))
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
     }
 
     TArray<AActor*> AllActors;
@@ -236,7 +236,7 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleDeleteActor(const TShare
         if (Actor && Actor->GetName() == ActorName)
         {
             // Store actor info before deletion for the response
-            TSharedPtr<FJsonObject> ActorInfo = FUnrealMCPCommonUtils::ActorToJsonObject(Actor);
+            TSharedPtr<FJsonObject> ActorInfo = FSpirrowBridgeCommonUtils::ActorToJsonObject(Actor);
             
             // Delete the actor
             Actor->Destroy();
@@ -247,16 +247,16 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleDeleteActor(const TShare
         }
     }
     
-    return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+    return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSetActorTransform(const TSharedPtr<FJsonObject>& Params)
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSetActorTransform(const TSharedPtr<FJsonObject>& Params)
 {
     // Get actor name
     FString ActorName;
     if (!Params->TryGetStringField(TEXT("name"), ActorName))
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
     }
 
     // Find the actor
@@ -275,7 +275,7 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSetActorTransform(const 
 
     if (!TargetActor)
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
     }
 
     // Get transform parameters
@@ -283,31 +283,31 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSetActorTransform(const 
 
     if (Params->HasField(TEXT("location")))
     {
-        NewTransform.SetLocation(FUnrealMCPCommonUtils::GetVectorFromJson(Params, TEXT("location")));
+        NewTransform.SetLocation(FSpirrowBridgeCommonUtils::GetVectorFromJson(Params, TEXT("location")));
     }
     if (Params->HasField(TEXT("rotation")))
     {
-        NewTransform.SetRotation(FQuat(FUnrealMCPCommonUtils::GetRotatorFromJson(Params, TEXT("rotation"))));
+        NewTransform.SetRotation(FQuat(FSpirrowBridgeCommonUtils::GetRotatorFromJson(Params, TEXT("rotation"))));
     }
     if (Params->HasField(TEXT("scale")))
     {
-        NewTransform.SetScale3D(FUnrealMCPCommonUtils::GetVectorFromJson(Params, TEXT("scale")));
+        NewTransform.SetScale3D(FSpirrowBridgeCommonUtils::GetVectorFromJson(Params, TEXT("scale")));
     }
 
     // Set the new transform
     TargetActor->SetActorTransform(NewTransform);
 
     // Return updated actor info
-    return FUnrealMCPCommonUtils::ActorToJsonObject(TargetActor, true);
+    return FSpirrowBridgeCommonUtils::ActorToJsonObject(TargetActor, true);
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleGetActorProperties(const TSharedPtr<FJsonObject>& Params)
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleGetActorProperties(const TSharedPtr<FJsonObject>& Params)
 {
     // Get actor name
     FString ActorName;
     if (!Params->TryGetStringField(TEXT("name"), ActorName))
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
     }
 
     // Find the actor
@@ -326,20 +326,20 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleGetActorProperties(const
 
     if (!TargetActor)
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
     }
 
     // Always return detailed properties for this command
-    return FUnrealMCPCommonUtils::ActorToJsonObject(TargetActor, true);
+    return FSpirrowBridgeCommonUtils::ActorToJsonObject(TargetActor, true);
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSetActorProperty(const TSharedPtr<FJsonObject>& Params)
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSetActorProperty(const TSharedPtr<FJsonObject>& Params)
 {
     // Get actor name
     FString ActorName;
     if (!Params->TryGetStringField(TEXT("name"), ActorName))
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
     }
 
     // Find the actor
@@ -358,27 +358,27 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSetActorProperty(const T
 
     if (!TargetActor)
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
     }
 
     // Get property name
     FString PropertyName;
     if (!Params->TryGetStringField(TEXT("property_name"), PropertyName))
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'property_name' parameter"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'property_name' parameter"));
     }
 
     // Get property value
     if (!Params->HasField(TEXT("property_value")))
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'property_value' parameter"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'property_value' parameter"));
     }
     
     TSharedPtr<FJsonValue> PropertyValue = Params->Values.FindRef(TEXT("property_value"));
     
     // Set the property using our utility function
     FString ErrorMessage;
-    if (FUnrealMCPCommonUtils::SetObjectProperty(TargetActor, PropertyName, PropertyValue, ErrorMessage))
+    if (FSpirrowBridgeCommonUtils::SetObjectProperty(TargetActor, PropertyName, PropertyValue, ErrorMessage))
     {
         // Property set successfully
         TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
@@ -387,34 +387,34 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSetActorProperty(const T
         ResultObj->SetBoolField(TEXT("success"), true);
         
         // Also include the full actor details
-        ResultObj->SetObjectField(TEXT("actor_details"), FUnrealMCPCommonUtils::ActorToJsonObject(TargetActor, true));
+        ResultObj->SetObjectField(TEXT("actor_details"), FSpirrowBridgeCommonUtils::ActorToJsonObject(TargetActor, true));
         return ResultObj;
     }
     else
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(ErrorMessage);
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(ErrorMessage);
     }
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSpawnBlueprintActor(const TSharedPtr<FJsonObject>& Params)
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSpawnBlueprintActor(const TSharedPtr<FJsonObject>& Params)
 {
     // Get required parameters
     FString BlueprintName;
     if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
     }
 
     FString ActorName;
     if (!Params->TryGetStringField(TEXT("actor_name"), ActorName))
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'actor_name' parameter"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'actor_name' parameter"));
     }
 
     // Find the blueprint
     if (BlueprintName.IsEmpty())
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Blueprint name is empty"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Blueprint name is empty"));
     }
 
     FString Root      = TEXT("/Game/Blueprints/");
@@ -422,13 +422,13 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSpawnBlueprintActor(cons
 
     if (!FPackageName::DoesPackageExist(AssetPath))
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint '%s' not found – it must reside under /Game/Blueprints"), *BlueprintName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint '%s' not found – it must reside under /Game/Blueprints"), *BlueprintName));
     }
 
     UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *AssetPath);
     if (!Blueprint)
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
     }
 
     // Get transform parameters
@@ -438,22 +438,22 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSpawnBlueprintActor(cons
 
     if (Params->HasField(TEXT("location")))
     {
-        Location = FUnrealMCPCommonUtils::GetVectorFromJson(Params, TEXT("location"));
+        Location = FSpirrowBridgeCommonUtils::GetVectorFromJson(Params, TEXT("location"));
     }
     if (Params->HasField(TEXT("rotation")))
     {
-        Rotation = FUnrealMCPCommonUtils::GetRotatorFromJson(Params, TEXT("rotation"));
+        Rotation = FSpirrowBridgeCommonUtils::GetRotatorFromJson(Params, TEXT("rotation"));
     }
     if (Params->HasField(TEXT("scale")))
     {
-        Scale = FUnrealMCPCommonUtils::GetVectorFromJson(Params, TEXT("scale"));
+        Scale = FSpirrowBridgeCommonUtils::GetVectorFromJson(Params, TEXT("scale"));
     }
 
     // Spawn the actor
     UWorld* World = GEditor->GetEditorWorldContext().World();
     if (!World)
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to get editor world"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get editor world"));
     }
 
     FTransform SpawnTransform;
@@ -467,13 +467,13 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSpawnBlueprintActor(cons
     AActor* NewActor = World->SpawnActor<AActor>(Blueprint->GeneratedClass, SpawnTransform, SpawnParams);
     if (NewActor)
     {
-        return FUnrealMCPCommonUtils::ActorToJsonObject(NewActor, true);
+        return FSpirrowBridgeCommonUtils::ActorToJsonObject(NewActor, true);
     }
 
-    return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to spawn blueprint actor"));
+    return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to spawn blueprint actor"));
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleFocusViewport(const TSharedPtr<FJsonObject>& Params)
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleFocusViewport(const TSharedPtr<FJsonObject>& Params)
 {
     // Get target actor name if provided
     FString TargetActorName;
@@ -484,7 +484,7 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleFocusViewport(const TSha
     bool HasLocation = false;
     if (Params->HasField(TEXT("location")))
     {
-        Location = FUnrealMCPCommonUtils::GetVectorFromJson(Params, TEXT("location"));
+        Location = FSpirrowBridgeCommonUtils::GetVectorFromJson(Params, TEXT("location"));
         HasLocation = true;
     }
 
@@ -500,7 +500,7 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleFocusViewport(const TSha
     bool HasOrientation = false;
     if (Params->HasField(TEXT("orientation")))
     {
-        Orientation = FUnrealMCPCommonUtils::GetRotatorFromJson(Params, TEXT("orientation"));
+        Orientation = FSpirrowBridgeCommonUtils::GetRotatorFromJson(Params, TEXT("orientation"));
         HasOrientation = true;
     }
 
@@ -508,7 +508,7 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleFocusViewport(const TSha
     FLevelEditorViewportClient* ViewportClient = (FLevelEditorViewportClient*)GEditor->GetActiveViewport()->GetClient();
     if (!ViewportClient)
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to get active viewport"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get active viewport"));
     }
 
     // If we have a target actor, focus on it
@@ -530,7 +530,7 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleFocusViewport(const TSha
 
         if (!TargetActor)
         {
-            return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *TargetActorName));
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *TargetActorName));
         }
 
         // Focus on the actor
@@ -543,7 +543,7 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleFocusViewport(const TSha
     }
     else
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Either 'target' or 'location' must be provided"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Either 'target' or 'location' must be provided"));
     }
 
     // Set orientation if provided
@@ -560,13 +560,13 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleFocusViewport(const TSha
     return ResultObj;
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleTakeScreenshot(const TSharedPtr<FJsonObject>& Params)
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleTakeScreenshot(const TSharedPtr<FJsonObject>& Params)
 {
     // Get file path parameter
     FString FilePath;
     if (!Params->TryGetStringField(TEXT("filepath"), FilePath))
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'filepath' parameter"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'filepath' parameter"));
     }
     
     // Ensure the file path has a proper extension
@@ -596,5 +596,5 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleTakeScreenshot(const TSh
         }
     }
     
-    return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to take screenshot"));
+    return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to take screenshot"));
 } 

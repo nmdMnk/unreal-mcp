@@ -1,4 +1,4 @@
-#include "Commands/UnrealMCPCommonUtils.h"
+#include "Commands/SpirrowBridgeCommonUtils.h"
 #include "GameFramework/Actor.h"
 #include "Engine/Blueprint.h"
 #include "EdGraph/EdGraph.h"
@@ -27,7 +27,7 @@
 #include "Dom/JsonValue.h"
 
 // JSON Utilities
-TSharedPtr<FJsonObject> FUnrealMCPCommonUtils::CreateErrorResponse(const FString& Message)
+TSharedPtr<FJsonObject> FSpirrowBridgeCommonUtils::CreateErrorResponse(const FString& Message)
 {
     TSharedPtr<FJsonObject> ResponseObject = MakeShared<FJsonObject>();
     ResponseObject->SetBoolField(TEXT("success"), false);
@@ -35,7 +35,7 @@ TSharedPtr<FJsonObject> FUnrealMCPCommonUtils::CreateErrorResponse(const FString
     return ResponseObject;
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPCommonUtils::CreateSuccessResponse(const TSharedPtr<FJsonObject>& Data)
+TSharedPtr<FJsonObject> FSpirrowBridgeCommonUtils::CreateSuccessResponse(const TSharedPtr<FJsonObject>& Data)
 {
     TSharedPtr<FJsonObject> ResponseObject = MakeShared<FJsonObject>();
     ResponseObject->SetBoolField(TEXT("success"), true);
@@ -48,7 +48,7 @@ TSharedPtr<FJsonObject> FUnrealMCPCommonUtils::CreateSuccessResponse(const TShar
     return ResponseObject;
 }
 
-void FUnrealMCPCommonUtils::GetIntArrayFromJson(const TSharedPtr<FJsonObject>& JsonObject, const FString& FieldName, TArray<int32>& OutArray)
+void FSpirrowBridgeCommonUtils::GetIntArrayFromJson(const TSharedPtr<FJsonObject>& JsonObject, const FString& FieldName, TArray<int32>& OutArray)
 {
     OutArray.Reset();
     
@@ -67,7 +67,7 @@ void FUnrealMCPCommonUtils::GetIntArrayFromJson(const TSharedPtr<FJsonObject>& J
     }
 }
 
-void FUnrealMCPCommonUtils::GetFloatArrayFromJson(const TSharedPtr<FJsonObject>& JsonObject, const FString& FieldName, TArray<float>& OutArray)
+void FSpirrowBridgeCommonUtils::GetFloatArrayFromJson(const TSharedPtr<FJsonObject>& JsonObject, const FString& FieldName, TArray<float>& OutArray)
 {
     OutArray.Reset();
     
@@ -86,7 +86,7 @@ void FUnrealMCPCommonUtils::GetFloatArrayFromJson(const TSharedPtr<FJsonObject>&
     }
 }
 
-FVector2D FUnrealMCPCommonUtils::GetVector2DFromJson(const TSharedPtr<FJsonObject>& JsonObject, const FString& FieldName)
+FVector2D FSpirrowBridgeCommonUtils::GetVector2DFromJson(const TSharedPtr<FJsonObject>& JsonObject, const FString& FieldName)
 {
     FVector2D Result(0.0f, 0.0f);
     
@@ -105,7 +105,7 @@ FVector2D FUnrealMCPCommonUtils::GetVector2DFromJson(const TSharedPtr<FJsonObjec
     return Result;
 }
 
-FVector FUnrealMCPCommonUtils::GetVectorFromJson(const TSharedPtr<FJsonObject>& JsonObject, const FString& FieldName)
+FVector FSpirrowBridgeCommonUtils::GetVectorFromJson(const TSharedPtr<FJsonObject>& JsonObject, const FString& FieldName)
 {
     FVector Result(0.0f, 0.0f, 0.0f);
     
@@ -125,7 +125,7 @@ FVector FUnrealMCPCommonUtils::GetVectorFromJson(const TSharedPtr<FJsonObject>& 
     return Result;
 }
 
-FRotator FUnrealMCPCommonUtils::GetRotatorFromJson(const TSharedPtr<FJsonObject>& JsonObject, const FString& FieldName)
+FRotator FSpirrowBridgeCommonUtils::GetRotatorFromJson(const TSharedPtr<FJsonObject>& JsonObject, const FString& FieldName)
 {
     FRotator Result(0.0f, 0.0f, 0.0f);
     
@@ -146,18 +146,18 @@ FRotator FUnrealMCPCommonUtils::GetRotatorFromJson(const TSharedPtr<FJsonObject>
 }
 
 // Blueprint Utilities
-UBlueprint* FUnrealMCPCommonUtils::FindBlueprint(const FString& BlueprintName)
+UBlueprint* FSpirrowBridgeCommonUtils::FindBlueprint(const FString& BlueprintName)
 {
     return FindBlueprintByName(BlueprintName);
 }
 
-UBlueprint* FUnrealMCPCommonUtils::FindBlueprintByName(const FString& BlueprintName)
+UBlueprint* FSpirrowBridgeCommonUtils::FindBlueprintByName(const FString& BlueprintName)
 {
     FString AssetPath = TEXT("/Game/Blueprints/") + BlueprintName;
     return LoadObject<UBlueprint>(nullptr, *AssetPath);
 }
 
-UEdGraph* FUnrealMCPCommonUtils::FindOrCreateEventGraph(UBlueprint* Blueprint)
+UEdGraph* FSpirrowBridgeCommonUtils::FindOrCreateEventGraph(UBlueprint* Blueprint)
 {
     if (!Blueprint)
     {
@@ -180,7 +180,7 @@ UEdGraph* FUnrealMCPCommonUtils::FindOrCreateEventGraph(UBlueprint* Blueprint)
 }
 
 // Blueprint node utilities
-UK2Node_Event* FUnrealMCPCommonUtils::CreateEventNode(UEdGraph* Graph, const FString& EventName, const FVector2D& Position)
+UK2Node_Event* FSpirrowBridgeCommonUtils::CreateEventNode(UEdGraph* Graph, const FString& EventName, const FVector2D& Position)
 {
     if (!Graph)
     {
@@ -232,7 +232,7 @@ UK2Node_Event* FUnrealMCPCommonUtils::CreateEventNode(UEdGraph* Graph, const FSt
     return EventNode;
 }
 
-UK2Node_CallFunction* FUnrealMCPCommonUtils::CreateFunctionCallNode(UEdGraph* Graph, UFunction* Function, const FVector2D& Position)
+UK2Node_CallFunction* FSpirrowBridgeCommonUtils::CreateFunctionCallNode(UEdGraph* Graph, UFunction* Function, const FVector2D& Position)
 {
     if (!Graph || !Function)
     {
@@ -251,7 +251,7 @@ UK2Node_CallFunction* FUnrealMCPCommonUtils::CreateFunctionCallNode(UEdGraph* Gr
     return FunctionNode;
 }
 
-UK2Node_VariableGet* FUnrealMCPCommonUtils::CreateVariableGetNode(UEdGraph* Graph, UBlueprint* Blueprint, const FString& VariableName, const FVector2D& Position)
+UK2Node_VariableGet* FSpirrowBridgeCommonUtils::CreateVariableGetNode(UEdGraph* Graph, UBlueprint* Blueprint, const FString& VariableName, const FVector2D& Position)
 {
     if (!Graph || !Blueprint)
     {
@@ -278,7 +278,7 @@ UK2Node_VariableGet* FUnrealMCPCommonUtils::CreateVariableGetNode(UEdGraph* Grap
     return nullptr;
 }
 
-UK2Node_VariableSet* FUnrealMCPCommonUtils::CreateVariableSetNode(UEdGraph* Graph, UBlueprint* Blueprint, const FString& VariableName, const FVector2D& Position)
+UK2Node_VariableSet* FSpirrowBridgeCommonUtils::CreateVariableSetNode(UEdGraph* Graph, UBlueprint* Blueprint, const FString& VariableName, const FVector2D& Position)
 {
     if (!Graph || !Blueprint)
     {
@@ -305,7 +305,7 @@ UK2Node_VariableSet* FUnrealMCPCommonUtils::CreateVariableSetNode(UEdGraph* Grap
     return nullptr;
 }
 
-UK2Node_InputAction* FUnrealMCPCommonUtils::CreateInputActionNode(UEdGraph* Graph, const FString& ActionName, const FVector2D& Position)
+UK2Node_InputAction* FSpirrowBridgeCommonUtils::CreateInputActionNode(UEdGraph* Graph, const FString& ActionName, const FVector2D& Position)
 {
     if (!Graph)
     {
@@ -324,7 +324,7 @@ UK2Node_InputAction* FUnrealMCPCommonUtils::CreateInputActionNode(UEdGraph* Grap
     return InputActionNode;
 }
 
-UK2Node_Self* FUnrealMCPCommonUtils::CreateSelfReferenceNode(UEdGraph* Graph, const FVector2D& Position)
+UK2Node_Self* FSpirrowBridgeCommonUtils::CreateSelfReferenceNode(UEdGraph* Graph, const FVector2D& Position)
 {
     if (!Graph)
     {
@@ -342,7 +342,7 @@ UK2Node_Self* FUnrealMCPCommonUtils::CreateSelfReferenceNode(UEdGraph* Graph, co
     return SelfNode;
 }
 
-bool FUnrealMCPCommonUtils::ConnectGraphNodes(UEdGraph* Graph, UEdGraphNode* SourceNode, const FString& SourcePinName, 
+bool FSpirrowBridgeCommonUtils::ConnectGraphNodes(UEdGraph* Graph, UEdGraphNode* SourceNode, const FString& SourcePinName, 
                                            UEdGraphNode* TargetNode, const FString& TargetPinName)
 {
     if (!Graph || !SourceNode || !TargetNode)
@@ -362,7 +362,7 @@ bool FUnrealMCPCommonUtils::ConnectGraphNodes(UEdGraph* Graph, UEdGraphNode* Sou
     return false;
 }
 
-UEdGraphPin* FUnrealMCPCommonUtils::FindPin(UEdGraphNode* Node, const FString& PinName, EEdGraphPinDirection Direction)
+UEdGraphPin* FSpirrowBridgeCommonUtils::FindPin(UEdGraphNode* Node, const FString& PinName, EEdGraphPinDirection Direction)
 {
     if (!Node)
     {
@@ -418,7 +418,7 @@ UEdGraphPin* FUnrealMCPCommonUtils::FindPin(UEdGraphNode* Node, const FString& P
 }
 
 // Actor utilities
-TSharedPtr<FJsonValue> FUnrealMCPCommonUtils::ActorToJson(AActor* Actor)
+TSharedPtr<FJsonValue> FSpirrowBridgeCommonUtils::ActorToJson(AActor* Actor)
 {
     if (!Actor)
     {
@@ -453,7 +453,7 @@ TSharedPtr<FJsonValue> FUnrealMCPCommonUtils::ActorToJson(AActor* Actor)
     return MakeShared<FJsonValueObject>(ActorObject);
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPCommonUtils::ActorToJsonObject(AActor* Actor, bool bDetailed)
+TSharedPtr<FJsonObject> FSpirrowBridgeCommonUtils::ActorToJsonObject(AActor* Actor, bool bDetailed)
 {
     if (!Actor)
     {
@@ -488,7 +488,7 @@ TSharedPtr<FJsonObject> FUnrealMCPCommonUtils::ActorToJsonObject(AActor* Actor, 
     return ActorObject;
 }
 
-UK2Node_Event* FUnrealMCPCommonUtils::FindExistingEventNode(UEdGraph* Graph, const FString& EventName)
+UK2Node_Event* FSpirrowBridgeCommonUtils::FindExistingEventNode(UEdGraph* Graph, const FString& EventName)
 {
     if (!Graph)
     {
@@ -509,7 +509,7 @@ UK2Node_Event* FUnrealMCPCommonUtils::FindExistingEventNode(UEdGraph* Graph, con
     return nullptr;
 }
 
-bool FUnrealMCPCommonUtils::SetObjectProperty(UObject* Object, const FString& PropertyName, 
+bool FSpirrowBridgeCommonUtils::SetObjectProperty(UObject* Object, const FString& PropertyName, 
                                      const TSharedPtr<FJsonValue>& Value, FString& OutErrorMessage)
 {
     if (!Object)

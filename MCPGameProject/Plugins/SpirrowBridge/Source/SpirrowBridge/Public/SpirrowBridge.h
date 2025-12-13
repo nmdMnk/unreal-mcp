@@ -8,29 +8,29 @@
 #include "Json.h"
 #include "Interfaces/IPv4/IPv4Address.h"
 #include "Interfaces/IPv4/IPv4Endpoint.h"
-#include "Commands/UnrealMCPEditorCommands.h"
-#include "Commands/UnrealMCPBlueprintCommands.h"
-#include "Commands/UnrealMCPBlueprintNodeCommands.h"
-#include "Commands/UnrealMCPProjectCommands.h"
-#include "Commands/UnrealMCPUMGCommands.h"
-#include "UnrealMCPBridge.generated.h"
+#include "Commands/SpirrowBridgeEditorCommands.h"
+#include "Commands/SpirrowBridgeBlueprintCommands.h"
+#include "Commands/SpirrowBridgeBlueprintNodeCommands.h"
+#include "Commands/SpirrowBridgeProjectCommands.h"
+#include "Commands/SpirrowBridgeUMGCommands.h"
+#include "SpirrowBridge.generated.h"
 
 class FMCPServerRunnable;
 
 /**
- * Editor subsystem for MCP Bridge
+ * Editor subsystem for Spirrow Bridge
  * Handles communication between external tools and the Unreal Editor
  * through a TCP socket connection. Commands are received as JSON and
  * routed to appropriate command handlers.
  */
 UCLASS()
-class UNREALMCP_API UUnrealMCPBridge : public UEditorSubsystem
+class SPIRROWBRIDGE_API USpirrowBridge : public UEditorSubsystem
 {
 	GENERATED_BODY()
 
 public:
-	UUnrealMCPBridge();
-	virtual ~UUnrealMCPBridge();
+	USpirrowBridge();
+	virtual ~USpirrowBridge();
 
 	// UEditorSubsystem implementation
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
@@ -56,9 +56,9 @@ private:
 	uint16 Port;
 
 	// Command handler instances
-	TSharedPtr<FUnrealMCPEditorCommands> EditorCommands;
-	TSharedPtr<FUnrealMCPBlueprintCommands> BlueprintCommands;
-	TSharedPtr<FUnrealMCPBlueprintNodeCommands> BlueprintNodeCommands;
-	TSharedPtr<FUnrealMCPProjectCommands> ProjectCommands;
-	TSharedPtr<FUnrealMCPUMGCommands> UMGCommands;
+	TSharedPtr<FSpirrowBridgeEditorCommands> EditorCommands;
+	TSharedPtr<FSpirrowBridgeBlueprintCommands> BlueprintCommands;
+	TSharedPtr<FSpirrowBridgeBlueprintNodeCommands> BlueprintNodeCommands;
+	TSharedPtr<FSpirrowBridgeProjectCommands> ProjectCommands;
+	TSharedPtr<FSpirrowBridgeUMGCommands> UMGCommands;
 }; 

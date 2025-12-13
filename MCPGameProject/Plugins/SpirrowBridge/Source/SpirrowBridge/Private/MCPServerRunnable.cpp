@@ -1,5 +1,5 @@
 #include "MCPServerRunnable.h"
-#include "UnrealMCPBridge.h"
+#include "SpirrowBridge.h"
 #include "Sockets.h"
 #include "SocketSubsystem.h"
 #include "Interfaces/IPv4/IPv4Address.h"
@@ -14,7 +14,7 @@
 // Buffer size for receiving data
 const int32 BufferSize = 8192;
 
-FMCPServerRunnable::FMCPServerRunnable(UUnrealMCPBridge* InBridge, TSharedPtr<FSocket> InListenerSocket)
+FMCPServerRunnable::FMCPServerRunnable(USpirrowBridge* InBridge, TSharedPtr<FSocket> InListenerSocket)
     : Bridge(InBridge)
     , ListenerSocket(InListenerSocket)
     , bRunning(true)

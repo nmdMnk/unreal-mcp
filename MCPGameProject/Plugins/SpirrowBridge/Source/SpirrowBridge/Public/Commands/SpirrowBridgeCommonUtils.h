@@ -18,9 +18,9 @@ class UK2Node_Self;
 class UFunction;
 
 /**
- * Common utilities for UnrealMCP commands
+ * Common utilities for SpirrowBridge commands
  */
-class UNREALMCP_API FUnrealMCPCommonUtils
+class SPIRROWBRIDGE_API FSpirrowBridgeCommonUtils
 {
 public:
     // JSON utilities

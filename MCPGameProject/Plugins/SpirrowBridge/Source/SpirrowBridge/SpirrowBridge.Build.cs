@@ -2,9 +2,9 @@
 
 using UnrealBuildTool;
 
-public class UnrealMCP : ModuleRules
+public class SpirrowBridge : ModuleRules
 {
-	public UnrealMCP(ReadOnlyTargetRules Target) : base(Target)
+	public SpirrowBridge(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		// Use IWYUSupport instead of the deprecated bEnforceIWYU in UE5.5
@@ -29,6 +29,7 @@ public class UnrealMCP : ModuleRules
 				"CoreUObject",
 				"Engine",
 				"InputCore",
+				"EnhancedInput",
 				"Networking",
 				"Sockets",
 				"HTTP",

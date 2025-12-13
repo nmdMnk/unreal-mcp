@@ -2,10 +2,10 @@
 	"FileVersion": 3,
 	"Version": 1,
 	"VersionName": "1.0",
-	"FriendlyName": "UnrealMCP",
-	"Description": "Model Context Protocol implementation for Unreal Engine",
+	"FriendlyName": "SpirrowBridge",
+	"Description": "Spirrow-UnrealWise Bridge - Model Context Protocol implementation for Unreal Engine",
 	"Category": "Editor",
-	"CreatedBy": "Your Name",
+	"CreatedBy": "SpirrowGames",
 	"CreatedByURL": "",
 	"DocsURL": "",
 	"MarketplaceURL": "",
@@ -16,7 +16,7 @@
 	"Installed": false,
 	"Modules": [
 		{
-			"Name": "UnrealMCP",
+			"Name": "SpirrowBridge",
 			"Type": "Editor",
 			"LoadingPhase": "Default",
 			"WhitelistPlatforms": [

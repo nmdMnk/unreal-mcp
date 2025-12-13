@@ -9,7 +9,7 @@ from typing import Dict, List, Any, Optional
 from mcp.server.fastmcp import FastMCP, Context
 
 # Get logger
-logger = logging.getLogger("UnrealMCP")
+logger = logging.getLogger("SpirrowBridge")
 
 def register_blueprint_node_tools(mcp: FastMCP):
     """Register Blueprint node manipulation tools with the MCP server."""

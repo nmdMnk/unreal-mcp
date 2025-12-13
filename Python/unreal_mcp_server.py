@@ -21,7 +21,7 @@ logging.basicConfig(
         # logging.StreamHandler(sys.stdout) # Remove this handler to unexpected non-whitespace characters in JSON
     ]
 )
-logger = logging.getLogger("UnrealMCP")
+logger = logging.getLogger("SpirrowBridge")
 
 # Configuration
 UNREAL_HOST = "127.0.0.1"
@@ -239,7 +239,7 @@ def get_unreal_connection() -> Optional[UnrealConnection]:
 async def server_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
     """Handle server startup and shutdown."""
     global _unreal_connection
-    logger.info("UnrealMCP server starting up")
+    logger.info("SpirrowBridge server starting up")
     try:
         _unreal_connection = get_unreal_connection()
         if _unreal_connection:
@@ -260,7 +260,7 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
 
 # Initialize server
 mcp = FastMCP(
-    "UnrealMCP",
+    "SpirrowBridge",
     lifespan=server_lifespan
 )
 

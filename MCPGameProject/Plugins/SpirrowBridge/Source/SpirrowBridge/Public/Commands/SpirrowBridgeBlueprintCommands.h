@@ -6,10 +6,10 @@
 /**
  * Handler class for Blueprint-related MCP commands
  */
-class UNREALMCP_API FUnrealMCPBlueprintCommands
+class SPIRROWBRIDGE_API FSpirrowBridgeBlueprintCommands
 {
 public:
-    FUnrealMCPBlueprintCommands();
+    FSpirrowBridgeBlueprintCommands();
 
     // Handle blueprint commands
     TSharedPtr<FJsonObject> HandleCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params);

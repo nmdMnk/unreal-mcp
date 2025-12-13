@@ -7,10 +7,10 @@
  * Handler class for Editor-related MCP commands
  * Handles viewport control, actor manipulation, and level management
  */
-class UNREALMCP_API FUnrealMCPEditorCommands
+class SPIRROWBRIDGE_API FSpirrowBridgeEditorCommands
 {
 public:
-    FUnrealMCPEditorCommands();
+    FSpirrowBridgeEditorCommands();
 
     // Handle editor commands
     TSharedPtr<FJsonObject> HandleCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params);

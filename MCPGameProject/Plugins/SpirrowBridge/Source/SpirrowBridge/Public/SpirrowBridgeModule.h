@@ -3,20 +3,20 @@
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
 
-class FUnrealMCPModule : public IModuleInterface
+class FSpirrowBridgeModule : public IModuleInterface
 {
 public:
 	/** IModuleInterface implementation */
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
 
-	static inline FUnrealMCPModule& Get()
+	static inline FSpirrowBridgeModule& Get()
 	{
-		return FModuleManager::LoadModuleChecked<FUnrealMCPModule>("UnrealMCP");
+		return FModuleManager::LoadModuleChecked<FSpirrowBridgeModule>("SpirrowBridge");
 	}
 
 	static inline bool IsAvailable()
 	{
-		return FModuleManager::Get().IsModuleLoaded("UnrealMCP");
+		return FModuleManager::Get().IsModuleLoaded("SpirrowBridge");
 	}
 }; 

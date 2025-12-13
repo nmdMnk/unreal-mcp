@@ -1,4 +1,4 @@
-#include "UnrealMCPBridge.h"
+#include "SpirrowBridge.h"
 #include "MCPServerRunnable.h"
 #include "Sockets.h"
 #include "SocketSubsystem.h"
@@ -51,27 +51,27 @@
 #include "EditorSubsystem.h"
 #include "Subsystems/EditorActorSubsystem.h"
 // Include our new command handler classes
-#include "Commands/UnrealMCPEditorCommands.h"
-#include "Commands/UnrealMCPBlueprintCommands.h"
-#include "Commands/UnrealMCPBlueprintNodeCommands.h"
-#include "Commands/UnrealMCPProjectCommands.h"
-#include "Commands/UnrealMCPCommonUtils.h"
-#include "Commands/UnrealMCPUMGCommands.h"
+#include "Commands/SpirrowBridgeEditorCommands.h"
+#include "Commands/SpirrowBridgeBlueprintCommands.h"
+#include "Commands/SpirrowBridgeBlueprintNodeCommands.h"
+#include "Commands/SpirrowBridgeProjectCommands.h"
+#include "Commands/SpirrowBridgeCommonUtils.h"
+#include "Commands/SpirrowBridgeUMGCommands.h"
 
 // Default settings
 #define MCP_SERVER_HOST "127.0.0.1"
 #define MCP_SERVER_PORT 55557
 
-UUnrealMCPBridge::UUnrealMCPBridge()
+USpirrowBridge::USpirrowBridge()
 {
-    EditorCommands = MakeShared<FUnrealMCPEditorCommands>();
-    BlueprintCommands = MakeShared<FUnrealMCPBlueprintCommands>();
-    BlueprintNodeCommands = MakeShared<FUnrealMCPBlueprintNodeCommands>();
-    ProjectCommands = MakeShared<FUnrealMCPProjectCommands>();
-    UMGCommands = MakeShared<FUnrealMCPUMGCommands>();
+    EditorCommands = MakeShared<FSpirrowBridgeEditorCommands>();
+    BlueprintCommands = MakeShared<FSpirrowBridgeBlueprintCommands>();
+    BlueprintNodeCommands = MakeShared<FSpirrowBridgeBlueprintNodeCommands>();
+    ProjectCommands = MakeShared<FSpirrowBridgeProjectCommands>();
+    UMGCommands = MakeShared<FSpirrowBridgeUMGCommands>();
 }
 
-UUnrealMCPBridge::~UUnrealMCPBridge()
+USpirrowBridge::~USpirrowBridge()
 {
     EditorCommands.Reset();
     BlueprintCommands.Reset();
@@ -81,9 +81,9 @@ UUnrealMCPBridge::~UUnrealMCPBridge()
 }
 
 // Initialize subsystem
-void UUnrealMCPBridge::Initialize(FSubsystemCollectionBase& Collection)
+void USpirrowBridge::Initialize(FSubsystemCollectionBase& Collection)
 {
-    UE_LOG(LogTemp, Display, TEXT("UnrealMCPBridge: Initializing"));
+    UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Initializing"));
     
     bIsRunning = false;
     ListenerSocket = nullptr;
@@ -97,18 +97,18 @@ void UUnrealMCPBridge::Initialize(FSubsystemCollectionBase& Collection)
 }
 
 // Clean up resources when subsystem is destroyed
-void UUnrealMCPBridge::Deinitialize()
+void USpirrowBridge::Deinitialize()
 {
-    UE_LOG(LogTemp, Display, TEXT("UnrealMCPBridge: Shutting down"));
+    UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Shutting down"));
     StopServer();
 }
 
 // Start the MCP server
-void UUnrealMCPBridge::StartServer()
+void USpirrowBridge::StartServer()
 {
     if (bIsRunning)
     {
-        UE_LOG(LogTemp, Warning, TEXT("UnrealMCPBridge: Server is already running"));
+        UE_LOG(LogTemp, Warning, TEXT("SpirrowBridge: Server is already running"));
         return;
     }
 
@@ -116,7 +116,7 @@ void UUnrealMCPBridge::StartServer()
     ISocketSubsystem* SocketSubsystem = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
     if (!SocketSubsystem)
     {
-        UE_LOG(LogTemp, Error, TEXT("UnrealMCPBridge: Failed to get socket subsystem"));
+        UE_LOG(LogTemp, Error, TEXT("SpirrowBridge: Failed to get socket subsystem"));
         return;
     }
 
@@ -124,7 +124,7 @@ void UUnrealMCPBridge::StartServer()
     TSharedPtr<FSocket> NewListenerSocket = MakeShareable(SocketSubsystem->CreateSocket(NAME_Stream, TEXT("UnrealMCPListener"), false));
     if (!NewListenerSocket.IsValid())
     {
-        UE_LOG(LogTemp, Error, TEXT("UnrealMCPBridge: Failed to create listener socket"));
+        UE_LOG(LogTemp, Error, TEXT("SpirrowBridge: Failed to create listener socket"));
         return;
     }
 
@@ -136,20 +136,20 @@ void UUnrealMCPBridge::StartServer()
     FIPv4Endpoint Endpoint(ServerAddress, Port);
     if (!NewListenerSocket->Bind(*Endpoint.ToInternetAddr()))
     {
-        UE_LOG(LogTemp, Error, TEXT("UnrealMCPBridge: Failed to bind listener socket to %s:%d"), *ServerAddress.ToString(), Port);
+        UE_LOG(LogTemp, Error, TEXT("SpirrowBridge: Failed to bind listener socket to %s:%d"), *ServerAddress.ToString(), Port);
         return;
     }
 
     // Start listening
     if (!NewListenerSocket->Listen(5))
     {
-        UE_LOG(LogTemp, Error, TEXT("UnrealMCPBridge: Failed to start listening"));
+        UE_LOG(LogTemp, Error, TEXT("SpirrowBridge: Failed to start listening"));
         return;
     }
 
     ListenerSocket = NewListenerSocket;
     bIsRunning = true;
-    UE_LOG(LogTemp, Display, TEXT("UnrealMCPBridge: Server started on %s:%d"), *ServerAddress.ToString(), Port);
+    UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Server started on %s:%d"), *ServerAddress.ToString(), Port);
 
     // Start server thread
     ServerThread = FRunnableThread::Create(
@@ -160,14 +160,14 @@ void UUnrealMCPBridge::StartServer()
 
     if (!ServerThread)
     {
-        UE_LOG(LogTemp, Error, TEXT("UnrealMCPBridge: Failed to create server thread"));
+        UE_LOG(LogTemp, Error, TEXT("SpirrowBridge: Failed to create server thread"));
         StopServer();
         return;
     }
 }
 
 // Stop the MCP server
-void UUnrealMCPBridge::StopServer()
+void USpirrowBridge::StopServer()
 {
     if (!bIsRunning)
     {
@@ -197,13 +197,13 @@ void UUnrealMCPBridge::StopServer()
         ListenerSocket.Reset();
     }
 
-    UE_LOG(LogTemp, Display, TEXT("UnrealMCPBridge: Server stopped"));
+    UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Server stopped"));
 }
 
 // Execute a command received from a client
-FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params)
+FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TSharedPtr<FJsonObject>& Params)
 {
-    UE_LOG(LogTemp, Display, TEXT("UnrealMCPBridge: Executing command: %s"), *CommandType);
+    UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Executing command: %s"), *CommandType);
     
     // Create a promise to wait for the result
     TPromise<FString> Promise;
@@ -264,7 +264,10 @@ FString UUnrealMCPBridge::ExecuteCommand(const FString& CommandType, const TShar
                 ResultJson = BlueprintNodeCommands->HandleCommand(CommandType, Params);
             }
             // Project Commands
-            else if (CommandType == TEXT("create_input_mapping"))
+            else if (CommandType == TEXT("create_input_mapping") ||
+                     CommandType == TEXT("create_input_action") ||
+                     CommandType == TEXT("create_input_mapping_context") ||
+                     CommandType == TEXT("add_action_to_mapping_context"))
             {
                 ResultJson = ProjectCommands->HandleCommand(CommandType, Params);
             }

@@ -5,7 +5,7 @@
 #include "Sockets.h"
 #include "Interfaces/IPv4/IPv4Address.h"
 
-class UUnrealMCPBridge;
+class USpirrowBridge;
 
 /**
  * Runnable class for the MCP server thread
@@ -13,7 +13,7 @@ class UUnrealMCPBridge;
 class FMCPServerRunnable : public FRunnable
 {
 public:
-	FMCPServerRunnable(UUnrealMCPBridge* InBridge, TSharedPtr<FSocket> InListenerSocket);
+	FMCPServerRunnable(USpirrowBridge* InBridge, TSharedPtr<FSocket> InListenerSocket);
 	virtual ~FMCPServerRunnable();
 
 	// FRunnable interface
@@ -27,7 +27,7 @@ protected:
 	void ProcessMessage(TSharedPtr<FSocket> Client, const FString& Message);
 
 private:
-	UUnrealMCPBridge* Bridge;
+	USpirrowBridge* Bridge;
 	TSharedPtr<FSocket> ListenerSocket;
 	TSharedPtr<FSocket> ClientSocket;
 	bool bRunning;
