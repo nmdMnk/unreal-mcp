@@ -1004,12 +1004,47 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleSetBlueprintPrope
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
     }
 
+    // === DEBUG: Log class hierarchy ===
+    UE_LOG(LogTemp, Warning, TEXT("=== SetBlueprintProperty Debug ==="));
+    UE_LOG(LogTemp, Warning, TEXT("Blueprint: %s"), *BlueprintName);
+    UE_LOG(LogTemp, Warning, TEXT("GeneratedClass: %s"), Blueprint->GeneratedClass ? *Blueprint->GeneratedClass->GetName() : TEXT("NULL"));
+
+    if (Blueprint->GeneratedClass)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Class Hierarchy:"));
+        UClass* CurrentClass = Blueprint->GeneratedClass;
+        int32 Depth = 0;
+        while (CurrentClass && Depth < 10)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("  [%d] %s"), Depth, *CurrentClass->GetName());
+            CurrentClass = CurrentClass->GetSuperClass();
+            Depth++;
+        }
+    }
+    // === END DEBUG ===
+
     // Get the default object
     UObject* DefaultObject = Blueprint->GeneratedClass->GetDefaultObject();
     if (!DefaultObject)
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get default object"));
     }
+
+    // === DEBUG: Log DefaultObject info ===
+    UE_LOG(LogTemp, Warning, TEXT("DefaultObject Class: %s"), *DefaultObject->GetClass()->GetName());
+    UE_LOG(LogTemp, Warning, TEXT("Looking for property: %s"), *PropertyName);
+
+    // List ALL properties including inherited ones
+    UE_LOG(LogTemp, Warning, TEXT("All properties (including inherited):"));
+    for (TFieldIterator<FProperty> PropIt(DefaultObject->GetClass(), EFieldIteratorFlags::IncludeSuper); PropIt; ++PropIt)
+    {
+        FProperty* Prop = *PropIt;
+        UE_LOG(LogTemp, Warning, TEXT("  - %s (%s) [Owner: %s]"),
+            *Prop->GetName(),
+            *Prop->GetCPPType(),
+            *Prop->GetOwnerClass()->GetName());
+    }
+    // === END DEBUG ===
 
     // Set the property value
     if (Params->HasField(TEXT("property_value")))
