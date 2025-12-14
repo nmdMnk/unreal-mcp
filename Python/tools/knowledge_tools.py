@@ -311,8 +311,11 @@ def register_knowledge_tools(mcp):
                                 })
 
                                 if response:
+                                    # レスポンスから result を取得
+                                    data = response.get("result", response)
+
                                     # C++クラス
-                                    for cls in response.get("cpp_classes", []):
+                                    for cls in data.get("cpp_classes", []):
                                         if cls["path"] not in seen_paths:
                                             seen_paths.add(cls["path"])
                                             all_matches.append({
@@ -324,7 +327,7 @@ def register_knowledge_tools(mcp):
                                             })
 
                                     # Blueprint
-                                    for bp in response.get("blueprints", []):
+                                    for bp in data.get("blueprints", []):
                                         if bp["path"] not in seen_paths:
                                             seen_paths.add(bp["path"])
                                             all_matches.append({
@@ -343,7 +346,10 @@ def register_knowledge_tools(mcp):
                             })
 
                             if response:
-                                for cls in response.get("cpp_classes", []):
+                                # レスポンスから result を取得
+                                data = response.get("result", response)
+
+                                for cls in data.get("cpp_classes", []):
                                     all_matches.append({
                                         "name": cls["name"],
                                         "path": cls["path"],
