@@ -58,22 +58,86 @@ Write-Host "  MCP SERVER IS NOW RUNNING" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Press Ctrl+C to stop the server" -ForegroundColor Cyan
+Write-Host "Note: If shutdown hangs, wait 5 seconds for automatic force kill" -ForegroundColor Yellow
 Write-Host ""
+
+# Create a job to run the server with timeout on shutdown
+$serverJob = Start-Job -ScriptBlock {
+    param($pythonDir)
+    Set-Location $pythonDir
+    & uv run unreal_mcp_server.py
+} -ArgumentList $pythonDir
 
 try {
-    uv run unreal_mcp_server.py
+    # Monitor the job and display output
+    while ($serverJob.State -eq 'Running') {
+        $jobOutput = Receive-Job -Job $serverJob
+        if ($jobOutput) {
+            Write-Host $jobOutput
+        }
+        Start-Sleep -Milliseconds 100
+    }
+
+    # Get final output
+    $finalOutput = Receive-Job -Job $serverJob
+    if ($finalOutput) {
+        Write-Host $finalOutput
+    }
+
+    # Check if job failed
+    if ($serverJob.State -eq 'Failed') {
+        $error = $serverJob.ChildJobs[0].JobStateInfo.Reason
+        throw $error
+    }
 }
 catch {
+    # Handle Ctrl+C or other interruptions
     Write-Host ""
-    Write-Host "========================================" -ForegroundColor Red
-    Write-Host "  ERROR: MCP Server Failed" -ForegroundColor Red
-    Write-Host "========================================" -ForegroundColor Red
-    Write-Host $_.Exception.Message -ForegroundColor Red
-    Write-Host ""
-    Read-Host "Press Enter to exit"
-}
+    Write-Host "Shutdown signal received..." -ForegroundColor Yellow
 
-Write-Host ""
-Write-Host "========================================" -ForegroundColor Yellow
-Write-Host "  MCP Server Stopped" -ForegroundColor Yellow
-Write-Host "========================================" -ForegroundColor Yellow
+    # Try to stop the job gracefully with 5 second timeout
+    Write-Host "Attempting graceful shutdown (5 second timeout)..." -ForegroundColor Yellow
+    Stop-Job -Job $serverJob
+
+    $timeout = 5
+    $elapsed = 0
+    while ($serverJob.State -eq 'Running' -and $elapsed -lt $timeout) {
+        Start-Sleep -Seconds 1
+        $elapsed++
+        Write-Host "." -NoNewline -ForegroundColor Gray
+    }
+
+    if ($serverJob.State -eq 'Running') {
+        Write-Host ""
+        Write-Host "Graceful shutdown timeout - force killing process..." -ForegroundColor Red
+
+        # Force kill any uv or python processes related to our server
+        Get-Process | Where-Object {
+            $_.ProcessName -like "*uv*" -or
+            ($_.ProcessName -like "*python*" -and $_.CommandLine -like "*unreal_mcp_server*")
+        } | ForEach-Object {
+            Write-Host "Killing process: $($_.ProcessName) (PID: $($_.Id))" -ForegroundColor Red
+            Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+        }
+    } else {
+        Write-Host ""
+        Write-Host "Graceful shutdown completed" -ForegroundColor Green
+    }
+
+    # Output any remaining job output
+    $remainingOutput = Receive-Job -Job $serverJob -ErrorAction SilentlyContinue
+    if ($remainingOutput) {
+        Write-Host $remainingOutput
+    }
+}
+finally {
+    # Always cleanup the job
+    if ($serverJob) {
+        Remove-Job -Job $serverJob -Force -ErrorAction SilentlyContinue
+    }
+
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Yellow
+    Write-Host "  MCP Server Stopped" -ForegroundColor Yellow
+    Write-Host "========================================" -ForegroundColor Yellow
+}

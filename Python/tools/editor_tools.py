@@ -221,41 +221,84 @@ def register_editor_tools(mcp: FastMCP):
         name: str,
         property_name: str,
         property_value,
+        component_name: str = None,
     ) -> Dict[str, Any]:
         """
-        Set a property on an actor.
-        
+        Set a property on an actor or its component.
+
         Args:
             name: Name of the actor
             property_name: Name of the property to set
             property_value: Value to set the property to
-            
+            component_name: Optional name of the component (e.g., "StaticMeshComponent0").
+                           If not provided, sets property on the actor itself.
+
         Returns:
             Dict containing response from Unreal with operation status
         """
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             unreal = get_unreal_connection()
             if not unreal:
                 logger.error("Failed to connect to Unreal Engine")
                 return {"success": False, "message": "Failed to connect to Unreal Engine"}
-                
-            response = unreal.send_command("set_actor_property", {
+
+            params = {
                 "name": name,
                 "property_name": property_name,
                 "property_value": property_value
-            })
-            
+            }
+
+            # Add component_name if provided
+            if component_name:
+                params["component_name"] = component_name
+
+            response = unreal.send_command("set_actor_property", params)
+
             if not response:
                 logger.error("No response from Unreal Engine")
                 return {"success": False, "message": "No response from Unreal Engine"}
-            
+
             logger.info(f"Set actor property response: {response}")
             return response
-            
+
         except Exception as e:
             error_msg = f"Error setting actor property: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def get_actor_components(ctx: Context, name: str) -> Dict[str, Any]:
+        """
+        Get all components of an actor.
+
+        Args:
+            name: Name of the actor
+
+        Returns:
+            Dict containing list of components with their names and types
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            response = unreal.send_command("get_actor_components", {
+                "name": name
+            })
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            return response
+
+        except Exception as e:
+            error_msg = f"Error getting actor components: {e}"
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 

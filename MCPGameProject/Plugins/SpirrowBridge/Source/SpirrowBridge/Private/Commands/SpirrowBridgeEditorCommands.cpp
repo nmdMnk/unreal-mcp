@@ -60,6 +60,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleCommand(const FStrin
     {
         return HandleSetActorProperty(Params);
     }
+    else if (CommandType == TEXT("get_actor_components"))
+    {
+        return HandleGetActorComponents(Params);
+    }
     // Blueprint actor spawning
     else if (CommandType == TEXT("spawn_blueprint_actor"))
     {
@@ -346,7 +350,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSetActorProperty(con
     AActor* TargetActor = nullptr;
     TArray<AActor*> AllActors;
     UGameplayStatics::GetAllActorsOfClass(GWorld, AActor::StaticClass(), AllActors);
-    
+
     for (AActor* Actor : AllActors)
     {
         if (Actor && Actor->GetName() == ActorName)
@@ -373,19 +377,68 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSetActorProperty(con
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'property_value' parameter"));
     }
-    
+
     TSharedPtr<FJsonValue> PropertyValue = Params->Values.FindRef(TEXT("property_value"));
-    
+
+    // Check if we're targeting a component
+    FString ComponentName;
+    UObject* TargetObject = TargetActor;
+
+    if (Params->TryGetStringField(TEXT("component_name"), ComponentName))
+    {
+        // Find the component by name
+        UActorComponent* FoundComponent = nullptr;
+
+        TArray<UActorComponent*> Components;
+        TargetActor->GetComponents(Components);
+
+        for (UActorComponent* Component : Components)
+        {
+            if (Component && Component->GetName() == ComponentName)
+            {
+                FoundComponent = Component;
+                break;
+            }
+        }
+
+        if (!FoundComponent)
+        {
+            // Log available components for debugging
+            FString AvailableComponents;
+            for (UActorComponent* Component : Components)
+            {
+                if (Component)
+                {
+                    if (!AvailableComponents.IsEmpty())
+                    {
+                        AvailableComponents += TEXT(", ");
+                    }
+                    AvailableComponents += Component->GetName();
+                }
+            }
+
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                FString::Printf(TEXT("Component '%s' not found on actor '%s'. Available components: %s"),
+                    *ComponentName, *ActorName, *AvailableComponents));
+        }
+
+        TargetObject = FoundComponent;
+    }
+
     // Set the property using our utility function
     FString ErrorMessage;
-    if (FSpirrowBridgeCommonUtils::SetObjectProperty(TargetActor, PropertyName, PropertyValue, ErrorMessage))
+    if (FSpirrowBridgeCommonUtils::SetObjectProperty(TargetObject, PropertyName, PropertyValue, ErrorMessage))
     {
         // Property set successfully
         TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
         ResultObj->SetStringField(TEXT("actor"), ActorName);
+        if (!ComponentName.IsEmpty())
+        {
+            ResultObj->SetStringField(TEXT("component"), ComponentName);
+        }
         ResultObj->SetStringField(TEXT("property"), PropertyName);
         ResultObj->SetBoolField(TEXT("success"), true);
-        
+
         // Also include the full actor details
         ResultObj->SetObjectField(TEXT("actor_details"), FSpirrowBridgeCommonUtils::ActorToJsonObject(TargetActor, true));
         return ResultObj;
@@ -609,4 +662,68 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleTakeScreenshot(const
     }
     
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to take screenshot"));
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleGetActorComponents(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get actor name
+    FString ActorName;
+    if (!Params->TryGetStringField(TEXT("name"), ActorName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+    }
+
+    // Find the actor
+    AActor* TargetActor = nullptr;
+    TArray<AActor*> AllActors;
+    UGameplayStatics::GetAllActorsOfClass(GWorld, AActor::StaticClass(), AllActors);
+
+    for (AActor* Actor : AllActors)
+    {
+        if (Actor && Actor->GetName() == ActorName)
+        {
+            TargetActor = Actor;
+            break;
+        }
+    }
+
+    if (!TargetActor)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+    }
+
+    // Get all components
+    TArray<UActorComponent*> Components;
+    TargetActor->GetComponents(Components);
+
+    TArray<TSharedPtr<FJsonValue>> ComponentArray;
+    for (UActorComponent* Component : Components)
+    {
+        if (Component)
+        {
+            TSharedPtr<FJsonObject> ComponentObj = MakeShared<FJsonObject>();
+            ComponentObj->SetStringField(TEXT("name"), Component->GetName());
+            ComponentObj->SetStringField(TEXT("class"), Component->GetClass()->GetName());
+
+            // Add scene component specific info
+            if (USceneComponent* SceneComp = Cast<USceneComponent>(Component))
+            {
+                FVector Location = SceneComp->GetRelativeLocation();
+                TArray<TSharedPtr<FJsonValue>> LocationArray;
+                LocationArray.Add(MakeShared<FJsonValueNumber>(Location.X));
+                LocationArray.Add(MakeShared<FJsonValueNumber>(Location.Y));
+                LocationArray.Add(MakeShared<FJsonValueNumber>(Location.Z));
+                ComponentObj->SetArrayField(TEXT("relative_location"), LocationArray);
+            }
+
+            ComponentArray.Add(MakeShared<FJsonValueObject>(ComponentObj));
+        }
+    }
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetStringField(TEXT("actor"), ActorName);
+    ResultObj->SetArrayField(TEXT("components"), ComponentArray);
+    ResultObj->SetNumberField(TEXT("count"), ComponentArray.Num());
+
+    return ResultObj;
 } 
