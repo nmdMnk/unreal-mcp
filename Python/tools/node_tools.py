@@ -20,7 +20,8 @@ def register_blueprint_node_tools(mcp: FastMCP):
         blueprint_name: str,
         event_name: str,
         node_position = None,
-        path: str = "/Game/Blueprints"
+        path: str = "/Game/Blueprints",
+        rationale: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Add an event node to a Blueprint's event graph.
@@ -33,11 +34,13 @@ def register_blueprint_node_tools(mcp: FastMCP):
                        - etc.
             node_position: Optional [X, Y] position in the graph
             path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+            rationale: Design rationale - why this event is being used (auto-saved to knowledge base)
 
         Returns:
             Response containing the node ID and success status
         """
         from unreal_mcp_server import get_unreal_connection
+        from tools.rag_tools import record_rationale
 
         try:
             # Handle default value within the method body
@@ -58,11 +61,23 @@ def register_blueprint_node_tools(mcp: FastMCP):
             
             logger.info(f"Adding event node '{event_name}' to blueprint '{blueprint_name}'")
             response = unreal.send_command("add_blueprint_event_node", params)
-            
+
             if not response:
                 logger.error("No response from Unreal Engine")
                 return {"success": False, "message": "No response from Unreal Engine"}
-            
+
+            # Record rationale if provided and operation was successful
+            if response.get("success", True) and rationale:
+                record_rationale(
+                    action="add_blueprint_event_node",
+                    details={
+                        "blueprint_name": blueprint_name,
+                        "event_name": event_name
+                    },
+                    rationale=rationale,
+                    category="blueprint_event"
+                )
+
             logger.info(f"Event node creation response: {response}")
             return response
             
@@ -133,7 +148,8 @@ def register_blueprint_node_tools(mcp: FastMCP):
         function_name: str,
         params = None,
         node_position = None,
-        path: str = "/Game/Blueprints"
+        path: str = "/Game/Blueprints",
+        rationale: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Add a function call node to a Blueprint's event graph.
@@ -145,11 +161,13 @@ def register_blueprint_node_tools(mcp: FastMCP):
             params: Optional parameters to set on the function node
             node_position: Optional [X, Y] position in the graph
             path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+            rationale: Design rationale - why this function is being used (auto-saved to knowledge base)
 
         Returns:
             Response containing the node ID and success status
         """
         from unreal_mcp_server import get_unreal_connection
+        from tools.rag_tools import record_rationale
 
         try:
             # Handle default values within the method body
@@ -174,11 +192,24 @@ def register_blueprint_node_tools(mcp: FastMCP):
             
             logger.info(f"Adding function node '{function_name}' to blueprint '{blueprint_name}'")
             response = unreal.send_command("add_blueprint_function_node", command_params)
-            
+
             if not response:
                 logger.error("No response from Unreal Engine")
                 return {"success": False, "message": "No response from Unreal Engine"}
-            
+
+            # Record rationale if provided and operation was successful
+            if response.get("success", True) and rationale:
+                record_rationale(
+                    action="add_blueprint_function_node",
+                    details={
+                        "blueprint_name": blueprint_name,
+                        "target": target,
+                        "function_name": function_name
+                    },
+                    rationale=rationale,
+                    category="blueprint_logic"
+                )
+
             logger.info(f"Function node creation response: {response}")
             return response
             
@@ -250,7 +281,8 @@ def register_blueprint_node_tools(mcp: FastMCP):
         variable_name: str,
         variable_type: str,
         is_exposed: bool = False,
-        path: str = "/Game/Blueprints"
+        path: str = "/Game/Blueprints",
+        rationale: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Add a variable to a Blueprint.
@@ -261,11 +293,13 @@ def register_blueprint_node_tools(mcp: FastMCP):
             variable_type: Type of the variable (Boolean, Integer, Float, Vector, etc.)
             is_exposed: Whether to expose the variable to the editor
             path: Content browser path where the blueprint is located (default: "/Game/Blueprints")
+            rationale: Design rationale - why this variable is needed (auto-saved to knowledge base)
 
         Returns:
             Response indicating success or failure
         """
         from unreal_mcp_server import get_unreal_connection
+        from tools.rag_tools import record_rationale
 
         try:
             params = {
@@ -283,11 +317,24 @@ def register_blueprint_node_tools(mcp: FastMCP):
             
             logger.info(f"Adding variable '{variable_name}' to blueprint '{blueprint_name}'")
             response = unreal.send_command("add_blueprint_variable", params)
-            
+
             if not response:
                 logger.error("No response from Unreal Engine")
                 return {"success": False, "message": "No response from Unreal Engine"}
-            
+
+            # Record rationale if provided and operation was successful
+            if response.get("success", True) and rationale:
+                record_rationale(
+                    action="add_blueprint_variable",
+                    details={
+                        "blueprint_name": blueprint_name,
+                        "variable_name": variable_name,
+                        "variable_type": variable_type
+                    },
+                    rationale=rationale,
+                    category="blueprint_variable"
+                )
+
             logger.info(f"Variable creation response: {response}")
             return response
             

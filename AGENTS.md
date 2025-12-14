@@ -309,6 +309,9 @@ def get_actor_components(ctx: Context, name: str) -> Dict[str, Any]:
 | `add_component_to_blueprint` | component | コンポーネント選定理由 |
 | `set_physics_properties` | physics | 物理設定の意図 |
 | `spawn_actor` | level_design | アクター配置の意図 |
+| `add_blueprint_event_node` | blueprint_event | イベント使用の意図 |
+| `add_blueprint_function_node` | blueprint_logic | 関数呼び出しの理由 |
+| `add_blueprint_variable` | blueprint_variable | 変数の役割 |
 
 ### 使用例
 
@@ -341,6 +344,27 @@ spawn_actor(
     location=[1000, 500, 100],
     rationale="第1ウェーブの敵出現地点。プレイヤー初期位置から見えない位置"
 )
+
+# Blueprint ノード・変数
+add_blueprint_event_node(
+    blueprint_name="BP_Enemy",
+    event_name="ReceiveBeginPlay",
+    rationale="初期化処理。武器装備とAI起動を実行"
+)
+
+add_blueprint_function_node(
+    blueprint_name="BP_Player",
+    target="self",
+    function_name="TakeDamage",
+    rationale="ダメージ処理。HP減少とヒットエフェクトを再生"
+)
+
+add_blueprint_variable(
+    blueprint_name="BP_Enemy",
+    variable_name="CurrentHealth",
+    variable_type="Float",
+    rationale="現在のHP。0で死亡処理をトリガー"
+)
 ```
 
 ### 書くべき内容
@@ -371,6 +395,7 @@ search_knowledge("質量 設定", category="physics")
 
 ## 更新履歴
 
-- 2024-12-14: rationale パラメータ機能を追加
+- 2024-12-14: node_tools.py に rationale パラメータを追加（3ツール）
+- 2024-12-14: rationale パラメータ機能を追加（4ツール）
 - 2024-12-14: 新しいコマンド追加手順、ビルドガイドを追加
 - 2024-12-03: 初版作成
