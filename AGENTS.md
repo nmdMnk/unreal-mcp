@@ -187,6 +187,114 @@ y = branch_index * 150
 
 ---
 
+## 新しいコマンドの追加手順
+
+### アーキテクチャ概要
+
+```
+[Python MCP Server]
+       ↓ TCP
+[SpirrowBridge.cpp] ExecuteCommand() ← コマンドルーティング（メイン）
+       ↓
+[各CommandHandler]
+  - SpirrowBridgeEditorCommands.cpp   ← アクター操作
+  - SpirrowBridgeBlueprintCommands.cpp ← Blueprint操作
+  - SpirrowBridgeProjectCommands.cpp   ← プロジェクト操作
+  - etc.
+```
+
+### チェックリスト（必須）
+
+新しいコマンドを追加する際は、以下の **すべてのファイル** を更新すること：
+
+| # | ファイル | 更新内容 | 場所 |
+|---|----------|----------|------|
+| 1 | `Commands/SpirrowBridge*Commands.h` | 関数宣言 | private セクション |
+| 2 | `Commands/SpirrowBridge*Commands.cpp` | 関数実装 | ファイル末尾 |
+| 3 | `Commands/SpirrowBridge*Commands.cpp` | HandleCommand内ルーティング | switch/if文 |
+| 4 | **`SpirrowBridge.cpp`** | **ExecuteCommand内ルーティング** | **else if文** |
+| 5 | `Python/tools/*_tools.py` | Python側ツール定義 | @mcp.tool() |
+
+⚠️ **重要**: #4 を忘れると「Unknown command」エラーになる！
+
+### 追加例
+
+新しいコマンド `get_actor_components` を追加する場合：
+
+```cpp
+// 1. SpirrowBridgeEditorCommands.h
+private:
+    TSharedPtr<FJsonObject> HandleGetActorComponents(const TSharedPtr<FJsonObject>& Params);
+
+// 2. SpirrowBridgeEditorCommands.cpp (実装)
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleGetActorComponents(...) { ... }
+
+// 3. SpirrowBridgeEditorCommands.cpp (HandleCommand内)
+else if (CommandType == TEXT("get_actor_components"))
+{
+    return HandleGetActorComponents(Params);
+}
+
+// 4. SpirrowBridge.cpp (ExecuteCommand内) ← 忘れがち！
+else if (CommandType == TEXT("get_actors_in_level") || 
+         ...
+         CommandType == TEXT("get_actor_components") ||  // ← 追加
+         ...)
+{
+    ResultJson = EditorCommands->HandleCommand(CommandType, Params);
+}
+```
+
+```python
+# 5. Python/tools/editor_tools.py
+@mcp.tool()
+def get_actor_components(ctx: Context, name: str) -> Dict[str, Any]:
+    ...
+```
+
+### 過去の不具合事例
+
+#### 2024-12-14: get_actor_components "Unknown command" エラー
+
+**症状**: `get_actor_components` を呼び出すと "Unknown command: get_actor_components" エラー
+
+**原因**: 
+- SpirrowBridgeEditorCommands.h/cpp は正しく更新されていた
+- SpirrowBridge.cpp の ExecuteCommand 内のルーティングが漏れていた
+
+**教訓**:
+- コマンドハンドラ内の HandleCommand だけでなく、SpirrowBridge.cpp の ExecuteCommand も更新が必要
+- 「ソースコードは正しいのに動かない」場合、ルーティング漏れを疑う
+
+---
+
+## プラグインのビルドについて
+
+### ビルドが必要な場合
+
+- C++ ソースコードを変更した場合
+- ヘッダーファイル（.h）を変更した場合
+- 新しいファイルを追加した場合
+
+### ビルド手順
+
+1. **UE エディタを閉じる**（必須）
+2. Visual Studio で `.sln` を開く
+3. **Build → Rebuild Solution**
+4. UE エディタを起動
+
+⚠️ **Live Coding（Ctrl+Alt+F11）では新しい関数の追加は反映されない**
+
+### ビルドが反映されない場合
+
+以下のフォルダを削除してからビルド：
+- `Plugins/SpirrowBridge/Binaries`
+- `Plugins/SpirrowBridge/Intermediate`
+- プロジェクトルートの `Intermediate`
+
+---
+
 ## 更新履歴
 
+- 2024-12-14: 新しいコマンド追加手順、ビルドガイドを追加
 - 2024-12-03: 初版作成
