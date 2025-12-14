@@ -526,6 +526,54 @@ def register_blueprint_tools(mcp: FastMCP):
             return {"success": False, "message": error_msg}
 
     @mcp.tool()
+    def duplicate_blueprint(
+        ctx: Context,
+        source_name: str,
+        new_name: str,
+        source_path: str = "/Game/Blueprints",
+        destination_path: str = None
+    ) -> Dict[str, Any]:
+        """
+        Duplicate an existing Blueprint asset.
+
+        Args:
+            source_name: Name of the Blueprint to duplicate (e.g., "BP_Enemy")
+            new_name: Name for the new duplicated Blueprint (e.g., "BP_Enemy_Variant")
+            source_path: Content path where the source Blueprint is located (default: "/Game/Blueprints")
+            destination_path: Content path where the duplicated Blueprint will be created (default: same as source_path)
+
+        Returns:
+            dict: Result containing success status and new Blueprint path
+
+        Example:
+            duplicate_blueprint(
+                source_name="BP_Enemy",
+                new_name="BP_Boss",
+                source_path="/Game/Blueprints/Characters",
+                destination_path="/Game/Blueprints/Bosses"
+            )
+        """
+        try:
+            # Default destination_path to source_path if not specified
+            if destination_path is None:
+                destination_path = source_path
+
+            params = {
+                "source_name": source_name,
+                "new_name": new_name,
+                "source_path": source_path,
+                "destination_path": destination_path
+            }
+
+            response = unreal.send_command("duplicate_blueprint", params)
+            return response
+
+        except Exception as e:
+            error_msg = f"Error duplicating blueprint: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
     def scan_project_classes(
         ctx: Context,
         class_type: str = "all",

@@ -27,6 +27,8 @@
 #include "Animation/AnimInstance.h"
 #include "Misc/App.h"
 #include "UObject/UObjectIterator.h"
+#include "AssetToolsModule.h"
+#include "IAssetTools.h"
 
 FSpirrowBridgeBlueprintCommands::FSpirrowBridgeBlueprintCommands()
 {
@@ -73,6 +75,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleCommand(const FSt
     else if (CommandType == TEXT("scan_project_classes"))
     {
         return HandleScanProjectClasses(Params);
+    }
+    else if (CommandType == TEXT("duplicate_blueprint"))
+    {
+        return HandleDuplicateBlueprint(Params);
     }
 
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown blueprint command: %s"), *CommandType));
@@ -1627,6 +1633,81 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleScanProjectClasse
     ResultObj->SetArrayField(TEXT("blueprints"), BlueprintsArray);
     ResultObj->SetNumberField(TEXT("total_cpp"), CppClassesArray.Num());
     ResultObj->SetNumberField(TEXT("total_blueprints"), BlueprintsArray.Num());
+
+    return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleDuplicateBlueprint(const TSharedPtr<FJsonObject>& Params)
+{
+    // Get required parameters
+    FString SourceName;
+    if (!Params->TryGetStringField(TEXT("source_name"), SourceName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'source_name' parameter"));
+    }
+
+    FString NewName;
+    if (!Params->TryGetStringField(TEXT("new_name"), NewName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'new_name' parameter"));
+    }
+
+    // Get optional parameters
+    FString SourcePath = TEXT("/Game/Blueprints");
+    Params->TryGetStringField(TEXT("source_path"), SourcePath);
+
+    FString DestinationPath = SourcePath; // Default to source path
+    Params->TryGetStringField(TEXT("destination_path"), DestinationPath);
+
+    // Build full source asset path
+    FString SourceAssetPath = SourcePath + TEXT("/") + SourceName + TEXT(".") + SourceName;
+
+    // Check if source Blueprint exists
+    if (!UEditorAssetLibrary::DoesAssetExist(SourceAssetPath))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Source Blueprint does not exist: %s"), *SourceAssetPath)
+        );
+    }
+
+    // Build full destination asset path
+    FString DestinationAssetPath = DestinationPath + TEXT("/") + NewName;
+
+    // Check if destination already exists
+    if (UEditorAssetLibrary::DoesAssetExist(DestinationAssetPath + TEXT(".") + NewName))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Destination Blueprint already exists: %s"), *DestinationAssetPath)
+        );
+    }
+
+    // Get AssetTools module
+    FAssetToolsModule& AssetToolsModule = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools");
+    IAssetTools& AssetTools = AssetToolsModule.Get();
+
+    // Duplicate the asset
+    UObject* SourceAsset = UEditorAssetLibrary::LoadAsset(SourceAssetPath);
+    if (!SourceAsset)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Failed to load source Blueprint: %s"), *SourceAssetPath)
+        );
+    }
+
+    UObject* DuplicatedAsset = AssetTools.DuplicateAsset(NewName, DestinationPath, SourceAsset);
+    if (!DuplicatedAsset)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Failed to duplicate Blueprint from %s to %s"), *SourceAssetPath, *DestinationAssetPath)
+        );
+    }
+
+    // Build success response
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
+    ResultObj->SetStringField(TEXT("message"), FString::Printf(TEXT("Blueprint duplicated successfully: %s"), *NewName));
+    ResultObj->SetStringField(TEXT("source_path"), SourceAssetPath);
+    ResultObj->SetStringField(TEXT("new_path"), DuplicatedAsset->GetPathName());
 
     return ResultObj;
 } 

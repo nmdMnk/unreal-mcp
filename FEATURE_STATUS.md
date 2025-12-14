@@ -63,6 +63,7 @@
 | ツール | 状態 | 備考 |
 |--------|------|------|
 | `delete_asset` | ✅ 動作OK | Content Browserからアセット削除 |
+| `duplicate_blueprint` | ✅ 実装完了 | Blueprint複製、カスタムパス対応 |
 
 ### その他
 
@@ -129,12 +130,29 @@
 | ツール | 説明 | 状態 |
 |--------|------|------|
 | `get_blueprint_graph` | 既存BPのノード構成取得 | 💡 アイデア |
-| `duplicate_blueprint` | BP複製 | 💡 アイデア |
-| `rename_actor` | アクター名変更 | 💡 アイデア |
+| `duplicate_blueprint` | BP複製 | ✅ 完了 |
+| `rename_actor` | アクター名変更 | ✅ 完了 |
 
 ---
 
 ## 最新の更新履歴
+
+### 2025-12-15: duplicate_blueprint & rename_actor ツール追加
+
+**新機能**:
+- `duplicate_blueprint`: 既存Blueprintを複製する機能
+  - ソース・複製先のパス指定対応（デフォルト: /Game/Blueprints）
+  - AssetToolsモジュールを使用した安全な複製
+  - 既存アセットチェックとエラーハンドリング
+- `rename_actor`: レベル内のアクター名を変更する機能
+  - ActorLabelとNameの両方で検索
+
+**変更範囲**:
+- Python blueprint_tools.py: duplicate_blueprint追加
+- Python editor_tools.py: rename_actor追加
+- C++ SpirrowBridgeBlueprintCommands: HandleDuplicateBlueprint実装、AssetToolsモジュール追加
+- C++ SpirrowBridgeEditorCommands: HandleRenameActor実装
+- ルーティング追加: SpirrowBridge.cpp ExecuteCommand更新
 
 ### 2025-12-15: set_actor_property 分離 & rationale 自動蓄積機能
 
