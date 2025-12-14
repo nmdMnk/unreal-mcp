@@ -176,7 +176,7 @@ def register_knowledge_tools(mcp):
     """Register knowledge assistance tools with the MCP server."""
 
     @mcp.tool()
-    async def find_relevant_nodes(
+    def find_relevant_nodes(
         ctx: Context,
         query: str,
         include_rag: bool = True,
@@ -216,6 +216,7 @@ def register_knowledge_tools(mcp):
             find_relevant_nodes("character movement", include_rag=False)
         """
         from unreal_mcp_server import get_unreal_connection
+        import requests
 
         result = {
             "query": query,
@@ -235,40 +236,41 @@ def register_knowledge_tools(mcp):
             suggested = get_suggested_classes(keywords)
             result["suggested_classes"] = suggested
 
-            # 3. RAG検索
+            # 3. RAG検索（同期版）
             if include_rag:
                 try:
-                    # RAGサーバーに直接接続
-                    import httpx
                     rag_url = "http://localhost:8100"
+                    response = requests.post(
+                        f"{rag_url}/search",
+                        json={
+                            "query": query,
+                            "n_results": max_rag_results
+                        },
+                        timeout=10.0
+                    )
 
-                    async with httpx.AsyncClient() as client:
-                        response = await client.post(
-                            f"{rag_url}/search",
-                            json={
-                                "query": query,
-                                "n_results": max_rag_results
-                            },
-                            timeout=10.0
-                        )
+                    if response.status_code == 200:
+                        rag_data = response.json()
+                        if rag_data.get("results"):
+                            documents = rag_data["results"].get("documents", [[]])
+                            metadatas = rag_data["results"].get("metadatas", [[]])
+                            distances = rag_data["results"].get("distances", [[]])
 
-                        if response.status_code == 200:
-                            rag_data = response.json()
-                            if rag_data.get("results"):
-                                for i, doc in enumerate(rag_data["results"].get("documents", [[]])[0]):
-                                    metadata = {}
-                                    if rag_data["results"].get("metadatas"):
-                                        metadata = rag_data["results"]["metadatas"][0][i] if i < len(rag_data["results"]["metadatas"][0]) else {}
-
-                                    distance = 0.0
-                                    if rag_data["results"].get("distances"):
-                                        distance = rag_data["results"]["distances"][0][i] if i < len(rag_data["results"]["distances"][0]) else 0.0
+                            if documents and len(documents) > 0:
+                                for i, doc in enumerate(documents[0]):
+                                    metadata = metadatas[0][i] if i < len(metadatas[0]) else {}
+                                    distance = distances[0][i] if i < len(distances[0]) else 0.0
 
                                     result["rag_results"].append({
                                         "content": doc,
                                         "category": metadata.get("category", "unknown"),
                                         "relevance": round(1.0 - distance, 2) if distance else 0.0
                                     })
+                            logger.info(f"RAG search returned {len(result['rag_results'])} results")
+                    else:
+                        logger.warning(f"RAG search returned status {response.status_code}")
+                except requests.exceptions.ConnectionError:
+                    logger.warning("RAG server not available at localhost:8100")
                 except Exception as e:
                     logger.warning(f"RAG search failed: {e}")
 
@@ -288,8 +290,13 @@ def register_knowledge_tools(mcp):
                                 parent_filters.append("UserWidget")
                             elif kw in ["animation", "anim", "montage"]:
                                 parent_filters.append("AnimInstance")
+                            elif kw in ["damage", "health", "attack"]:
+                                parent_filters.append("Character")
+                            elif kw in ["spawn", "projectile", "shoot"]:
+                                parent_filters.append("Actor")
 
                         parent_filters = list(set(parent_filters))
+                        logger.info(f"Parent filters for project search: {parent_filters}")
 
                         # 各フィルタでスキャン
                         all_matches = []
@@ -297,6 +304,7 @@ def register_knowledge_tools(mcp):
 
                         if parent_filters:
                             for parent in parent_filters[:3]:  # 最大3つの親クラスで検索
+                                logger.info(f"Scanning for parent class: {parent}")
                                 response = unreal.send_command("scan_project_classes", {
                                     "parent_class": parent,
                                     "exclude_reinst": True
@@ -304,7 +312,7 @@ def register_knowledge_tools(mcp):
 
                                 if response:
                                     # C++クラス
-                                    for cls in response.get("cpp_classes", [])[:max_project_results]:
+                                    for cls in response.get("cpp_classes", []):
                                         if cls["path"] not in seen_paths:
                                             seen_paths.add(cls["path"])
                                             all_matches.append({
@@ -316,7 +324,7 @@ def register_knowledge_tools(mcp):
                                             })
 
                                     # Blueprint
-                                    for bp in response.get("blueprints", [])[:max_project_results]:
+                                    for bp in response.get("blueprints", []):
                                         if bp["path"] not in seen_paths:
                                             seen_paths.add(bp["path"])
                                             all_matches.append({
@@ -327,14 +335,15 @@ def register_knowledge_tools(mcp):
                                             })
                         else:
                             # フィルタなしでプロジェクトモジュールのみスキャン
+                            logger.info("No parent filters, scanning TrapxTrapCpp module")
                             response = unreal.send_command("scan_project_classes", {
                                 "class_type": "cpp",
-                                "module_filter": "TrapxTrapCpp",  # TODO: 動的に取得
+                                "module_filter": "TrapxTrapCpp",
                                 "exclude_reinst": True
                             })
 
                             if response:
-                                for cls in response.get("cpp_classes", [])[:max_project_results]:
+                                for cls in response.get("cpp_classes", []):
                                     all_matches.append({
                                         "name": cls["name"],
                                         "path": cls["path"],
@@ -344,13 +353,20 @@ def register_knowledge_tools(mcp):
                                     })
 
                         result["project_matches"] = all_matches[:max_project_results]
+                        logger.info(f"Project search returned {len(result['project_matches'])} matches")
+                    else:
+                        logger.warning("Could not get Unreal connection")
 
                 except Exception as e:
                     logger.warning(f"Project class search failed: {e}")
+                    import traceback
+                    logger.warning(traceback.format_exc())
 
             return result
 
         except Exception as e:
             error_msg = f"Error in find_relevant_nodes: {e}"
             logger.error(error_msg)
+            import traceback
+            logger.error(traceback.format_exc())
             return {"error": error_msg, **result}
