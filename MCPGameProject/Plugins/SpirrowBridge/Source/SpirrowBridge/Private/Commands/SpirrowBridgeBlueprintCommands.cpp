@@ -160,34 +160,39 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleCreateBlueprint(c
         {
             UE_LOG(LogTemp, Log, TEXT("[Method 3] Attempting LoadClass for '%s'..."), *ClassName);
 
-            // Try /Script/Engine
-            FString ClassPath = FString::Printf(TEXT("/Script/Engine.%s"), *ClassName);
-            FoundClass = LoadClass<AActor>(nullptr, *ClassPath);
-            if (FoundClass)
+            // Get project module name
+            FString ProjectModuleName = FApp::GetProjectName();
+
+            // Build list of paths to try - both with and without 'A' prefix
+            TArray<FString> ModulePaths;
+
+            // With 'A' prefix (ClassName already has it)
+            ModulePaths.Add(FString::Printf(TEXT("/Script/Engine.%s"), *ClassName));
+            ModulePaths.Add(FString::Printf(TEXT("/Script/Game.%s"), *ClassName));
+            ModulePaths.Add(FString::Printf(TEXT("/Script/%s.%s"), *ProjectModuleName, *ClassName));
+
+            // Without 'A' prefix - this is how UE actually registers classes in reflection!
+            if (ClassName.StartsWith(TEXT("A")))
             {
-                UE_LOG(LogTemp, Log, TEXT("[Method 3] Found parent class via LoadClass: %s"), *ClassPath);
+                FString ClassNameWithoutPrefix = ClassName.RightChop(1);  // Remove 'A' prefix
+                ModulePaths.Add(FString::Printf(TEXT("/Script/Engine.%s"), *ClassNameWithoutPrefix));
+                ModulePaths.Add(FString::Printf(TEXT("/Script/Game.%s"), *ClassNameWithoutPrefix));
+                ModulePaths.Add(FString::Printf(TEXT("/Script/%s.%s"), *ProjectModuleName, *ClassNameWithoutPrefix));
             }
 
-            // Try /Script/Game
-            if (!FoundClass)
-            {
-                ClassPath = FString::Printf(TEXT("/Script/Game.%s"), *ClassName);
-                FoundClass = LoadClass<AActor>(nullptr, *ClassPath);
-                if (FoundClass)
-                {
-                    UE_LOG(LogTemp, Log, TEXT("[Method 3] Found parent class via LoadClass: %s"), *ClassPath);
-                }
-            }
+            // Also try the original name as provided by user (without any prefix manipulation)
+            ModulePaths.Add(FString::Printf(TEXT("/Script/Engine.%s"), *ParentClass));
+            ModulePaths.Add(FString::Printf(TEXT("/Script/Game.%s"), *ParentClass));
+            ModulePaths.Add(FString::Printf(TEXT("/Script/%s.%s"), *ProjectModuleName, *ParentClass));
 
-            // Try /Script/{ProjectName}
-            if (!FoundClass)
+            for (const FString& ModulePath : ModulePaths)
             {
-                FString ProjectName = FApp::GetProjectName();
-                ClassPath = FString::Printf(TEXT("/Script/%s.%s"), *ProjectName, *ClassName);
-                FoundClass = LoadClass<AActor>(nullptr, *ClassPath);
+                UE_LOG(LogTemp, Log, TEXT("[Method 3] Trying: %s"), *ModulePath);
+                FoundClass = LoadClass<AActor>(nullptr, *ModulePath);
                 if (FoundClass)
                 {
-                    UE_LOG(LogTemp, Log, TEXT("[Method 3] Found parent class via LoadClass: %s"), *ClassPath);
+                    UE_LOG(LogTemp, Log, TEXT("[Method 3] SUCCESS: Loaded class from '%s'"), *ModulePath);
+                    break;
                 }
             }
         }
