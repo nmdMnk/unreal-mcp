@@ -64,6 +64,7 @@
 |--------|------|------|
 | `delete_asset` | ✅ 動作OK | Content Browserからアセット削除 |
 | `duplicate_blueprint` | ✅ 実装完了 | Blueprint複製、カスタムパス対応 |
+| `get_blueprint_graph` | ✅ 実装完了 | Blueprintのノードグラフ構成取得、ノード・接続・変数・コンポーネント情報 |
 
 ### その他
 
@@ -129,13 +130,35 @@
 
 | ツール | 説明 | 状態 |
 |--------|------|------|
-| `get_blueprint_graph` | 既存BPのノード構成取得 | 💡 アイデア |
+| `get_blueprint_graph` | 既存BPのノード構成取得 | ✅ 完了 |
 | `duplicate_blueprint` | BP複製 | ✅ 完了 |
 | `rename_actor` | アクター名変更 | ✅ 完了 |
 
 ---
 
 ## 最新の更新履歴
+
+### 2025-12-15: get_blueprint_graph ツール追加
+
+**新機能**:
+- `get_blueprint_graph`: 既存Blueprintのノードグラフ構成を取得
+  - ノード一覧（ID、タイプ、クラス、タイトル、座標、ピン情報）
+  - ノード間の接続情報（ソース/ターゲットのノードID・ピン名）
+  - 変数一覧（名前、型、公開設定）
+  - コンポーネント一覧（名前、クラス）
+  - 親クラス情報
+  - pathパラメータ対応（デフォルト: /Game/Blueprints）
+
+**ノードタイプ判定**:
+- Event（K2Node_Event）
+- Function（K2Node_CallFunction）
+- VariableGet/VariableSet（K2Node_VariableGet/Set）
+- Other（その他のノード）
+
+**変更範囲**:
+- Python blueprint_tools.py: get_blueprint_graph追加
+- C++ SpirrowBridgeBlueprintCommands: HandleGetBlueprintGraph実装
+- ルーティング追加: HandleCommand、SpirrowBridge.cpp ExecuteCommand
 
 ### 2025-12-15: duplicate_blueprint & rename_actor ツール追加
 

@@ -250,7 +250,8 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("set_static_mesh_properties") ||
                      CommandType == TEXT("set_pawn_properties") ||
                      CommandType == TEXT("scan_project_classes") ||
-                     CommandType == TEXT("duplicate_blueprint"))
+                     CommandType == TEXT("duplicate_blueprint") ||
+                     CommandType == TEXT("get_blueprint_graph"))
             {
                 ResultJson = BlueprintCommands->HandleCommand(CommandType, Params);
             }

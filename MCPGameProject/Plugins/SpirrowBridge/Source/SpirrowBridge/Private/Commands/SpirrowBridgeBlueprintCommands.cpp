@@ -80,6 +80,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleCommand(const FSt
     {
         return HandleDuplicateBlueprint(Params);
     }
+    else if (CommandType == TEXT("get_blueprint_graph"))
+    {
+        return HandleGetBlueprintGraph(Params);
+    }
 
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown blueprint command: %s"), *CommandType));
 }
@@ -1710,4 +1714,149 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleDuplicateBlueprin
     ResultObj->SetStringField(TEXT("new_path"), DuplicatedAsset->GetPathName());
 
     return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleGetBlueprintGraph(const TSharedPtr<FJsonObject>& Params)
+{
+    TSharedPtr<FJsonObject> ResultJson = MakeShareable(new FJsonObject());
+
+    FString BlueprintName = Params->GetStringField(TEXT("blueprint_name"));
+    FString Path = Params->GetStringField(TEXT("path"));
+
+    if (BlueprintName.IsEmpty())
+    {
+        ResultJson->SetStringField(TEXT("status"), TEXT("error"));
+        ResultJson->SetStringField(TEXT("error"), TEXT("blueprint_name is required"));
+        return ResultJson;
+    }
+
+    // Find the Blueprint
+    UBlueprint* Blueprint = FindBlueprintByName(BlueprintName, Path);
+    if (!Blueprint)
+    {
+        ResultJson->SetStringField(TEXT("status"), TEXT("error"));
+        ResultJson->SetStringField(TEXT("error"), FString::Printf(TEXT("Blueprint '%s' not found at path '%s'"), *BlueprintName, *Path));
+        return ResultJson;
+    }
+
+    TSharedPtr<FJsonObject> ResultData = MakeShareable(new FJsonObject());
+    ResultData->SetStringField(TEXT("blueprint_name"), BlueprintName);
+    ResultData->SetStringField(TEXT("parent_class"), Blueprint->ParentClass ? Blueprint->ParentClass->GetName() : TEXT("None"));
+
+    // Get Event Graph nodes
+    TArray<TSharedPtr<FJsonValue>> NodesArray;
+    TArray<TSharedPtr<FJsonValue>> ConnectionsArray;
+
+    for (UEdGraph* Graph : Blueprint->UbergraphPages)
+    {
+        if (!Graph) continue;
+
+        for (UEdGraphNode* Node : Graph->Nodes)
+        {
+            if (!Node) continue;
+
+            TSharedPtr<FJsonObject> NodeObj = MakeShareable(new FJsonObject());
+            NodeObj->SetStringField(TEXT("id"), Node->NodeGuid.ToString());
+            NodeObj->SetStringField(TEXT("class"), Node->GetClass()->GetName());
+            NodeObj->SetStringField(TEXT("title"), Node->GetNodeTitle(ENodeTitleType::FullTitle).ToString());
+            NodeObj->SetNumberField(TEXT("pos_x"), Node->NodePosX);
+            NodeObj->SetNumberField(TEXT("pos_y"), Node->NodePosY);
+
+            // Get node type info
+            if (UK2Node_Event* EventNode = Cast<UK2Node_Event>(Node))
+            {
+                NodeObj->SetStringField(TEXT("type"), TEXT("Event"));
+                NodeObj->SetStringField(TEXT("event_name"), EventNode->GetFunctionName().ToString());
+            }
+            else if (UK2Node_CallFunction* FuncNode = Cast<UK2Node_CallFunction>(Node))
+            {
+                NodeObj->SetStringField(TEXT("type"), TEXT("Function"));
+                NodeObj->SetStringField(TEXT("function_name"), FuncNode->GetFunctionName().ToString());
+            }
+            else if (UK2Node_VariableGet* VarGetNode = Cast<UK2Node_VariableGet>(Node))
+            {
+                NodeObj->SetStringField(TEXT("type"), TEXT("VariableGet"));
+                NodeObj->SetStringField(TEXT("variable_name"), VarGetNode->GetVarName().ToString());
+            }
+            else if (UK2Node_VariableSet* VarSetNode = Cast<UK2Node_VariableSet>(Node))
+            {
+                NodeObj->SetStringField(TEXT("type"), TEXT("VariableSet"));
+                NodeObj->SetStringField(TEXT("variable_name"), VarSetNode->GetVarName().ToString());
+            }
+            else
+            {
+                NodeObj->SetStringField(TEXT("type"), TEXT("Other"));
+            }
+
+            // Get pin information
+            TArray<TSharedPtr<FJsonValue>> PinsArray;
+            for (UEdGraphPin* Pin : Node->Pins)
+            {
+                if (!Pin) continue;
+
+                TSharedPtr<FJsonObject> PinObj = MakeShareable(new FJsonObject());
+                PinObj->SetStringField(TEXT("name"), Pin->PinName.ToString());
+                PinObj->SetStringField(TEXT("direction"), Pin->Direction == EGPD_Input ? TEXT("Input") : TEXT("Output"));
+                PinObj->SetStringField(TEXT("type"), Pin->PinType.PinCategory.ToString());
+                PinsArray.Add(MakeShareable(new FJsonValueObject(PinObj)));
+
+                // Record connections
+                for (UEdGraphPin* LinkedPin : Pin->LinkedTo)
+                {
+                    if (!LinkedPin || !LinkedPin->GetOwningNode()) continue;
+
+                    // Only record output -> input connections to avoid duplicates
+                    if (Pin->Direction == EGPD_Output)
+                    {
+                        TSharedPtr<FJsonObject> ConnObj = MakeShareable(new FJsonObject());
+                        ConnObj->SetStringField(TEXT("source_node"), Node->NodeGuid.ToString());
+                        ConnObj->SetStringField(TEXT("source_pin"), Pin->PinName.ToString());
+                        ConnObj->SetStringField(TEXT("target_node"), LinkedPin->GetOwningNode()->NodeGuid.ToString());
+                        ConnObj->SetStringField(TEXT("target_pin"), LinkedPin->PinName.ToString());
+                        ConnectionsArray.Add(MakeShareable(new FJsonValueObject(ConnObj)));
+                    }
+                }
+            }
+            NodeObj->SetArrayField(TEXT("pins"), PinsArray);
+
+            NodesArray.Add(MakeShareable(new FJsonValueObject(NodeObj)));
+        }
+    }
+
+    ResultData->SetArrayField(TEXT("nodes"), NodesArray);
+    ResultData->SetArrayField(TEXT("connections"), ConnectionsArray);
+
+    // Get Variables
+    TArray<TSharedPtr<FJsonValue>> VariablesArray;
+    for (FBPVariableDescription& Var : Blueprint->NewVariables)
+    {
+        TSharedPtr<FJsonObject> VarObj = MakeShareable(new FJsonObject());
+        VarObj->SetStringField(TEXT("name"), Var.VarName.ToString());
+        VarObj->SetStringField(TEXT("type"), Var.VarType.PinCategory.ToString());
+        VarObj->SetBoolField(TEXT("is_exposed"), Var.HasMetaData(FBlueprintMetadata::MD_ExposeOnSpawn));
+        VariablesArray.Add(MakeShareable(new FJsonValueObject(VarObj)));
+    }
+    ResultData->SetArrayField(TEXT("variables"), VariablesArray);
+
+    // Get Components
+    TArray<TSharedPtr<FJsonValue>> ComponentsArray;
+    if (Blueprint->SimpleConstructionScript)
+    {
+        TArray<USCS_Node*> AllNodes = Blueprint->SimpleConstructionScript->GetAllNodes();
+        for (USCS_Node* SCSNode : AllNodes)
+        {
+            if (!SCSNode || !SCSNode->ComponentTemplate) continue;
+
+            TSharedPtr<FJsonObject> CompObj = MakeShareable(new FJsonObject());
+            CompObj->SetStringField(TEXT("name"), SCSNode->GetVariableName().ToString());
+            CompObj->SetStringField(TEXT("class"), SCSNode->ComponentTemplate->GetClass()->GetName());
+            ComponentsArray.Add(MakeShareable(new FJsonValueObject(CompObj)));
+        }
+    }
+    ResultData->SetArrayField(TEXT("components"), ComponentsArray);
+
+    ResultJson->SetStringField(TEXT("status"), TEXT("success"));
+    ResultJson->SetObjectField(TEXT("result"), ResultData);
+
+    return ResultJson;
 } 

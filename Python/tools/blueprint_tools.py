@@ -574,6 +574,42 @@ def register_blueprint_tools(mcp: FastMCP):
             return {"success": False, "message": error_msg}
 
     @mcp.tool()
+    def get_blueprint_graph(
+        ctx: Context,
+        blueprint_name: str,
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Get the node graph structure of an existing Blueprint.
+
+        Args:
+            blueprint_name: Name of the Blueprint to analyze
+            path: Content browser path where the Blueprint is located (default: "/Game/Blueprints")
+
+        Returns:
+            dict: Result containing nodes, connections, variables, and components
+
+        Example:
+            get_blueprint_graph(
+                blueprint_name="BP_Enemy",
+                path="/Game/Blueprints/Characters"
+            )
+        """
+        try:
+            params = {
+                "blueprint_name": blueprint_name,
+                "path": path
+            }
+
+            response = unreal.send_command("get_blueprint_graph", params)
+            return response
+
+        except Exception as e:
+            error_msg = f"Error getting blueprint graph: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
     def scan_project_classes(
         ctx: Context,
         class_type: str = "all",
