@@ -5,6 +5,7 @@
 #include "Factories/BlueprintFactory.h"
 #include "EdGraphSchema_K2.h"
 #include "K2Node_Event.h"
+#include "K2Node_CallFunction.h"
 #include "K2Node_VariableGet.h"
 #include "K2Node_VariableSet.h"
 #include "Components/StaticMeshComponent.h"
