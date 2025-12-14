@@ -64,6 +64,40 @@ Unreal MCP統合は、自然言語を通じてUnreal Engineを制御するため
 
 これらすべての機能は、AIアシスタントを介した自然言語コマンドでアクセスでき、Unreal Engineワークフローの自動化と制御を簡単にします。
 
+### ナレッジアシスタント機能について
+
+`find_relevant_nodes` ツールは、「やりたいこと」から逆引きで関連するUEノード、クラス、アセットを提案します。RAGナレッジベースとプロジェクトクラスを統合検索し、日本語・英語の両方に対応しています。
+
+**主な機能**:
+- **キーワード抽出**: クエリから自動的にキーワードを抽出（日本語→英語変換対応）
+- **UEクラス推奨**: 30以上のキーワードマッピングに基づき、適切なエンジンクラス/関数を提案
+- **RAG検索**: プロジェクト固有のナレッジベースから関連情報を検索（関連度スコア付き）
+- **プロジェクトクラススキャン**: キーワードに基づいてスマートにフィルタリングされたプロジェクトクラスを検索
+
+**使用例**:
+```python
+# 日本語クエリ - ジャンプ機能の実装方法を調べる
+find_relevant_nodes("ジャンプを実装したい")
+# 推奨: Character, CharacterMovementComponent, Jump, LaunchCharacter
+
+# 英語クエリ - AI敵の追跡機能を調べる
+find_relevant_nodes("make enemy chase player")
+# 推奨: AIController, AIMoveTo, MoveToActor, BehaviorTree
+
+# プロジェクトクラスのみ検索 - RAGを使わずに既存クラスを探す
+find_relevant_nodes("character movement", include_rag=False)
+
+# RAGナレッジのみ検索 - プロジェクトクラスをスキャンせずに知識を探す
+find_relevant_nodes("UI widget design patterns", include_project=False)
+```
+
+**対応キーワード例**:
+- **移動系**: jump/ジャンプ, move/移動, walk/歩く, run/走る, sprint, fly/飛ぶ, swim/泳ぐ, crouch/しゃがむ
+- **戦闘系**: damage/ダメージ, health/体力, attack/攻撃, shoot/撃つ, projectile/弾, hit/当たり
+- **AI系**: ai, chase/追いかける, patrol/巡回, follow/ついていく, enemy/敵
+- **物理系**: physics/物理, collision/衝突, overlap/重なり, trigger/トリガー
+- **その他**: animation/アニメーション, input/入力, ui/widget, camera/カメラ, save/保存, timer/タイマー, network/ネットワーク
+
 ### Blueprint親クラス指定について
 
 `create_blueprint`でC++親クラスを指定する際、Aプレフィックスの有無を気にする必要はありません。システムは以下の3段階で親クラスを検索します：
