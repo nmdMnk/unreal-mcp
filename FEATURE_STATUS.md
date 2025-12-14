@@ -20,6 +20,8 @@
 | `get_actor_properties` | ✅ 動作OK | |
 | `set_actor_property` | ✅ 動作OK | アクター自体のプロパティを設定。rationale対応 |
 | `set_actor_component_property` | ✅ 動作OK | アクターのコンポーネントのプロパティを設定。rationale対応 |
+| `rename_actor` | ✅ 動作OK | アクター名変更（ActorLabel/Name両対応） |
+| `get_actor_components` | 🔲 未確認 | アクターのコンポーネント一覧取得 |
 
 ### Blueprint操作
 
@@ -267,7 +269,7 @@
 - **トランスポート**: stdio（デフォルト）/ SSE（開発用）
 - **起動スクリプト**: start_mcp_server.ps1 / start_mcp_server.bat
 - **設定管理**: config.local.ps1 / config.local.bat（環境固有設定）
-- **最終確認日**: 2025-12-14
+- **最終確認日**: 2025-12-15
 
 ---
 
