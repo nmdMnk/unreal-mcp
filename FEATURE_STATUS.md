@@ -78,6 +78,13 @@
 | `list_knowledge` | ✅ 動作OK | 登録済みナレッジ一覧取得 |
 | `delete_knowledge` | ✅ 動作OK | ID指定でナレッジ削除 |
 
+### ナレッジアシスタント
+
+| ツール | 状態 | 備考 |
+|--------|------|------|
+| `find_relevant_nodes` | ✅ 動作OK | RAG検索+プロジェクトクラススキャン統合、日英対応 |
+| `scan_project_classes` | ✅ 動作OK | C++/BP一覧取得、親クラス・モジュール・タイプフィルタ対応 |
+
 ---
 
 ## 確認された制限事項
@@ -90,15 +97,15 @@
 
 ## 追加予定機能
 
-### Phase 1: ナレッジアシスタント（優先度高）
+### Phase 1: ナレッジアシスタント（完了）
 
 目的: 「やりたいこと → 使うべきノード/クラス」の逆引き支援
 
 | ツール | 説明 | 状態 |
 |--------|------|------|
-| `find_relevant_nodes` | 目的からBPノード/C++クラスを検索 | 📋 計画中 |
+| `find_relevant_nodes` | 目的からBPノード/C++クラスを検索、RAG統合 | ✅ 完了 |
+| `scan_project_classes` | プロジェクト内のクラス/BP一覧取得 | ✅ 完了 |
 | `explain_node` | ノード/クラスの詳細解説 | 📋 計画中 |
-| `scan_project_classes` | プロジェクト内のクラス/BP一覧取得 | 📋 計画中 |
 
 ### Phase 2: RAG統合（完了）
 
@@ -130,6 +137,30 @@
 
 ## 最新の更新履歴
 
+### 2025-12-14: ナレッジアシスタント実装 & バグ修正
+
+**新機能**:
+- `scan_project_classes`: プロジェクト内C++クラス/Blueprint一覧取得
+  - 親クラス・モジュール・パスフィルタ対応
+  - Blueprintタイプフィルタ（Actor/Widget/Anim/Interface等）
+  - REINST_*クラス（Live Coding一時クラス）自動除外
+- `find_relevant_nodes`: やりたいことから関連ノード/クラスを検索
+  - RAGナレッジ検索とプロジェクトクラススキャンを統合
+  - 日本語・英語キーワード自動抽出（30+マッピング）
+  - スマート親クラスフィルタリング
+
+**バグ修正**:
+- `find_relevant_nodes`: async関数を同期関数に変更（httpx → requests）
+- `find_relevant_nodes`: `scan_project_classes`レスポンス解析を修正
+- `create_input_action`: 既存アセットチェック追加（UEクラッシュ防止）
+
+**変更範囲**:
+- C++ SpirrowBridgeBlueprintCommands: `HandleScanProjectClasses`実装
+- C++ SpirrowBridgeProjectCommands: `HandleCreateInputAction`に既存チェック
+- Python knowledge_tools.py: 新規作成（UEクラスマッピング、find_relevant_nodes実装）
+- Python pyproject.toml: httpx依存追加（後にrequests使用に変更）
+- README.md: ナレッジアシスタント機能セクション追加
+
 ### 2025-12-14: 全Blueprint関連ツールにpathパラメータ追加
 
 全てのBlueprint関連ツール（26個のツール）にpathパラメータを追加し、カスタムフォルダでのBlueprint操作を可能にしました。
@@ -154,7 +185,7 @@
 - **ベクトルDB**: ChromaDB
 - **起動スクリプト**: start_mcp_server.ps1 / start_mcp_server.bat
 - **設定管理**: config.local.ps1 / config.local.bat（環境固有設定）
-- **最終確認日**: 2025-12-09
+- **最終確認日**: 2025-12-14
 
 ---
 
