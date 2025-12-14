@@ -391,6 +391,47 @@ def register_editor_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    @mcp.tool()
+    def rename_actor(
+        ctx: Context,
+        current_name: str,
+        new_name: str
+    ) -> Dict[str, Any]:
+        """
+        Rename an actor in the current level.
+
+        Args:
+            current_name: Current name of the actor
+            new_name: New name for the actor
+
+        Returns:
+            Dict containing success status and actor details
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            response = unreal.send_command("rename_actor", {
+                "current_name": current_name,
+                "new_name": new_name
+            })
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Rename actor response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error renaming actor: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     # @mcp.tool() commented out because it's buggy
     def focus_viewport(
         ctx: Context,

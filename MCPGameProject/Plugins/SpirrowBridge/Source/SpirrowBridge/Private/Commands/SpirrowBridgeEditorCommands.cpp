@@ -64,6 +64,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleCommand(const FStrin
     {
         return HandleGetActorComponents(Params);
     }
+    else if (CommandType == TEXT("rename_actor"))
+    {
+        return HandleRenameActor(Params);
+    }
     // Blueprint actor spawning
     else if (CommandType == TEXT("spawn_blueprint_actor"))
     {
@@ -726,4 +730,56 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleGetActorComponents(c
     ResultObj->SetNumberField(TEXT("count"), ComponentArray.Num());
 
     return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleRenameActor(const TSharedPtr<FJsonObject>& Params)
+{
+    TSharedPtr<FJsonObject> ResultJson = MakeShareable(new FJsonObject());
+
+    FString CurrentName = Params->GetStringField(TEXT("current_name"));
+    FString NewName = Params->GetStringField(TEXT("new_name"));
+
+    if (CurrentName.IsEmpty() || NewName.IsEmpty())
+    {
+        ResultJson->SetStringField(TEXT("status"), TEXT("error"));
+        ResultJson->SetStringField(TEXT("error"), TEXT("current_name and new_name are required"));
+        return ResultJson;
+    }
+
+    // Find the actor
+    AActor* FoundActor = nullptr;
+    UWorld* World = GEditor->GetEditorWorldContext().World();
+
+    if (World)
+    {
+        for (TActorIterator<AActor> It(World); It; ++It)
+        {
+            if (It->GetActorLabel() == CurrentName || It->GetName() == CurrentName)
+            {
+                FoundActor = *It;
+                break;
+            }
+        }
+    }
+
+    if (!FoundActor)
+    {
+        ResultJson->SetStringField(TEXT("status"), TEXT("error"));
+        ResultJson->SetStringField(TEXT("error"), FString::Printf(TEXT("Actor '%s' not found"), *CurrentName));
+        return ResultJson;
+    }
+
+    // Rename the actor
+    FoundActor->SetActorLabel(NewName);
+    FoundActor->Rename(*NewName);
+
+    ResultJson->SetStringField(TEXT("status"), TEXT("success"));
+
+    TSharedPtr<FJsonObject> ResultData = MakeShareable(new FJsonObject());
+    ResultData->SetStringField(TEXT("old_name"), CurrentName);
+    ResultData->SetStringField(TEXT("new_name"), NewName);
+    ResultData->SetStringField(TEXT("class"), FoundActor->GetClass()->GetName());
+    ResultJson->SetObjectField(TEXT("result"), ResultData);
+
+    return ResultJson;
 } 
