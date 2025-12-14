@@ -10,7 +10,8 @@ dependencies = [
   "uvicorn",
   "fastapi",
   "pydantic>=2.10.0",
-  "requests"
+  "requests",
+  "httpx>=0.25.0"
 ]
 
 [build-system]
