@@ -58,6 +58,7 @@
 #include "Commands/SpirrowBridgeCommonUtils.h"
 #include "Commands/SpirrowBridgeUMGCommands.h"
 #include "Commands/SpirrowBridgeConfigCommands.h"
+#include "Commands/SpirrowBridgeGASCommands.h"
 
 // Default settings
 #define MCP_SERVER_HOST "127.0.0.1"
@@ -71,6 +72,7 @@ USpirrowBridge::USpirrowBridge()
     ProjectCommands = MakeShared<FSpirrowBridgeProjectCommands>();
     UMGCommands = MakeShared<FSpirrowBridgeUMGCommands>();
     ConfigCommands = MakeShared<FSpirrowBridgeConfigCommands>();
+    GASCommands = MakeShared<FSpirrowBridgeGASCommands>();
 }
 
 USpirrowBridge::~USpirrowBridge()
@@ -81,6 +83,7 @@ USpirrowBridge::~USpirrowBridge()
     ProjectCommands.Reset();
     UMGCommands.Reset();
     ConfigCommands.Reset();
+    GASCommands.Reset();
 }
 
 // Initialize subsystem
@@ -296,6 +299,13 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("list_config_sections"))
             {
                 ResultJson = ConfigCommands->HandleCommand(CommandType, Params);
+            }
+            // GAS Commands
+            else if (CommandType == TEXT("add_gameplay_tags") ||
+                     CommandType == TEXT("list_gameplay_tags") ||
+                     CommandType == TEXT("remove_gameplay_tag"))
+            {
+                ResultJson = GASCommands->HandleCommand(CommandType, Params);
             }
             else
             {

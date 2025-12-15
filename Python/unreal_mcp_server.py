@@ -273,6 +273,7 @@ from tools.umg_tools import register_umg_tools
 from tools.rag_tools import register_rag_tools
 from tools.knowledge_tools import register_knowledge_tools
 from tools.config_tools import register_config_tools
+from tools.gas_tools import register_gas_tools
 
 # Register tools
 register_editor_tools(mcp)
@@ -282,7 +283,8 @@ register_project_tools(mcp)
 register_umg_tools(mcp)
 register_rag_tools(mcp)
 register_knowledge_tools(mcp)
-register_config_tools(mcp)  
+register_config_tools(mcp)
+register_gas_tools(mcp)  
 
 @mcp.prompt()
 def info():

@@ -82,6 +82,14 @@
 | `set_config_value` | ✅ 実装完了 | プロジェクト設定値の変更 |
 | `list_config_sections` | ✅ 実装完了 | Config ファイルのセクション一覧取得 |
 
+### GAS（Gameplay Ability System）
+
+| ツール | 状態 | 備考 |
+|--------|------|------|
+| `add_gameplay_tags` | ✅ 実装完了 | Gameplay Tags の追加（バッチ対応、コメント設定可能） |
+| `list_gameplay_tags` | ✅ 実装完了 | Gameplay Tags の一覧取得（プレフィックスフィルタ対応） |
+| `remove_gameplay_tag` | ✅ 実装完了 | Gameplay Tag の削除 |
+
 ### RAG連携
 
 | ツール | 状態 | 備考 |
@@ -147,6 +155,54 @@
 ---
 
 ## 最新の更新履歴
+
+### 2025-12-15: GAS Phase 1-A - Gameplay Tags 管理機能
+
+**新機能**:
+- Gameplay Tags の管理機能を追加（DefaultGameplayTags.ini 操作）
+  - `add_gameplay_tags`: 複数のタグを一括追加、コメント設定対応
+  - `list_gameplay_tags`: 全タグの一覧取得、プレフィックスフィルタ対応
+  - `remove_gameplay_tag`: 指定したタグを削除
+
+**INI フォーマット対応**:
+- `+GameplayTagList=(Tag="TagName",DevComment="Comment")` 形式の解析と書き込み
+- 既存タグの保持（追加時の重複チェック）
+- セクション `[/Script/GameplayTags.GameplayTagsSettings]` の自動作成
+
+**主な用途**:
+- GAS（Gameplay Ability System）の Gameplay Tags 定義
+- タグの階層構造管理（例: `Ability.Attack.Melee`, `Ability.Attack.Range`）
+- タグへのコメント追加による設計意図の記録
+
+**使用例**:
+```python
+# タグを追加（コメント付き）
+add_gameplay_tags(
+    tags=["Ability.Attack.Melee", "Ability.Attack.Range", "State.Dead"],
+    comments={
+        "Ability.Attack.Melee": "近接攻撃アビリティ",
+        "Ability.Attack.Range": "遠距離攻撃アビリティ",
+        "State.Dead": "死亡状態タグ"
+    }
+)
+
+# プレフィックスでフィルタして一覧取得
+list_gameplay_tags(filter_prefix="Ability.Attack")
+
+# タグを削除
+remove_gameplay_tag(tag="State.Dead")
+```
+
+**変更範囲**:
+- C++ SpirrowBridgeGASCommands: 新規作成（ヘッダー・実装）
+- C++ SpirrowBridge: ルーティング追加（ExecuteCommand、メンバー変数、初期化・クリーンアップ）
+- Python gas_tools.py: 新規作成
+- Python unreal_mcp_server.py: register_gas_tools追加
+
+**技術詳細**:
+- INI ファイル直接操作（FFileHelper による読み書き）
+- 正規表現を使わない文字列パース（Tag/DevComment 抽出）
+- 既存タグの TSet による重複管理
 
 ### 2025-12-15: Config（ini）ファイル操作対応
 
