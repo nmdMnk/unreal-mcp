@@ -9,6 +9,7 @@
 #include "GameplayEffect.h"
 #include "GameplayEffectTypes.h"
 #include "GameplayTagContainer.h"
+#include "GameplayEffectComponents/TargetTagsGameplayEffectComponent.h"
 #include "Factories/BlueprintFactory.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Kismet2/BlueprintEditorUtils.h"
@@ -694,21 +695,39 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(co
         }
     }
 
-    // Set Application Tags (GrantedTags - tags granted while effect is active)
+    // Set Application Tags using TargetTagsGameplayEffectComponent (UE5 way)
     if (ApplicationTagsArray && ApplicationTagsArray->Num() > 0)
     {
-        for (const TSharedPtr<FJsonValue>& TagValue : *ApplicationTagsArray)
+        // Create the TargetTags component
+        UTargetTagsGameplayEffectComponent* TargetTagsComponent = NewObject<UTargetTagsGameplayEffectComponent>(EffectCDO, NAME_None, RF_Public);
+
+        if (TargetTagsComponent)
         {
-            FString TagString = TagValue->AsString();
-            FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*TagString), false);
-            if (Tag.IsValid())
+            // Build the tag container
+            FInheritedTagContainer TagContainer;
+
+            for (const TSharedPtr<FJsonValue>& TagValue : *ApplicationTagsArray)
             {
-                EffectCDO->InheritableOwnedTagsContainer.AddTag(Tag);
+                FString TagString = TagValue->AsString();
+                FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*TagString), false);
+                if (Tag.IsValid())
+                {
+                    TagContainer.Added.AddTag(Tag);
+                    UE_LOG(LogTemp, Display, TEXT("Adding granted tag: %s"), *TagString);
+                }
+                else
+                {
+                    UE_LOG(LogTemp, Warning, TEXT("Invalid gameplay tag: %s"), *TagString);
+                }
             }
-            else
-            {
-                UE_LOG(LogTemp, Warning, TEXT("Invalid gameplay tag: %s"), *TagString);
-            }
+
+            // Set the tags on the component
+            TargetTagsComponent->SetAndApplyTargetTagChanges(TagContainer);
+
+            // Add component to the GameplayEffect
+            EffectCDO->GEComponents.Add(TargetTagsComponent);
+
+            UE_LOG(LogTemp, Display, TEXT("Added TargetTagsGameplayEffectComponent with %d tags"), TagContainer.Added.Num());
         }
     }
 
