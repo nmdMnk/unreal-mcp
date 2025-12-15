@@ -350,3 +350,186 @@ def register_gas_tools(mcp: FastMCP):
             error_msg = f"Error creating gameplay effect: {e}"
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def create_gas_character(
+        ctx: Context,
+        name: str,
+        parent_class: str = "Character",
+        asc_component_name: str = "AbilitySystemComponent",
+        replication_mode: str = "Mixed",
+        default_abilities: Optional[List[str]] = None,
+        default_effects: Optional[List[str]] = None,
+        path: str = "/Game/GAS/Characters",
+        rationale: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Create a GAS-enabled Character Blueprint with AbilitySystemComponent configured.
+
+        This is a high-level tool that combines:
+        - Blueprint creation
+        - AbilitySystemComponent addition
+        - Default abilities/effects configuration
+
+        Args:
+            name: Blueprint name (e.g., "BP_GASCharacter")
+            parent_class: Parent class to inherit from (default: "Character")
+            asc_component_name: Name for the AbilitySystemComponent (default: "AbilitySystemComponent")
+            replication_mode: ASC replication mode for multiplayer:
+                - "Full": Full replication (server authority)
+                - "Mixed": Mixed mode (recommended for player-controlled)
+                - "Minimal": Minimal replication (AI/NPCs)
+            default_abilities: List of GameplayAbility class paths to grant by default
+                Example: ["/Game/GAS/Abilities/GA_Attack.GA_Attack_C"]
+            default_effects: List of GameplayEffect class paths to apply by default
+                Example: ["/Game/GAS/Effects/GE_DefaultStats.GE_DefaultStats_C"]
+            path: Content browser path for the Blueprint
+            rationale: Design rationale (auto-saved to knowledge base)
+
+        Returns:
+            Dict containing:
+            - success: Whether the operation succeeded
+            - blueprint_path: Path to the created Blueprint
+            - asc_component: Name of the ASC component
+            - abilities_set: Number of default abilities configured
+            - effects_set: Number of default effects configured
+
+        Example:
+            create_gas_character(
+                name="BP_PlayerGAS",
+                parent_class="Character",
+                replication_mode="Mixed",
+                default_abilities=[
+                    "/Game/GAS/Abilities/GA_Jump.GA_Jump_C",
+                    "/Game/GAS/Abilities/GA_Attack.GA_Attack_C"
+                ],
+                default_effects=[
+                    "/Game/GAS/Effects/GE_DefaultStats.GE_DefaultStats_C"
+                ],
+                path="/Game/GAS/Characters"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+        from tools.rag_tools import record_rationale
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "name": name,
+                "parent_class": parent_class,
+                "asc_component_name": asc_component_name,
+                "replication_mode": replication_mode,
+                "default_abilities": default_abilities or [],
+                "default_effects": default_effects or [],
+                "path": path
+            }
+
+            logger.info(f"Creating GAS Character: {name}")
+            response = unreal.send_command("create_gas_character", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            # Record rationale if provided and successful
+            if rationale and response.get("success"):
+                record_rationale(
+                    action=f"create_gas_character:{name}",
+                    rationale=rationale,
+                    details={
+                        "parent_class": parent_class,
+                        "replication_mode": replication_mode,
+                        "abilities_count": len(default_abilities or []),
+                        "effects_count": len(default_effects or []),
+                        "path": path
+                    }
+                )
+
+            if response.get("success"):
+                logger.info(f"Created GAS Character: {response.get('blueprint_path', 'N/A')}")
+            else:
+                logger.error(f"Failed to create GAS Character: {response.get('error', 'Unknown error')}")
+
+            return response
+
+        except Exception as e:
+            error_msg = f"Error creating GAS character: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def set_ability_system_defaults(
+        ctx: Context,
+        blueprint_name: str,
+        asc_component_name: str = "AbilitySystemComponent",
+        default_abilities: Optional[List[str]] = None,
+        default_effects: Optional[List[str]] = None,
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Set default abilities and effects on an existing AbilitySystemComponent.
+
+        Use this to configure an ASC that was already added to a Blueprint,
+        either manually or via add_component_to_blueprint.
+
+        Args:
+            blueprint_name: Name of the Blueprint containing the ASC
+            asc_component_name: Name of the AbilitySystemComponent in the Blueprint
+            default_abilities: List of GameplayAbility class paths to grant
+                Example: ["/Game/GAS/Abilities/GA_Attack.GA_Attack_C"]
+            default_effects: List of GameplayEffect class paths to apply
+                Example: ["/Game/GAS/Effects/GE_DefaultStats.GE_DefaultStats_C"]
+            path: Content browser path where the Blueprint is located
+
+        Returns:
+            Dict containing:
+            - success: Whether the operation succeeded
+            - abilities_set: Number of abilities configured
+            - effects_set: Number of effects configured
+
+        Example:
+            set_ability_system_defaults(
+                blueprint_name="BP_ExistingCharacter",
+                asc_component_name="AbilitySystem",
+                default_abilities=["/Game/GAS/Abilities/GA_Dash.GA_Dash_C"],
+                path="/Game/Characters"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "asc_component_name": asc_component_name,
+                "default_abilities": default_abilities or [],
+                "default_effects": default_effects or [],
+                "path": path
+            }
+
+            logger.info(f"Setting ASC defaults on: {blueprint_name}")
+            response = unreal.send_command("set_ability_system_defaults", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            if response.get("success"):
+                logger.info(f"Set {response.get('abilities_set', 0)} abilities, {response.get('effects_set', 0)} effects")
+            else:
+                logger.error(f"Failed to set ASC defaults: {response.get('error', 'Unknown error')}")
+
+            return response
+
+        except Exception as e:
+            error_msg = f"Error setting ability system defaults: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}

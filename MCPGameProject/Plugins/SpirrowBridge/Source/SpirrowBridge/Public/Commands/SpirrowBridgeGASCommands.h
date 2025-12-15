@@ -44,6 +44,16 @@ private:
     TSharedPtr<FJsonObject> HandleCreateGameplayEffect(const TSharedPtr<FJsonObject>& Params);
 
     /**
+     * Create a GAS-enabled Character Blueprint with ASC configured
+     */
+    TSharedPtr<FJsonObject> HandleCreateGASCharacter(const TSharedPtr<FJsonObject>& Params);
+
+    /**
+     * Set default abilities and effects on an existing ASC
+     */
+    TSharedPtr<FJsonObject> HandleSetAbilitySystemDefaults(const TSharedPtr<FJsonObject>& Params);
+
+    /**
      * Get the path to DefaultGameplayTags.ini
      */
     FString GetGameplayTagsConfigPath() const;

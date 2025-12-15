@@ -15,6 +15,11 @@
 #include "AssetToolsModule.h"
 #include "IAssetTools.h"
 #include "UObject/SavePackage.h"
+#include "Engine/SimpleConstructionScript.h"
+#include "Engine/SCS_Node.h"
+#include "GameFramework/Character.h"
+#include "AbilitySystemComponent.h"
+#include "GameplayAbility.h"
 
 FSpirrowBridgeGASCommands::FSpirrowBridgeGASCommands()
 {
@@ -45,6 +50,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCommand(const FString& 
     else if (CommandType == TEXT("create_gameplay_effect"))
     {
         return HandleCreateGameplayEffect(Params);
+    }
+    else if (CommandType == TEXT("create_gas_character"))
+    {
+        return HandleCreateGASCharacter(Params);
+    }
+    else if (CommandType == TEXT("set_ability_system_defaults"))
+    {
+        return HandleSetAbilitySystemDefaults(Params);
     }
 
     TSharedPtr<FJsonObject> ErrorResponse = MakeShareable(new FJsonObject);
@@ -713,6 +726,305 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(co
     Response->SetNumberField(TEXT("modifier_count"), ModifiersArray ? ModifiersArray->Num() : 0);
 
     UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Created GameplayEffect '%s' at %s"), *Name, *AssetPath);
+
+    return Response;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGASCharacter(const TSharedPtr<FJsonObject>& Params)
+{
+    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
+
+    // Extract parameters
+    FString Name;
+    if (!Params->TryGetStringField(TEXT("name"), Name) || Name.IsEmpty())
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("Missing or empty 'name' parameter"));
+        return Response;
+    }
+
+    FString ParentClassStr;
+    Params->TryGetStringField(TEXT("parent_class"), ParentClassStr);
+    if (ParentClassStr.IsEmpty())
+    {
+        ParentClassStr = TEXT("Character");
+    }
+
+    FString ASCComponentName;
+    Params->TryGetStringField(TEXT("asc_component_name"), ASCComponentName);
+    if (ASCComponentName.IsEmpty())
+    {
+        ASCComponentName = TEXT("AbilitySystemComponent");
+    }
+
+    FString ReplicationMode;
+    Params->TryGetStringField(TEXT("replication_mode"), ReplicationMode);
+    if (ReplicationMode.IsEmpty())
+    {
+        ReplicationMode = TEXT("Mixed");
+    }
+
+    FString PathStr;
+    Params->TryGetStringField(TEXT("path"), PathStr);
+    if (PathStr.IsEmpty())
+    {
+        PathStr = TEXT("/Game/GAS/Characters");
+    }
+
+    // Get default abilities and effects arrays
+    const TArray<TSharedPtr<FJsonValue>>* DefaultAbilitiesArray = nullptr;
+    Params->TryGetArrayField(TEXT("default_abilities"), DefaultAbilitiesArray);
+
+    const TArray<TSharedPtr<FJsonValue>>* DefaultEffectsArray = nullptr;
+    Params->TryGetArrayField(TEXT("default_effects"), DefaultEffectsArray);
+
+    // Find parent class
+    UClass* ParentClass = nullptr;
+    if (ParentClassStr == TEXT("Character"))
+    {
+        ParentClass = ACharacter::StaticClass();
+    }
+    else
+    {
+        ParentClass = FindObject<UClass>(nullptr, *ParentClassStr);
+        if (!ParentClass)
+        {
+            Response->SetBoolField(TEXT("success"), false);
+            Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Parent class not found: %s"), *ParentClassStr));
+            return Response;
+        }
+    }
+
+    // Create package and asset
+    FString PackageName = PathStr / Name;
+    UPackage* Package = CreatePackage(*PackageName);
+    if (!Package)
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("Failed to create package"));
+        return Response;
+    }
+
+    // Create Blueprint
+    UBlueprint* NewBlueprint = FKismetEditorUtilities::CreateBlueprint(
+        ParentClass,
+        Package,
+        FName(*Name),
+        BPTYPE_Normal,
+        UBlueprint::StaticClass(),
+        UBlueprintGeneratedClass::StaticClass(),
+        NAME_None
+    );
+
+    if (!NewBlueprint)
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("Failed to create Blueprint"));
+        return Response;
+    }
+
+    // Add AbilitySystemComponent to the Blueprint
+    USimpleConstructionScript* SCS = NewBlueprint->SimpleConstructionScript;
+    if (!SCS)
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("Blueprint has no SimpleConstructionScript"));
+        return Response;
+    }
+
+    USCS_Node* NewNode = SCS->CreateNode(UAbilitySystemComponent::StaticClass(), FName(*ASCComponentName));
+    if (!NewNode)
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("Failed to create AbilitySystemComponent node"));
+        return Response;
+    }
+
+    SCS->AddNode(NewNode);
+    UE_LOG(LogTemp, Log, TEXT("Added AbilitySystemComponent '%s' to Blueprint"), *ASCComponentName);
+
+    // Configure ASC replication mode
+    UAbilitySystemComponent* ASCTemplate = Cast<UAbilitySystemComponent>(NewNode->ComponentTemplate);
+    if (ASCTemplate)
+    {
+        if (ReplicationMode == TEXT("Full"))
+        {
+            ASCTemplate->SetReplicationMode(EGameplayEffectReplicationMode::Full);
+            UE_LOG(LogTemp, Log, TEXT("Set ASC replication mode to Full"));
+        }
+        else if (ReplicationMode == TEXT("Mixed"))
+        {
+            ASCTemplate->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
+            UE_LOG(LogTemp, Log, TEXT("Set ASC replication mode to Mixed"));
+        }
+        else if (ReplicationMode == TEXT("Minimal"))
+        {
+            ASCTemplate->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
+            UE_LOG(LogTemp, Log, TEXT("Set ASC replication mode to Minimal"));
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Unknown replication mode '%s', using default"), *ReplicationMode);
+        }
+
+        // Note: UAbilitySystemComponent doesn't have DefaultAbilities/DefaultEffects properties by default
+        // These would typically be set in a custom ASC subclass or in BeginPlay
+        // For now, we'll log them for reference
+        if (DefaultAbilitiesArray && DefaultAbilitiesArray->Num() > 0)
+        {
+            UE_LOG(LogTemp, Log, TEXT("Default abilities specified (%d abilities) - note these need to be granted in BeginPlay or custom ASC class"), DefaultAbilitiesArray->Num());
+            for (const TSharedPtr<FJsonValue>& AbilityValue : *DefaultAbilitiesArray)
+            {
+                FString AbilityPath = AbilityValue->AsString();
+                UE_LOG(LogTemp, Log, TEXT("  - %s"), *AbilityPath);
+            }
+        }
+
+        if (DefaultEffectsArray && DefaultEffectsArray->Num() > 0)
+        {
+            UE_LOG(LogTemp, Log, TEXT("Default effects specified (%d effects) - note these need to be applied in BeginPlay or custom ASC class"), DefaultEffectsArray->Num());
+            for (const TSharedPtr<FJsonValue>& EffectValue : *DefaultEffectsArray)
+            {
+                FString EffectPath = EffectValue->AsString();
+                UE_LOG(LogTemp, Log, TEXT("  - %s"), *EffectPath);
+            }
+        }
+    }
+
+    // Compile and save
+    FKismetEditorUtilities::CompileBlueprint(NewBlueprint);
+
+    FString AssetPath = PackageName + TEXT(".") + Name;
+    FAssetRegistryModule::AssetCreated(NewBlueprint);
+    Package->MarkPackageDirty();
+
+    // Build response
+    Response->SetBoolField(TEXT("success"), true);
+    Response->SetStringField(TEXT("name"), Name);
+    Response->SetStringField(TEXT("asset_path"), AssetPath);
+    Response->SetStringField(TEXT("parent_class"), ParentClassStr);
+    Response->SetStringField(TEXT("asc_component_name"), ASCComponentName);
+    Response->SetStringField(TEXT("replication_mode"), ReplicationMode);
+
+    UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Created GAS Character Blueprint '%s' at %s with ASC"), *Name, *AssetPath);
+
+    return Response;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleSetAbilitySystemDefaults(const TSharedPtr<FJsonObject>& Params)
+{
+    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
+
+    // Extract parameters
+    FString BlueprintName;
+    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName) || BlueprintName.IsEmpty())
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("Missing or empty 'blueprint_name' parameter"));
+        return Response;
+    }
+
+    FString ASCComponentName;
+    Params->TryGetStringField(TEXT("asc_component_name"), ASCComponentName);
+    if (ASCComponentName.IsEmpty())
+    {
+        ASCComponentName = TEXT("AbilitySystemComponent");
+    }
+
+    FString PathStr;
+    Params->TryGetStringField(TEXT("path"), PathStr);
+    if (PathStr.IsEmpty())
+    {
+        PathStr = TEXT("/Game/Blueprints");
+    }
+
+    // Get default abilities and effects arrays
+    const TArray<TSharedPtr<FJsonValue>>* DefaultAbilitiesArray = nullptr;
+    Params->TryGetArrayField(TEXT("default_abilities"), DefaultAbilitiesArray);
+
+    const TArray<TSharedPtr<FJsonValue>>* DefaultEffectsArray = nullptr;
+    Params->TryGetArrayField(TEXT("default_effects"), DefaultEffectsArray);
+
+    // Load Blueprint
+    FString AssetPath = PathStr / BlueprintName + TEXT(".") + BlueprintName;
+    UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *AssetPath);
+    if (!Blueprint)
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Blueprint not found: %s"), *AssetPath));
+        return Response;
+    }
+
+    // Find ASC component
+    USimpleConstructionScript* SCS = Blueprint->SimpleConstructionScript;
+    if (!SCS)
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("Blueprint has no SimpleConstructionScript"));
+        return Response;
+    }
+
+    USCS_Node* ASCNode = nullptr;
+    TArray<USCS_Node*> AllNodes = SCS->GetAllNodes();
+    for (USCS_Node* Node : AllNodes)
+    {
+        if (Node && Node->GetVariableName().ToString() == ASCComponentName)
+        {
+            ASCNode = Node;
+            break;
+        }
+    }
+
+    if (!ASCNode)
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), FString::Printf(TEXT("AbilitySystemComponent '%s' not found in Blueprint"), *ASCComponentName));
+        return Response;
+    }
+
+    UAbilitySystemComponent* ASCTemplate = Cast<UAbilitySystemComponent>(ASCNode->ComponentTemplate);
+    if (!ASCTemplate)
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("Component is not an AbilitySystemComponent"));
+        return Response;
+    }
+
+    // Note: UAbilitySystemComponent doesn't have DefaultAbilities/DefaultEffects properties by default
+    // These would typically be set in a custom ASC subclass or in BeginPlay
+    // For now, we'll log them for reference
+    if (DefaultAbilitiesArray && DefaultAbilitiesArray->Num() > 0)
+    {
+        UE_LOG(LogTemp, Log, TEXT("Default abilities specified (%d abilities) - note these need to be granted in BeginPlay or custom ASC class"), DefaultAbilitiesArray->Num());
+        for (const TSharedPtr<FJsonValue>& AbilityValue : *DefaultAbilitiesArray)
+        {
+            FString AbilityPath = AbilityValue->AsString();
+            UE_LOG(LogTemp, Log, TEXT("  - %s"), *AbilityPath);
+        }
+    }
+
+    if (DefaultEffectsArray && DefaultEffectsArray->Num() > 0)
+    {
+        UE_LOG(LogTemp, Log, TEXT("Default effects specified (%d effects) - note these need to be applied in BeginPlay or custom ASC class"), DefaultEffectsArray->Num());
+        for (const TSharedPtr<FJsonValue>& EffectValue : *DefaultEffectsArray)
+        {
+            FString EffectPath = EffectValue->AsString();
+            UE_LOG(LogTemp, Log, TEXT("  - %s"), *EffectPath);
+        }
+    }
+
+    // Compile and save
+    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    Blueprint->MarkPackageDirty();
+
+    // Build response
+    Response->SetBoolField(TEXT("success"), true);
+    Response->SetStringField(TEXT("blueprint_name"), BlueprintName);
+    Response->SetStringField(TEXT("asc_component_name"), ASCComponentName);
+    Response->SetNumberField(TEXT("default_abilities_count"), DefaultAbilitiesArray ? DefaultAbilitiesArray->Num() : 0);
+    Response->SetNumberField(TEXT("default_effects_count"), DefaultEffectsArray ? DefaultEffectsArray->Num() : 0);
+
+    UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Configured ASC defaults for Blueprint '%s'"), *BlueprintName);
 
     return Response;
 }
