@@ -169,13 +169,13 @@ create_blueprint(name="BP_Player", parent_class="APlayerCharacterBase")
 ## 🚀 クイックスタートガイド
 
 ### 前提条件
-- Unreal Engine 5.5+
+- Unreal Engine 5.5, 5.6, 5.7（5.5+で動作確認済み）
 - Python 3.12+
 - MCPクライアント（例：Claude Desktop、Cursor、Windsurf）
 
 ### サンプルプロジェクト
 
-すぐに始めるには、`MCPGameProject`のスタータープロジェクトを使用してください。これは`SpirrowBridge.uplugin`が既に設定されたUE 5.5 Blank Starter Projectです。
+すぐに始めるには、`MCPGameProject`のスタータープロジェクトを使用してください。これは`SpirrowBridge.uplugin`が既に設定されたUE 5.x対応のBlank Starter Projectです。
 
 1. **プロジェクトの準備**
    - .uprojectファイルを右クリック
@@ -202,6 +202,16 @@ create_blueprint(name="BP_Player", parent_class="APlayerCharacterBase")
    - Visual Studioプロジェクトファイルを生成
    - ソリューション（`.sln`）を開く
    - ターゲットプラットフォームと出力設定でビルド
+
+#### UE 5.x 互換性に関する注意
+
+SpirrowBridgeはUE 5.5、5.6、5.7で動作確認済みです。プロジェクトの `.Target.cs` ファイルは、これらのバージョン全てで互換性のある設定になっています：
+
+- `BuildSettingsVersion.V5` を使用（UE 5.5+で利用可能）
+- `EngineIncludeOrderVersion.Unreal5_5` を使用（UE 5.5+で利用可能）
+- `CppCompileWarningSettings.UndefinedIdentifierWarningLevel` を使用（UE 5.6+の推奨設定）
+
+他のバージョンのUnreal Engineで使用する場合、`.Target.cs` ファイルでビルドエラーが発生する可能性があります。その場合は、エンジンバージョンに応じて適切なビルド設定バージョンに調整してください。
 
 ### Pythonサーバーのセットアップ
 
