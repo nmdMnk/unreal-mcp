@@ -34,6 +34,11 @@ private:
     TSharedPtr<FJsonObject> HandleRemoveGameplayTag(const TSharedPtr<FJsonObject>& Params);
 
     /**
+     * List GAS-related assets in the project
+     */
+    TSharedPtr<FJsonObject> HandleListGASAssets(const TSharedPtr<FJsonObject>& Params);
+
+    /**
      * Get the path to DefaultGameplayTags.ini
      */
     FString GetGameplayTagsConfigPath() const;

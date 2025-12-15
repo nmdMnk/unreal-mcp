@@ -173,3 +173,63 @@ def register_gas_tools(mcp: FastMCP):
             error_msg = f"Error removing gameplay tag: {e}"
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def list_gas_assets(
+        ctx: Context,
+        asset_type: str = "all",
+        path_filter: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        List GAS-related assets (GameplayEffects, GameplayAbilities, GameplayCues) in the project.
+
+        Args:
+            asset_type: Filter by asset type:
+                - "effect": GameplayEffect Blueprints only
+                - "ability": GameplayAbility Blueprints only
+                - "cue": GameplayCue actors and notifies only
+                - "attribute_set": AttributeSet classes only
+                - "all": All GAS-related assets (default)
+            path_filter: Filter by content path (e.g., "/Game/GAS/")
+
+        Returns:
+            Dict containing:
+            - success: Whether the operation succeeded
+            - effects: List of GameplayEffect assets
+            - abilities: List of GameplayAbility assets
+            - cues: List of GameplayCue assets
+            - attribute_sets: List of AttributeSet classes
+            - total_count: Total number of assets found
+
+        Example:
+            list_gas_assets(asset_type="effect", path_filter="/Game/GAS/Effects/")
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "asset_type": asset_type,
+                "path_filter": path_filter or ""
+            }
+
+            logger.info(f"Listing GAS assets (type={asset_type}, path={path_filter or 'all'})")
+            response = unreal.send_command("list_gas_assets", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            total = response.get("total_count", 0)
+            logger.info(f"Found {total} GAS assets")
+
+            return response
+
+        except Exception as e:
+            error_msg = f"Error listing GAS assets: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}

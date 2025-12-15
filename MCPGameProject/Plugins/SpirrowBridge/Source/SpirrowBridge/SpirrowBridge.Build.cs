@@ -53,7 +53,8 @@ public class SpirrowBridge : ModuleRules
 				"BlueprintGraph",
 				"Projects",
 				"AssetRegistry",
-				"AssetTools"
+				"AssetTools",
+				"GameplayAbilities"
 			}
 		);
 		

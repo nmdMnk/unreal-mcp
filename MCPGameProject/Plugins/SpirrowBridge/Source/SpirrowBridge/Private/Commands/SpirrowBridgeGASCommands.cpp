@@ -3,6 +3,9 @@
 #include "Misc/Paths.h"
 #include "HAL/PlatformFileManager.h"
 #include "Serialization/JsonSerializer.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "Engine/Blueprint.h"
+#include "Engine/BlueprintGeneratedClass.h"
 
 FSpirrowBridgeGASCommands::FSpirrowBridgeGASCommands()
 {
@@ -25,6 +28,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCommand(const FString& 
     else if (CommandType == TEXT("remove_gameplay_tag"))
     {
         return HandleRemoveGameplayTag(Params);
+    }
+    else if (CommandType == TEXT("list_gas_assets"))
+    {
+        return HandleListGASAssets(Params);
     }
 
     TSharedPtr<FJsonObject> ErrorResponse = MakeShareable(new FJsonObject);
@@ -328,6 +335,147 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleRemoveGameplayTag(const
     Response->SetBoolField(TEXT("removed"), bFound);
     Response->SetStringField(TEXT("message"), bFound ? FString::Printf(TEXT("Removed tag: %s"), *TagToRemove) : FString::Printf(TEXT("Tag not found: %s"), *TagToRemove));
     Response->SetStringField(TEXT("file_path"), ConfigPath);
+
+    return Response;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleListGASAssets(const TSharedPtr<FJsonObject>& Params)
+{
+    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
+
+    FString AssetType = Params->GetStringField(TEXT("asset_type"));
+    FString PathFilter = Params->GetStringField(TEXT("path_filter"));
+
+    // Get Asset Registry
+    FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+    IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+
+    // Results arrays
+    TArray<TSharedPtr<FJsonValue>> EffectsArray;
+    TArray<TSharedPtr<FJsonValue>> AbilitiesArray;
+    TArray<TSharedPtr<FJsonValue>> CuesArray;
+    TArray<TSharedPtr<FJsonValue>> AttributeSetsArray;
+
+    // Helper lambda to create asset info JSON
+    auto CreateAssetInfo = [](const FAssetData& Asset) -> TSharedPtr<FJsonObject> {
+        TSharedPtr<FJsonObject> AssetObj = MakeShareable(new FJsonObject);
+        AssetObj->SetStringField(TEXT("name"), Asset.AssetName.ToString());
+        AssetObj->SetStringField(TEXT("path"), Asset.GetObjectPathString());
+        AssetObj->SetStringField(TEXT("class"), Asset.AssetClassPath.GetAssetName().ToString());
+        return AssetObj;
+    };
+
+    // Search for Blueprint assets
+    FARFilter Filter;
+    Filter.ClassPaths.Add(FTopLevelAssetPath(TEXT("/Script/Engine"), TEXT("Blueprint")));
+    Filter.bRecursiveClasses = true;
+    Filter.bRecursivePaths = true;
+
+    if (!PathFilter.IsEmpty())
+    {
+        Filter.PackagePaths.Add(FName(*PathFilter));
+        Filter.bRecursivePaths = true;
+    }
+
+    TArray<FAssetData> BlueprintAssets;
+    AssetRegistry.GetAssets(Filter, BlueprintAssets);
+
+    for (const FAssetData& Asset : BlueprintAssets)
+    {
+        // Load the blueprint to check its parent class
+        UBlueprint* Blueprint = Cast<UBlueprint>(Asset.GetAsset());
+        if (!Blueprint || !Blueprint->GeneratedClass)
+        {
+            continue;
+        }
+
+        UClass* ParentClass = Blueprint->GeneratedClass->GetSuperClass();
+        if (!ParentClass)
+        {
+            continue;
+        }
+
+        FString ParentClassName = ParentClass->GetName();
+
+        // Check if it's a GameplayEffect
+        bool bIsEffect = false;
+        bool bIsAbility = false;
+        bool bIsCue = false;
+        bool bIsAttributeSet = false;
+
+        // Walk up the class hierarchy to find GAS base classes
+        UClass* CurrentClass = ParentClass;
+        while (CurrentClass)
+        {
+            FString ClassName = CurrentClass->GetName();
+
+            if (ClassName.Contains(TEXT("GameplayEffect")))
+            {
+                bIsEffect = true;
+                break;
+            }
+            else if (ClassName.Contains(TEXT("GameplayAbility")))
+            {
+                bIsAbility = true;
+                break;
+            }
+            else if (ClassName.Contains(TEXT("GameplayCueNotify")))
+            {
+                bIsCue = true;
+                break;
+            }
+            else if (ClassName.Contains(TEXT("AttributeSet")))
+            {
+                bIsAttributeSet = true;
+                break;
+            }
+
+            CurrentClass = CurrentClass->GetSuperClass();
+        }
+
+        // Add to appropriate array based on type filter
+        if (bIsEffect && (AssetType == TEXT("all") || AssetType == TEXT("effect")))
+        {
+            TSharedPtr<FJsonObject> AssetObj = CreateAssetInfo(Asset);
+            AssetObj->SetStringField(TEXT("type"), TEXT("GameplayEffect"));
+            AssetObj->SetStringField(TEXT("parent_class"), ParentClassName);
+            EffectsArray.Add(MakeShareable(new FJsonValueObject(AssetObj)));
+        }
+        else if (bIsAbility && (AssetType == TEXT("all") || AssetType == TEXT("ability")))
+        {
+            TSharedPtr<FJsonObject> AssetObj = CreateAssetInfo(Asset);
+            AssetObj->SetStringField(TEXT("type"), TEXT("GameplayAbility"));
+            AssetObj->SetStringField(TEXT("parent_class"), ParentClassName);
+            AbilitiesArray.Add(MakeShareable(new FJsonValueObject(AssetObj)));
+        }
+        else if (bIsCue && (AssetType == TEXT("all") || AssetType == TEXT("cue")))
+        {
+            TSharedPtr<FJsonObject> AssetObj = CreateAssetInfo(Asset);
+            AssetObj->SetStringField(TEXT("type"), TEXT("GameplayCue"));
+            AssetObj->SetStringField(TEXT("parent_class"), ParentClassName);
+            CuesArray.Add(MakeShareable(new FJsonValueObject(AssetObj)));
+        }
+        else if (bIsAttributeSet && (AssetType == TEXT("all") || AssetType == TEXT("attribute_set")))
+        {
+            TSharedPtr<FJsonObject> AssetObj = CreateAssetInfo(Asset);
+            AssetObj->SetStringField(TEXT("type"), TEXT("AttributeSet"));
+            AssetObj->SetStringField(TEXT("parent_class"), ParentClassName);
+            AttributeSetsArray.Add(MakeShareable(new FJsonValueObject(AssetObj)));
+        }
+    }
+
+    // Build response
+    Response->SetBoolField(TEXT("success"), true);
+    Response->SetArrayField(TEXT("effects"), EffectsArray);
+    Response->SetArrayField(TEXT("abilities"), AbilitiesArray);
+    Response->SetArrayField(TEXT("cues"), CuesArray);
+    Response->SetArrayField(TEXT("attribute_sets"), AttributeSetsArray);
+
+    int32 TotalCount = EffectsArray.Num() + AbilitiesArray.Num() + CuesArray.Num() + AttributeSetsArray.Num();
+    Response->SetNumberField(TEXT("total_count"), TotalCount);
+
+    UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Found %d GAS assets (Effects: %d, Abilities: %d, Cues: %d, AttributeSets: %d)"),
+        TotalCount, EffectsArray.Num(), AbilitiesArray.Num(), CuesArray.Num(), AttributeSetsArray.Num());
 
     return Response;
 }

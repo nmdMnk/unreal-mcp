@@ -303,7 +303,8 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
             // GAS Commands
             else if (CommandType == TEXT("add_gameplay_tags") ||
                      CommandType == TEXT("list_gameplay_tags") ||
-                     CommandType == TEXT("remove_gameplay_tag"))
+                     CommandType == TEXT("remove_gameplay_tag") ||
+                     CommandType == TEXT("list_gas_assets"))
             {
                 ResultJson = GASCommands->HandleCommand(CommandType, Params);
             }
