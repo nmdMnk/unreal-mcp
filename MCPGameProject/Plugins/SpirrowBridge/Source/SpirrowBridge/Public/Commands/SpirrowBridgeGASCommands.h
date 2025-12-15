@@ -3,6 +3,9 @@
 #include "CoreMinimal.h"
 #include "Dom/JsonObject.h"
 
+// Forward declarations
+struct FGameplayTagContainer;
+
 /**
  * Handles GAS (Gameplay Ability System) related commands for SpirrowBridge.
  */
