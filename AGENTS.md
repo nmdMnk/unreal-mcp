@@ -314,6 +314,9 @@ def get_actor_components(ctx: Context, name: str) -> Dict[str, Any]:
 | `add_blueprint_event_node` | blueprint_event | イベント使用の意図 |
 | `add_blueprint_function_node` | blueprint_logic | 関数呼び出しの理由 |
 | `add_blueprint_variable` | blueprint_variable | 変数の役割 |
+| `create_gameplay_effect` | gas_effect | GameplayEffect設計の意図（効果の用途、タグ戦略） |
+| `create_gameplay_ability` | gas_ability | GameplayAbility設計の意図（アビリティの役割、発動条件） |
+| `create_gas_character` | gas_character | GAS Character設計の意図（デフォルトAbilityとEffect選定理由） |
 
 ### 使用例
 
