@@ -557,7 +557,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(co
     }
 
     // 3. Check if Blueprint object exists in memory
-    UBlueprint* ExistingBlueprint = FindObject<UBlueprint>(ANY_PACKAGE, *Name);
+    UBlueprint* ExistingBlueprint = FindObject<UBlueprint>(nullptr, *Name);
     if (ExistingBlueprint)
     {
         // Check if it's in the same path
@@ -841,7 +841,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGASCharacter(cons
     }
 
     // 3. Check if Blueprint object exists in memory
-    UBlueprint* ExistingBlueprint = FindObject<UBlueprint>(ANY_PACKAGE, *Name);
+    UBlueprint* ExistingBlueprint = FindObject<UBlueprint>(nullptr, *Name);
     if (ExistingBlueprint)
     {
         // Check if it's in the same path
@@ -952,7 +952,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGASCharacter(cons
     // Compile and save
     FKismetEditorUtilities::CompileBlueprint(NewBlueprint);
 
-    FString AssetPath = PackageName + TEXT(".") + Name;
+    // AssetPath already defined at the beginning of function for duplicate checks
     FAssetRegistryModule::AssetCreated(NewBlueprint);
     Package->MarkPackageDirty();
 
