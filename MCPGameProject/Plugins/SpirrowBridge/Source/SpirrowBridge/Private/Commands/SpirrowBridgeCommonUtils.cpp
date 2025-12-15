@@ -816,16 +816,16 @@ bool FSpirrowBridgeCommonUtils::SetObjectProperty(UObject* Object, const FString
         if (Value->Type == EJson::String)
         {
             FString AssetPath = Value->AsString();
-            FSoftObjectPath SoftPath(AssetPath);
-            SoftObjectProp->SetPropertyValue(PropertyAddr, SoftPath);
+            FSoftObjectPtr SoftPtr(FSoftObjectPath(AssetPath));
+            SoftObjectProp->SetPropertyValue(PropertyAddr, SoftPtr);
             UE_LOG(LogTemp, Display, TEXT("Set soft object property %s to path: %s"),
                    *PropertyName, *AssetPath);
             return true;
         }
         else if (Value->Type == EJson::Null)
         {
-            FSoftObjectPath EmptyPath;
-            SoftObjectProp->SetPropertyValue(PropertyAddr, EmptyPath);
+            FSoftObjectPtr EmptyPtr;
+            SoftObjectProp->SetPropertyValue(PropertyAddr, EmptyPtr);
             return true;
         }
         else
