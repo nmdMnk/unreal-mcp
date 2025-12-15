@@ -54,7 +54,9 @@ public class SpirrowBridge : ModuleRules
 				"Projects",
 				"AssetRegistry",
 				"AssetTools",
-				"GameplayAbilities"
+				"GameplayAbilities",
+				"GameplayTags",
+				"GameplayTasks"
 			}
 		);
 		

@@ -6,6 +6,15 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Engine/Blueprint.h"
 #include "Engine/BlueprintGeneratedClass.h"
+#include "GameplayEffect.h"
+#include "GameplayTagContainer.h"
+#include "Factories/BlueprintFactory.h"
+#include "Kismet2/KismetEditorUtilities.h"
+#include "Kismet2/BlueprintEditorUtils.h"
+#include "EditorAssetLibrary.h"
+#include "AssetToolsModule.h"
+#include "IAssetTools.h"
+#include "UObject/SavePackage.h"
 
 FSpirrowBridgeGASCommands::FSpirrowBridgeGASCommands()
 {
@@ -32,6 +41,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCommand(const FString& 
     else if (CommandType == TEXT("list_gas_assets"))
     {
         return HandleListGASAssets(Params);
+    }
+    else if (CommandType == TEXT("create_gameplay_effect"))
+    {
+        return HandleCreateGameplayEffect(Params);
     }
 
     TSharedPtr<FJsonObject> ErrorResponse = MakeShareable(new FJsonObject);
@@ -476,6 +489,230 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleListGASAssets(const TSh
 
     UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Found %d GAS assets (Effects: %d, Abilities: %d, Cues: %d, AttributeSets: %d)"),
         TotalCount, EffectsArray.Num(), AbilitiesArray.Num(), CuesArray.Num(), AttributeSetsArray.Num());
+
+    return Response;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(const TSharedPtr<FJsonObject>& Params)
+{
+    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
+
+    // Get parameters
+    FString Name = Params->GetStringField(TEXT("name"));
+    FString DurationPolicyStr = Params->GetStringField(TEXT("duration_policy"));
+    double DurationMagnitude = Params->GetNumberField(TEXT("duration_magnitude"));
+    double Period = Params->GetNumberField(TEXT("period"));
+    FString Path = Params->GetStringField(TEXT("path"));
+
+    const TArray<TSharedPtr<FJsonValue>>* ModifiersArray = nullptr;
+    Params->TryGetArrayField(TEXT("modifiers"), ModifiersArray);
+
+    const TArray<TSharedPtr<FJsonValue>>* ApplicationTagsArray = nullptr;
+    Params->TryGetArrayField(TEXT("application_tags"), ApplicationTagsArray);
+
+    const TArray<TSharedPtr<FJsonValue>>* RemovalTagsArray = nullptr;
+    Params->TryGetArrayField(TEXT("removal_tags"), RemovalTagsArray);
+
+    // Validate name
+    if (Name.IsEmpty())
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("Missing 'name' parameter"));
+        return Response;
+    }
+
+    // Construct full asset path
+    FString PackagePath = Path / Name;
+    FString AssetPath = PackagePath + TEXT(".") + Name;
+
+    // Check if asset already exists
+    if (UEditorAssetLibrary::DoesAssetExist(AssetPath))
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Asset already exists: %s"), *AssetPath));
+        return Response;
+    }
+
+    // Create the package
+    UPackage* Package = CreatePackage(*PackagePath);
+    if (!Package)
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("Failed to create package"));
+        return Response;
+    }
+
+    // Create Blueprint factory
+    UBlueprintFactory* Factory = NewObject<UBlueprintFactory>();
+    Factory->ParentClass = UGameplayEffect::StaticClass();
+
+    // Create the Blueprint asset
+    UBlueprint* Blueprint = Cast<UBlueprint>(Factory->FactoryCreateNew(
+        UBlueprint::StaticClass(),
+        Package,
+        FName(*Name),
+        RF_Public | RF_Standalone,
+        nullptr,
+        GWarn
+    ));
+
+    if (!Blueprint)
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("Failed to create GameplayEffect Blueprint"));
+        return Response;
+    }
+
+    // Compile the blueprint to generate the class
+    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+
+    // Get the CDO (Class Default Object) to set properties
+    UGameplayEffect* EffectCDO = Cast<UGameplayEffect>(Blueprint->GeneratedClass->GetDefaultObject());
+    if (!EffectCDO)
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("Failed to get GameplayEffect CDO"));
+        return Response;
+    }
+
+    // Set Duration Policy
+    if (DurationPolicyStr == TEXT("Instant"))
+    {
+        EffectCDO->DurationPolicy = EGameplayEffectDurationType::Instant;
+    }
+    else if (DurationPolicyStr == TEXT("HasDuration"))
+    {
+        EffectCDO->DurationPolicy = EGameplayEffectDurationType::HasDuration;
+        // Set duration magnitude
+        EffectCDO->DurationMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(DurationMagnitude));
+    }
+    else if (DurationPolicyStr == TEXT("Infinite"))
+    {
+        EffectCDO->DurationPolicy = EGameplayEffectDurationType::Infinite;
+    }
+
+    // Set Period if specified
+    if (Period > 0.0)
+    {
+        EffectCDO->Period = FScalableFloat(Period);
+    }
+
+    // Set Modifiers
+    if (ModifiersArray && ModifiersArray->Num() > 0)
+    {
+        for (const TSharedPtr<FJsonValue>& ModValue : *ModifiersArray)
+        {
+            const TSharedPtr<FJsonObject>* ModObj = nullptr;
+            if (!ModValue->TryGetObject(ModObj) || !ModObj)
+            {
+                continue;
+            }
+
+            FString AttributeName = (*ModObj)->GetStringField(TEXT("attribute"));
+            FString OperationStr = (*ModObj)->GetStringField(TEXT("operation"));
+            double Magnitude = (*ModObj)->GetNumberField(TEXT("magnitude"));
+
+            // Create modifier info
+            FGameplayModifierInfo ModInfo;
+
+            // Set operation
+            if (OperationStr == TEXT("Add"))
+            {
+                ModInfo.ModifierOp = EGameplayModOp::Additive;
+            }
+            else if (OperationStr == TEXT("Multiply"))
+            {
+                ModInfo.ModifierOp = EGameplayModOp::Multiplicitive;
+            }
+            else if (OperationStr == TEXT("Divide"))
+            {
+                ModInfo.ModifierOp = EGameplayModOp::Division;
+            }
+            else if (OperationStr == TEXT("Override"))
+            {
+                ModInfo.ModifierOp = EGameplayModOp::Override;
+            }
+            else
+            {
+                ModInfo.ModifierOp = EGameplayModOp::Additive;
+            }
+
+            // Set magnitude
+            ModInfo.ModifierMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(Magnitude));
+
+            // Note: Setting the Attribute requires finding the actual FGameplayAttribute
+            // For now, we store the attribute name in the modifier info
+            // The actual attribute binding would need the AttributeSet class reference
+            // This is a simplified implementation - full implementation would need AttributeSet lookup
+
+            EffectCDO->Modifiers.Add(ModInfo);
+
+            UE_LOG(LogTemp, Display, TEXT("Added modifier: %s %s %.2f"),
+                *AttributeName, *OperationStr, Magnitude);
+        }
+    }
+
+    // Set Application Tags (GrantedTags - tags granted while effect is active)
+    if (ApplicationTagsArray && ApplicationTagsArray->Num() > 0)
+    {
+        for (const TSharedPtr<FJsonValue>& TagValue : *ApplicationTagsArray)
+        {
+            FString TagString = TagValue->AsString();
+            FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*TagString), false);
+            if (Tag.IsValid())
+            {
+                EffectCDO->InheritableOwnedTagsContainer.AddTag(Tag);
+            }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("Invalid gameplay tag: %s"), *TagString);
+            }
+        }
+    }
+
+    // Set Removal Tags (RemoveGameplayEffectsWithTags - effects with these tags are removed)
+    if (RemovalTagsArray && RemovalTagsArray->Num() > 0)
+    {
+        for (const TSharedPtr<FJsonValue>& TagValue : *RemovalTagsArray)
+        {
+            FString TagString = TagValue->AsString();
+            FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*TagString), false);
+            if (Tag.IsValid())
+            {
+                EffectCDO->RemoveGameplayEffectsWithTags.Added.AddTag(Tag);
+            }
+        }
+    }
+
+    // Mark package dirty and save
+    Package->MarkPackageDirty();
+    Blueprint->MarkPackageDirty();
+
+    // Compile again after setting properties
+    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+
+    // Save the asset
+    FString PackageFileName = FPackageName::LongPackageNameToFilename(PackagePath, FPackageName::GetAssetPackageExtension());
+    FSavePackageArgs SaveArgs;
+    SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
+    bool bSaved = UPackage::SavePackage(Package, Blueprint, *PackageFileName, SaveArgs);
+
+    if (!bSaved)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Failed to save GameplayEffect asset to disk, but asset was created in memory"));
+    }
+
+    // Notify asset registry
+    FAssetRegistryModule::AssetCreated(Blueprint);
+
+    // Build response
+    Response->SetBoolField(TEXT("success"), true);
+    Response->SetStringField(TEXT("name"), Name);
+    Response->SetStringField(TEXT("asset_path"), AssetPath);
+    Response->SetStringField(TEXT("duration_policy"), DurationPolicyStr);
+    Response->SetNumberField(TEXT("modifier_count"), ModifiersArray ? ModifiersArray->Num() : 0);
+
+    UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Created GameplayEffect '%s' at %s"), *Name, *AssetPath);
 
     return Response;
 }

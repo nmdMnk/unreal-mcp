@@ -39,6 +39,11 @@ private:
     TSharedPtr<FJsonObject> HandleListGASAssets(const TSharedPtr<FJsonObject>& Params);
 
     /**
+     * Create a GameplayEffect Blueprint asset
+     */
+    TSharedPtr<FJsonObject> HandleCreateGameplayEffect(const TSharedPtr<FJsonObject>& Params);
+
+    /**
      * Get the path to DefaultGameplayTags.ini
      */
     FString GetGameplayTagsConfigPath() const;

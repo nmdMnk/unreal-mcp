@@ -233,3 +233,120 @@ def register_gas_tools(mcp: FastMCP):
             error_msg = f"Error listing GAS assets: {e}"
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def create_gameplay_effect(
+        ctx: Context,
+        name: str,
+        duration_policy: str = "Instant",
+        duration_magnitude: Optional[float] = None,
+        period: Optional[float] = None,
+        modifiers: Optional[List[Dict[str, Any]]] = None,
+        application_tags: Optional[List[str]] = None,
+        removal_tags: Optional[List[str]] = None,
+        path: str = "/Game/GAS/Effects",
+        rationale: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Create a GameplayEffect Blueprint asset.
+
+        Args:
+            name: Effect name (e.g., "GE_Damage", "GE_HealOverTime")
+            duration_policy: Effect duration type:
+                - "Instant": Applied once immediately (e.g., damage, heal)
+                - "HasDuration": Lasts for a set time (e.g., buffs, debuffs)
+                - "Infinite": Lasts until manually removed (e.g., passive effects)
+            duration_magnitude: Duration in seconds (required if duration_policy is "HasDuration")
+            period: Period in seconds for periodic effects (e.g., damage over time)
+            modifiers: List of attribute modifiers, each containing:
+                - attribute: Attribute name (e.g., "Health", "Mana", "Damage")
+                - operation: "Add", "Multiply", "Divide", or "Override"
+                - magnitude: Numeric value for the modifier
+                Example: [{"attribute": "Health", "operation": "Add", "magnitude": -25.0}]
+            application_tags: Gameplay tags to grant when effect is applied
+            removal_tags: Gameplay tags to remove when effect is applied
+            path: Content browser path for the asset
+            rationale: Design rationale (auto-saved to knowledge base)
+
+        Returns:
+            Dict containing:
+            - success: Whether the operation succeeded
+            - asset_path: Path to the created asset
+            - name: Name of the created effect
+
+        Examples:
+            # Instant damage
+            create_gameplay_effect(
+                name="GE_Damage",
+                duration_policy="Instant",
+                modifiers=[{"attribute": "Health", "operation": "Add", "magnitude": -25.0}]
+            )
+
+            # Heal over time
+            create_gameplay_effect(
+                name="GE_HealOverTime",
+                duration_policy="HasDuration",
+                duration_magnitude=5.0,
+                period=1.0,
+                modifiers=[{"attribute": "Health", "operation": "Add", "magnitude": 10.0}]
+            )
+
+            # Speed buff
+            create_gameplay_effect(
+                name="GE_SpeedBuff",
+                duration_policy="HasDuration",
+                duration_magnitude=10.0,
+                modifiers=[{"attribute": "MoveSpeed", "operation": "Multiply", "magnitude": 1.5}],
+                application_tags=["Status.Buff.Speed"]
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+        from tools.rag_tools import record_rationale
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "name": name,
+                "duration_policy": duration_policy,
+                "duration_magnitude": duration_magnitude or 0.0,
+                "period": period or 0.0,
+                "modifiers": modifiers or [],
+                "application_tags": application_tags or [],
+                "removal_tags": removal_tags or [],
+                "path": path
+            }
+
+            logger.info(f"Creating GameplayEffect: {name} ({duration_policy})")
+            response = unreal.send_command("create_gameplay_effect", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            # Record rationale if provided and successful
+            if rationale and response.get("success"):
+                record_rationale(
+                    action=f"create_gameplay_effect:{name}",
+                    rationale=rationale,
+                    details={
+                        "duration_policy": duration_policy,
+                        "modifiers": modifiers,
+                        "path": path
+                    }
+                )
+
+            if response.get("success"):
+                logger.info(f"Created GameplayEffect: {response.get('asset_path', 'N/A')}")
+            else:
+                logger.error(f"Failed to create GameplayEffect: {response.get('error', 'Unknown error')}")
+
+            return response
+
+        except Exception as e:
+            error_msg = f"Error creating gameplay effect: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
