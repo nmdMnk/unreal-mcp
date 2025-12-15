@@ -19,10 +19,6 @@
 			]
 		},
 		{
-			"Name": "GameplayAbilities",
-			"Enabled": true
-		},
-		{
 			"Name": "SpirrowBridge",
 			"Enabled": true
 		}
