@@ -89,6 +89,7 @@
 | `add_gameplay_tags` | ✅ 実装完了 | Gameplay Tags の追加（バッチ対応、コメント設定可能） |
 | `list_gameplay_tags` | ✅ 実装完了 | Gameplay Tags の一覧取得（プレフィックスフィルタ対応） |
 | `remove_gameplay_tag` | ✅ 実装完了 | Gameplay Tag の削除 |
+| `list_gas_assets` | ✅ 実装完了 | GAS関連アセット一覧取得（Effect/Ability/Cue/AttributeSet） |
 
 ### RAG連携
 
@@ -155,6 +156,47 @@
 ---
 
 ## 最新の更新履歴
+
+### 2025-12-15: GAS Phase 1-B - GAS アセット一覧取得機能
+
+**新機能**:
+- GAS関連アセットの一覧取得機能を追加
+  - `list_gas_assets`: プロジェクト内のGameplayEffect、GameplayAbility、GameplayCue、AttributeSetを検索
+
+**対応アセットタイプ**:
+- GameplayEffect Blueprints
+- GameplayAbility Blueprints
+- GameplayCue actors and notifies
+- AttributeSet classes
+
+**主な機能**:
+- アセットタイプフィルタリング（effect/ability/cue/attribute_set/all）
+- コンテンツパスフィルタリング（再帰的検索）
+- クラス階層走査によるGASアセット識別
+- 各アセットの詳細情報取得（名前、パス、クラス、タイプ、親クラス）
+
+**使用例**:
+```python
+# 全GASアセット一覧
+list_gas_assets()
+
+# GameplayEffectのみ
+list_gas_assets(asset_type="effect")
+
+# 特定フォルダ配下
+list_gas_assets(asset_type="ability", path_filter="/Game/Abilities/")
+```
+
+**変更範囲**:
+- Python gas_tools.py: list_gas_assets ツール追加
+- C++ SpirrowBridgeGASCommands: HandleListGASAssets 実装
+- C++ SpirrowBridge: コマンドルーティング更新
+- C++ SpirrowBridge.Build.cs: GameplayAbilities モジュール依存追加
+
+**技術詳細**:
+- AssetRegistry を使用したBlueprint検索
+- クラス階層走査による型判定（Contains チェック）
+- アセットロードによる親クラス取得
 
 ### 2025-12-15: GAS Phase 1-A - Gameplay Tags 管理機能
 

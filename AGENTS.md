@@ -413,6 +413,7 @@ search_knowledge("質量 設定", category="physics")
 
 ## 更新履歴
 
+- 2025-12-15: GAS Phase 1-B 実装。GAS アセット一覧取得機能（list_gas_assets）を追加
 - 2025-12-15: GAS Phase 1-A 実装。Gameplay Tags 管理機能（add_gameplay_tags, list_gameplay_tags, remove_gameplay_tag）を追加
 - 2025-12-15: Config（ini）ファイル操作対応を追加。get_config_value, set_config_value, list_config_sections ツールを実装
 - 2025-12-15: ObjectProperty（アセット参照）対応を追加。`TObjectPtr<T>`, `TSoftObjectPtr<T>`, `TSubclassOf<T>` 型のプロパティ設定が可能に
