@@ -533,3 +533,142 @@ def register_gas_tools(mcp: FastMCP):
             error_msg = f"Error setting ability system defaults: {e}"
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def create_gameplay_ability(
+        ctx: Context,
+        name: str,
+        parent_class: str = "GameplayAbility",
+        ability_tags: Optional[List[str]] = None,
+        cancel_abilities_with_tags: Optional[List[str]] = None,
+        block_abilities_with_tags: Optional[List[str]] = None,
+        activation_owned_tags: Optional[List[str]] = None,
+        activation_required_tags: Optional[List[str]] = None,
+        activation_blocked_tags: Optional[List[str]] = None,
+        cost_effect: Optional[str] = None,
+        cooldown_effect: Optional[str] = None,
+        instancing_policy: str = "InstancedPerActor",
+        net_execution_policy: str = "LocalPredicted",
+        path: str = "/Game/GAS/Abilities",
+        rationale: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Create a GameplayAbility Blueprint asset.
+
+        Args:
+            name: Ability name (e.g., "GA_Attack", "GA_Dash", "GA_FireBall")
+            parent_class: Parent class (default: "GameplayAbility", can use custom C++ ability class)
+            ability_tags: Tags that identify this ability (e.g., ["Ability.Attack.Melee"])
+            cancel_abilities_with_tags: Tags of abilities to cancel when this activates
+            block_abilities_with_tags: Tags of abilities blocked while this is active
+            activation_owned_tags: Tags granted while ability is active
+            activation_required_tags: Tags required to activate this ability
+            activation_blocked_tags: Tags that prevent activation if present
+            cost_effect: GameplayEffect path for ability cost (e.g., "/Game/GAS/Effects/GE_ManaCost.GE_ManaCost_C")
+            cooldown_effect: GameplayEffect path for cooldown (e.g., "/Game/GAS/Effects/GE_Cooldown.GE_Cooldown_C")
+            instancing_policy: How ability is instanced:
+                - "NonInstanced": No instance created (most efficient, limited functionality)
+                - "InstancedPerActor": One instance per actor (recommended)
+                - "InstancedPerExecution": New instance each activation
+            net_execution_policy: Network execution policy:
+                - "LocalPredicted": Client predicts, server authoritative (recommended)
+                - "LocalOnly": Client only, no replication
+                - "ServerInitiated": Server starts, replicated to client
+                - "ServerOnly": Server only
+            path: Content browser path for the asset
+            rationale: Design rationale (auto-saved to knowledge base)
+
+        Returns:
+            Dict containing:
+            - success: Whether the operation succeeded
+            - asset_path: Path to the created asset
+            - name: Name of the created ability
+
+        Examples:
+            # Simple melee attack
+            create_gameplay_ability(
+                name="GA_MeleeAttack",
+                ability_tags=["Ability.Attack.Melee"],
+                activation_owned_tags=["State.Attacking"],
+                block_abilities_with_tags=["Ability.Attack"],
+                path="/Game/GAS/Abilities"
+            )
+
+            # Ability with cost and cooldown
+            create_gameplay_ability(
+                name="GA_FireBall",
+                ability_tags=["Ability.Spell.Fire"],
+                cost_effect="/Game/GAS/Effects/GE_ManaCost.GE_ManaCost_C",
+                cooldown_effect="/Game/GAS/Effects/GE_SpellCooldown.GE_SpellCooldown_C",
+                activation_blocked_tags=["State.Silenced"],
+                path="/Game/GAS/Abilities"
+            )
+
+            # Dash ability
+            create_gameplay_ability(
+                name="GA_Dash",
+                ability_tags=["Ability.Movement.Dash"],
+                cancel_abilities_with_tags=["Ability.Attack"],
+                activation_owned_tags=["State.Dashing"],
+                cooldown_effect="/Game/GAS/Effects/GE_DashCooldown.GE_DashCooldown_C",
+                instancing_policy="InstancedPerActor",
+                net_execution_policy="LocalPredicted",
+                path="/Game/GAS/Abilities"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+        from tools.rag_tools import record_rationale
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "name": name,
+                "parent_class": parent_class,
+                "ability_tags": ability_tags or [],
+                "cancel_abilities_with_tags": cancel_abilities_with_tags or [],
+                "block_abilities_with_tags": block_abilities_with_tags or [],
+                "activation_owned_tags": activation_owned_tags or [],
+                "activation_required_tags": activation_required_tags or [],
+                "activation_blocked_tags": activation_blocked_tags or [],
+                "cost_effect": cost_effect or "",
+                "cooldown_effect": cooldown_effect or "",
+                "instancing_policy": instancing_policy,
+                "net_execution_policy": net_execution_policy,
+                "path": path
+            }
+
+            logger.info(f"Creating GameplayAbility: {name}")
+            response = unreal.send_command("create_gameplay_ability", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            # Record rationale if provided and successful
+            if rationale and response.get("success"):
+                record_rationale(
+                    action=f"create_gameplay_ability:{name}",
+                    rationale=rationale,
+                    details={
+                        "parent_class": parent_class,
+                        "ability_tags": ability_tags,
+                        "instancing_policy": instancing_policy,
+                        "path": path
+                    }
+                )
+
+            if response.get("success"):
+                logger.info(f"Created GameplayAbility: {response.get('asset_path', 'N/A')}")
+            else:
+                logger.error(f"Failed to create GameplayAbility: {response.get('error', 'Unknown error')}")
+
+            return response
+
+        except Exception as e:
+            error_msg = f"Error creating gameplay ability: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}

@@ -54,6 +54,16 @@ private:
     TSharedPtr<FJsonObject> HandleSetAbilitySystemDefaults(const TSharedPtr<FJsonObject>& Params);
 
     /**
+     * Create a GameplayAbility Blueprint asset
+     */
+    TSharedPtr<FJsonObject> HandleCreateGameplayAbility(const TSharedPtr<FJsonObject>& Params);
+
+    /**
+     * Helper to set gameplay tag container from JSON array
+     */
+    void SetGameplayTagContainerFromArray(FGameplayTagContainer& Container, const TArray<TSharedPtr<FJsonValue>>* TagsArray);
+
+    /**
      * Get the path to DefaultGameplayTags.ini
      */
     FString GetGameplayTagsConfigPath() const;

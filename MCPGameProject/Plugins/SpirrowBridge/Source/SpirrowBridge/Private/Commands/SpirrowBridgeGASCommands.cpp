@@ -20,6 +20,7 @@
 #include "Engine/SCS_Node.h"
 #include "GameFramework/Character.h"
 #include "AbilitySystemComponent.h"
+#include "Abilities/GameplayAbility.h"
 
 FSpirrowBridgeGASCommands::FSpirrowBridgeGASCommands()
 {
@@ -58,6 +59,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCommand(const FString& 
     else if (CommandType == TEXT("set_ability_system_defaults"))
     {
         return HandleSetAbilitySystemDefaults(Params);
+    }
+    else if (CommandType == TEXT("create_gameplay_ability"))
+    {
+        return HandleCreateGameplayAbility(Params);
     }
 
     TSharedPtr<FJsonObject> ErrorResponse = MakeShareable(new FJsonObject);
@@ -1083,6 +1088,274 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleSetAbilitySystemDefault
     Response->SetNumberField(TEXT("default_effects_count"), DefaultEffectsArray ? DefaultEffectsArray->Num() : 0);
 
     UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Configured ASC defaults for Blueprint '%s'"), *BlueprintName);
+
+    return Response;
+}
+
+void FSpirrowBridgeGASCommands::SetGameplayTagContainerFromArray(FGameplayTagContainer& Container, const TArray<TSharedPtr<FJsonValue>>* TagsArray)
+{
+    if (!TagsArray)
+    {
+        return;
+    }
+
+    for (const TSharedPtr<FJsonValue>& TagValue : *TagsArray)
+    {
+        FString TagString = TagValue->AsString();
+        FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*TagString), false);
+        if (Tag.IsValid())
+        {
+            Container.AddTag(Tag);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Invalid gameplay tag: %s"), *TagString);
+        }
+    }
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayAbility(const TSharedPtr<FJsonObject>& Params)
+{
+    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
+
+    // Get parameters
+    FString Name = Params->GetStringField(TEXT("name"));
+    FString ParentClassName = Params->GetStringField(TEXT("parent_class"));
+    FString CostEffectPath = Params->GetStringField(TEXT("cost_effect"));
+    FString CooldownEffectPath = Params->GetStringField(TEXT("cooldown_effect"));
+    FString InstancingPolicyStr = Params->GetStringField(TEXT("instancing_policy"));
+    FString NetExecutionPolicyStr = Params->GetStringField(TEXT("net_execution_policy"));
+    FString Path = Params->GetStringField(TEXT("path"));
+
+    // Get tag arrays
+    const TArray<TSharedPtr<FJsonValue>>* AbilityTagsArray = nullptr;
+    Params->TryGetArrayField(TEXT("ability_tags"), AbilityTagsArray);
+
+    const TArray<TSharedPtr<FJsonValue>>* CancelTagsArray = nullptr;
+    Params->TryGetArrayField(TEXT("cancel_abilities_with_tags"), CancelTagsArray);
+
+    const TArray<TSharedPtr<FJsonValue>>* BlockTagsArray = nullptr;
+    Params->TryGetArrayField(TEXT("block_abilities_with_tags"), BlockTagsArray);
+
+    const TArray<TSharedPtr<FJsonValue>>* ActivationOwnedTagsArray = nullptr;
+    Params->TryGetArrayField(TEXT("activation_owned_tags"), ActivationOwnedTagsArray);
+
+    const TArray<TSharedPtr<FJsonValue>>* ActivationRequiredTagsArray = nullptr;
+    Params->TryGetArrayField(TEXT("activation_required_tags"), ActivationRequiredTagsArray);
+
+    const TArray<TSharedPtr<FJsonValue>>* ActivationBlockedTagsArray = nullptr;
+    Params->TryGetArrayField(TEXT("activation_blocked_tags"), ActivationBlockedTagsArray);
+
+    // Validate name
+    if (Name.IsEmpty())
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("Missing 'name' parameter"));
+        return Response;
+    }
+
+    // Construct full asset path
+    FString PackagePath = Path / Name;
+    FString AssetPath = PackagePath + TEXT(".") + Name;
+
+    // Check if asset already exists - multiple checks for safety
+    if (UEditorAssetLibrary::DoesAssetExist(AssetPath))
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Asset already exists: %s"), *AssetPath));
+        return Response;
+    }
+
+    UPackage* ExistingPackage = FindPackage(nullptr, *PackagePath);
+    if (ExistingPackage)
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Package already exists: %s"), *PackagePath));
+        return Response;
+    }
+
+    // Find parent class
+    UClass* ParentClass = nullptr;
+    if (ParentClassName == TEXT("GameplayAbility") || ParentClassName.IsEmpty())
+    {
+        ParentClass = UGameplayAbility::StaticClass();
+    }
+    else
+    {
+        ParentClass = FindObject<UClass>(nullptr, *ParentClassName);
+        if (!ParentClass)
+        {
+            ParentClass = LoadClass<UGameplayAbility>(nullptr, *ParentClassName);
+        }
+        if (!ParentClass)
+        {
+            ParentClass = UGameplayAbility::StaticClass();
+            UE_LOG(LogTemp, Warning, TEXT("Parent class '%s' not found, using UGameplayAbility"), *ParentClassName);
+        }
+    }
+
+    // Create the package
+    UPackage* Package = CreatePackage(*PackagePath);
+    if (!Package)
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("Failed to create package"));
+        return Response;
+    }
+
+    // Create Blueprint factory
+    UBlueprintFactory* Factory = NewObject<UBlueprintFactory>();
+    Factory->ParentClass = ParentClass;
+
+    // Create the Blueprint asset
+    UBlueprint* Blueprint = Cast<UBlueprint>(Factory->FactoryCreateNew(
+        UBlueprint::StaticClass(),
+        Package,
+        FName(*Name),
+        RF_Public | RF_Standalone,
+        nullptr,
+        GWarn
+    ));
+
+    if (!Blueprint)
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("Failed to create GameplayAbility Blueprint"));
+        return Response;
+    }
+
+    // Compile the blueprint to generate the class
+    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+
+    // Get the CDO (Class Default Object) to set properties
+    UGameplayAbility* AbilityCDO = Cast<UGameplayAbility>(Blueprint->GeneratedClass->GetDefaultObject());
+    if (!AbilityCDO)
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), TEXT("Failed to get GameplayAbility CDO"));
+        return Response;
+    }
+
+    // Set Ability Tags
+    SetGameplayTagContainerFromArray(AbilityCDO->AbilityTags, AbilityTagsArray);
+
+    // Set Cancel Abilities With Tags
+    SetGameplayTagContainerFromArray(AbilityCDO->CancelAbilitiesWithTag, CancelTagsArray);
+
+    // Set Block Abilities With Tags
+    SetGameplayTagContainerFromArray(AbilityCDO->BlockAbilitiesWithTag, BlockTagsArray);
+
+    // Set Activation Owned Tags
+    SetGameplayTagContainerFromArray(AbilityCDO->ActivationOwnedTags, ActivationOwnedTagsArray);
+
+    // Set Activation Required Tags
+    SetGameplayTagContainerFromArray(AbilityCDO->ActivationRequiredTags, ActivationRequiredTagsArray);
+
+    // Set Activation Blocked Tags
+    SetGameplayTagContainerFromArray(AbilityCDO->ActivationBlockedTags, ActivationBlockedTagsArray);
+
+    // Set Cost Effect
+    if (!CostEffectPath.IsEmpty())
+    {
+        UClass* CostEffectClass = LoadClass<UGameplayEffect>(nullptr, *CostEffectPath);
+        if (CostEffectClass)
+        {
+            AbilityCDO->CostGameplayEffectClass = CostEffectClass;
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Cost effect class not found: %s"), *CostEffectPath);
+        }
+    }
+
+    // Set Cooldown Effect
+    if (!CooldownEffectPath.IsEmpty())
+    {
+        UClass* CooldownEffectClass = LoadClass<UGameplayEffect>(nullptr, *CooldownEffectPath);
+        if (CooldownEffectClass)
+        {
+            AbilityCDO->CooldownGameplayEffectClass = CooldownEffectClass;
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Cooldown effect class not found: %s"), *CooldownEffectPath);
+        }
+    }
+
+    // Set Instancing Policy
+    if (InstancingPolicyStr == TEXT("NonInstanced"))
+    {
+        AbilityCDO->InstancingPolicy = EGameplayAbilityInstancingPolicy::NonInstanced;
+    }
+    else if (InstancingPolicyStr == TEXT("InstancedPerActor"))
+    {
+        AbilityCDO->InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+    }
+    else if (InstancingPolicyStr == TEXT("InstancedPerExecution"))
+    {
+        AbilityCDO->InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerExecution;
+    }
+
+    // Set Net Execution Policy
+    if (NetExecutionPolicyStr == TEXT("LocalPredicted"))
+    {
+        AbilityCDO->NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
+    }
+    else if (NetExecutionPolicyStr == TEXT("LocalOnly"))
+    {
+        AbilityCDO->NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalOnly;
+    }
+    else if (NetExecutionPolicyStr == TEXT("ServerInitiated"))
+    {
+        AbilityCDO->NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
+    }
+    else if (NetExecutionPolicyStr == TEXT("ServerOnly"))
+    {
+        AbilityCDO->NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
+    }
+
+    // Mark package dirty and save
+    Package->MarkPackageDirty();
+    Blueprint->MarkPackageDirty();
+
+    // Compile again after setting properties
+    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+
+    // Save the asset
+    FString PackageFileName = FPackageName::LongPackageNameToFilename(PackagePath, FPackageName::GetAssetPackageExtension());
+    FSavePackageArgs SaveArgs;
+    SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
+    bool bSaved = UPackage::SavePackage(Package, Blueprint, *PackageFileName, SaveArgs);
+
+    if (!bSaved)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Failed to save GameplayAbility asset to disk, but asset was created in memory"));
+    }
+
+    // Notify asset registry
+    FAssetRegistryModule::AssetCreated(Blueprint);
+
+    // Count tags set for response
+    int32 TotalTagsSet = 0;
+    if (AbilityTagsArray) TotalTagsSet += AbilityTagsArray->Num();
+    if (CancelTagsArray) TotalTagsSet += CancelTagsArray->Num();
+    if (BlockTagsArray) TotalTagsSet += BlockTagsArray->Num();
+    if (ActivationOwnedTagsArray) TotalTagsSet += ActivationOwnedTagsArray->Num();
+    if (ActivationRequiredTagsArray) TotalTagsSet += ActivationRequiredTagsArray->Num();
+    if (ActivationBlockedTagsArray) TotalTagsSet += ActivationBlockedTagsArray->Num();
+
+    // Build response
+    Response->SetBoolField(TEXT("success"), true);
+    Response->SetStringField(TEXT("name"), Name);
+    Response->SetStringField(TEXT("asset_path"), AssetPath);
+    Response->SetStringField(TEXT("parent_class"), ParentClass->GetName());
+    Response->SetStringField(TEXT("instancing_policy"), InstancingPolicyStr);
+    Response->SetStringField(TEXT("net_execution_policy"), NetExecutionPolicyStr);
+    Response->SetNumberField(TEXT("tags_configured"), TotalTagsSet);
+    Response->SetBoolField(TEXT("has_cost"), !CostEffectPath.IsEmpty());
+    Response->SetBoolField(TEXT("has_cooldown"), !CooldownEffectPath.IsEmpty());
+
+    UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Created GameplayAbility '%s' at %s"), *Name, *AssetPath);
 
     return Response;
 }

@@ -307,7 +307,8 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("list_gas_assets") ||
                      CommandType == TEXT("create_gameplay_effect") ||
                      CommandType == TEXT("create_gas_character") ||
-                     CommandType == TEXT("set_ability_system_defaults"))
+                     CommandType == TEXT("set_ability_system_defaults") ||
+                     CommandType == TEXT("create_gameplay_ability"))
             {
                 ResultJson = GASCommands->HandleCommand(CommandType, Params);
             }
