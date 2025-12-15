@@ -199,6 +199,11 @@ create_blueprint(name="BP_Player", parent_class="APlayerCharacterBase")
    - プラグインを有効化
    - プロンプトが表示されたらエディタを再起動
 
+   **依存関係**: SpirrowBridgeは以下のプラグインに依存しています（自動的に有効化されます）：
+   - **GameplayAbilities** - GAS (Gameplay Ability System) 機能に必要
+   - **EditorScriptingUtilities** - エディタ操作に必要
+   - **EnhancedInput** - 入力システム操作に必要
+
 3. **プラグインのビルド**
    - .uprojectファイルを右クリック
    - Visual Studioプロジェクトファイルを生成
