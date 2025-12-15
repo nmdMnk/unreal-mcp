@@ -57,7 +57,7 @@ Unreal MCP統合は、自然言語を通じてUnreal Engineを制御するため
 | **Blueprint ノードグラフ** | • イベントノードの追加（BeginPlay、Tickなど）<br>• 関数呼び出しノードの作成と接続<br>• カスタム型とデフォルト値を持つ変数の追加<br>• コンポーネントと自己参照の作成<br>• グラフ内のノードの検索と管理<br>• 全ノード操作ツールでpathパラメータ対応 |
 | **入力システム** | • Enhanced Input Actionアセットの作成（Digital/Axis1D/2D/3D対応）<br>• Input Mapping Contextアセットの作成<br>• アクションマッピングの追加（トリガー、モディファイア対応）<br>• レガシー入力マッピングの作成（Action/Axis） |
 | **プロジェクト設定** | • Config（ini）ファイルの読み書き<br>• デフォルトGameModeやマップ設定の変更<br>• 対応ファイル：DefaultEngine.ini、DefaultGame.ini、DefaultEditor.ini、DefaultInput.ini<br>• セクション一覧の取得 |
-| **GAS（Gameplay Ability System）** | • Gameplay Tags の管理（DefaultGameplayTags.ini 操作）<br>• タグの一括追加・削除<br>• コメント設定によるタグの説明記録<br>• プレフィックスフィルタによるタグ検索<br>• GAS関連アセット一覧取得（GameplayEffect/Ability/Cue/AttributeSet）<br>• アセットタイプ・パスフィルタリング |
+| **GAS（Gameplay Ability System）** | • Gameplay Tags の管理（DefaultGameplayTags.ini 操作）<br>• タグの一括追加・削除<br>• コメント設定によるタグの説明記録<br>• プレフィックスフィルタによるタグ検索<br>• GAS関連アセット一覧取得（GameplayEffect/Ability/Cue/AttributeSet）<br>• アセットタイプ・パスフィルタリング<br>• GameplayEffect Blueprint作成（Modifiers/Tags/Duration/Stacking設定）<br>• GameplayAbility Blueprint作成（Tags/Cost/Cooldown/Policies設定）<br>• GAS Character作成（ASC自動設定）<br>• **UE5.7互換性**: protectedプロパティへのリフレクションベースアクセス |
 | **アセット管理** | • Content Browserからのアセット削除<br>• アセット存在確認とエラーハンドリング<br>• Blueprint複製機能（カスタムパス対応）<br>• Blueprintノードグラフ構成の取得（ノード、接続、変数、コンポーネント情報） |
 | **エディタコントロール** | • 特定のアクターまたは位置へのビューポートフォーカス<br>• ビューポートカメラの向きと距離の制御 |
 | **プロジェクト構造解析** | • C++クラスとBlueprintアセットのスキャン<br>• 親クラス・モジュール・パスによるフィルタリング<br>• Blueprintタイプフィルタ（Actor/Widget/Anim/Interface等）<br>• REINST_*クラス（Live Coding一時クラス）の自動除外<br>• プロジェクト固有のクラス階層の可視化<br>• Engineクラスの除外オプション |
@@ -217,6 +217,16 @@ SpirrowBridgeはUE 5.5、5.6、5.7で動作確認済みです。プロジェク�
 - `BuildSettingsVersion.V5` を使用（UE 5.5+で利用可能）
 - `EngineIncludeOrderVersion.Unreal5_5` を使用（UE 5.5+で利用可能）
 - `CppCompileWarningSettings.UndefinedIdentifierWarningLevel` を使用（UE 5.6+の推奨設定）
+
+**UE5.7でのGAS API変更への対応**
+
+UE5.7では、`UGameplayAbility`の多くのプロパティが`protected`セクションに移動されました。SpirrowBridgeは**リフレクションベースのプロパティアクセス**を使用してこの問題に対応しています：
+
+- **対象プロパティ**: AbilityTags、CancelAbilitiesWithTag、BlockAbilitiesWithTag、ActivationOwnedTags、ActivationRequiredTags、ActivationBlockedTags、CostGameplayEffectClass、CooldownGameplayEffectClass、InstancingPolicy、NetExecutionPolicy
+- **実装方法**: `FProperty::FindPropertyByName` + `ContainerPtrToValuePtr` を使用した間接アクセス
+- **利点**: UE5.5（public）とUE5.7（protected）の両方で同じコードが動作
+
+この実装により、プラグインは複数のUEバージョン間で高い互換性を維持しています。
 
 他のバージョンのUnreal Engineで使用する場合、`.Target.cs` ファイルでビルドエラーが発生する可能性があります。その場合は、エンジンバージョンに応じて適切なビルド設定バージョンに調整してください。
 
