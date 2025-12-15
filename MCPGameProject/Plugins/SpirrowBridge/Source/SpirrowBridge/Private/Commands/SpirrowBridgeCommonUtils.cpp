@@ -844,17 +844,63 @@ bool FSpirrowBridgeCommonUtils::SetObjectProperty(UObject* Object, const FString
         if (Value->Type == EJson::String)
         {
             FString ClassPath = Value->AsString();
-            UClass* LoadedClass = LoadClass<UObject>(nullptr, *ClassPath);
+            UClass* LoadedClass = nullptr;
+
+            // Method 1: Try LoadClass for C++ classes (e.g., "/Script/Engine.Character")
+            LoadedClass = LoadClass<UObject>(nullptr, *ClassPath);
+
+            // Method 2: If LoadClass failed, try loading as Blueprint asset
+            if (!LoadedClass)
+            {
+                UObject* LoadedAsset = UEditorAssetLibrary::LoadAsset(ClassPath);
+
+                if (LoadedAsset)
+                {
+                    // Check if it's a Blueprint asset
+                    UBlueprint* Blueprint = Cast<UBlueprint>(LoadedAsset);
+                    if (Blueprint && Blueprint->GeneratedClass)
+                    {
+                        LoadedClass = Blueprint->GeneratedClass;
+                        UE_LOG(LogTemp, Display, TEXT("Loaded Blueprint class: %s -> %s"),
+                               *ClassPath, *LoadedClass->GetName());
+                    }
+                    // Check if it's already a UClass (loaded via different path)
+                    else if (UClass* DirectClass = Cast<UClass>(LoadedAsset))
+                    {
+                        LoadedClass = DirectClass;
+                        UE_LOG(LogTemp, Display, TEXT("Loaded class directly: %s"), *ClassPath);
+                    }
+                }
+            }
+
+            // Method 3: Try alternative path format (without .AssetName suffix)
+            if (!LoadedClass && !ClassPath.Contains(TEXT(".")))
+            {
+                FString AssetName = FPaths::GetCleanFilename(ClassPath);
+                FString AlternativePath = ClassPath + TEXT(".") + AssetName;
+
+                UObject* LoadedAsset = UEditorAssetLibrary::LoadAsset(AlternativePath);
+                if (LoadedAsset)
+                {
+                    UBlueprint* Blueprint = Cast<UBlueprint>(LoadedAsset);
+                    if (Blueprint && Blueprint->GeneratedClass)
+                    {
+                        LoadedClass = Blueprint->GeneratedClass;
+                        UE_LOG(LogTemp, Display, TEXT("Loaded Blueprint class via alternative path: %s -> %s"),
+                               *AlternativePath, *LoadedClass->GetName());
+                    }
+                }
+            }
 
             if (LoadedClass)
             {
-                // Verify the class is compatible
+                // Verify the class is compatible with the property's meta class
                 UClass* MetaClass = ClassProp->MetaClass;
                 if (LoadedClass->IsChildOf(MetaClass))
                 {
                     ClassProp->SetObjectPropertyValue(PropertyAddr, LoadedClass);
-                    UE_LOG(LogTemp, Display, TEXT("Set class property %s to: %s"),
-                           *PropertyName, *ClassPath);
+                    UE_LOG(LogTemp, Display, TEXT("Set class property %s to: %s (MetaClass: %s)"),
+                           *PropertyName, *LoadedClass->GetName(), *MetaClass->GetName());
                     return true;
                 }
                 else
@@ -877,6 +923,7 @@ bool FSpirrowBridgeCommonUtils::SetObjectProperty(UObject* Object, const FString
         else if (Value->Type == EJson::Null)
         {
             ClassProp->SetObjectPropertyValue(PropertyAddr, nullptr);
+            UE_LOG(LogTemp, Display, TEXT("Set class property %s to null"), *PropertyName);
             return true;
         }
         else
