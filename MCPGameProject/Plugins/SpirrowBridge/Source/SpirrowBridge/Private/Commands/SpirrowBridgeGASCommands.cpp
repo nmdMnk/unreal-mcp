@@ -698,56 +698,32 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(co
     // Set Application Tags using TargetTagsGameplayEffectComponent (UE5 way)
     if (ApplicationTagsArray && ApplicationTagsArray->Num() > 0)
     {
-        // Create the TargetTags component
-        UTargetTagsGameplayEffectComponent* TargetTagsComponent = NewObject<UTargetTagsGameplayEffectComponent>(EffectCDO, NAME_None, RF_Public);
+        // Use FindOrAddComponent which is the UE5 recommended way
+        UTargetTagsGameplayEffectComponent& TargetTagsComponent = EffectCDO->FindOrAddComponent<UTargetTagsGameplayEffectComponent>();
 
-        if (TargetTagsComponent)
+        // Build the tag container - must add to both Added AND CombinedTags
+        FInheritedTagContainer TagContainer;
+
+        for (const TSharedPtr<FJsonValue>& TagValue : *ApplicationTagsArray)
         {
-            // Build the tag container
-            FInheritedTagContainer TagContainer;
-
-            for (const TSharedPtr<FJsonValue>& TagValue : *ApplicationTagsArray)
+            FString TagString = TagValue->AsString();
+            FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*TagString), false);
+            if (Tag.IsValid())
             {
-                FString TagString = TagValue->AsString();
-                FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*TagString), false);
-                if (Tag.IsValid())
-                {
-                    TagContainer.Added.AddTag(Tag);
-                    UE_LOG(LogTemp, Display, TEXT("Adding granted tag: %s"), *TagString);
-                }
-                else
-                {
-                    UE_LOG(LogTemp, Warning, TEXT("Invalid gameplay tag: %s"), *TagString);
-                }
-            }
-
-            // Set the tags on the component
-            TargetTagsComponent->SetAndApplyTargetTagChanges(TagContainer);
-
-            // Add component to the GameplayEffect using reflection (GEComponents is protected in UE5.7)
-            FProperty* GEComponentsProperty = EffectCDO->GetClass()->FindPropertyByName(FName("GEComponents"));
-            if (GEComponentsProperty)
-            {
-                FArrayProperty* ArrayProperty = CastField<FArrayProperty>(GEComponentsProperty);
-                if (ArrayProperty)
-                {
-                    void* ArrayPtr = ArrayProperty->ContainerPtrToValuePtr<void>(EffectCDO);
-                    FScriptArrayHelper ArrayHelper(ArrayProperty, ArrayPtr);
-                    int32 NewIndex = ArrayHelper.AddValue();
-
-                    FObjectProperty* InnerProperty = CastField<FObjectProperty>(ArrayProperty->Inner);
-                    if (InnerProperty)
-                    {
-                        InnerProperty->SetObjectPropertyValue(ArrayHelper.GetRawPtr(NewIndex), TargetTagsComponent);
-                        UE_LOG(LogTemp, Display, TEXT("Added TargetTagsGameplayEffectComponent with %d tags using reflection"), TagContainer.Added.Num());
-                    }
-                }
+                // Must add to both Added and CombinedTags for the tags to actually appear
+                TagContainer.Added.AddTag(Tag);
+                TagContainer.CombinedTags.AddTag(Tag);
+                UE_LOG(LogTemp, Display, TEXT("Adding granted tag: %s"), *TagString);
             }
             else
             {
-                UE_LOG(LogTemp, Warning, TEXT("Failed to find GEComponents property via reflection"));
+                UE_LOG(LogTemp, Warning, TEXT("Invalid gameplay tag: %s"), *TagString);
             }
         }
+
+        // Set the tags on the component
+        TargetTagsComponent.SetAndApplyTargetTagChanges(TagContainer);
+        UE_LOG(LogTemp, Display, TEXT("Added TargetTagsGameplayEffectComponent with %d tags"), TagContainer.Added.Num());
     }
 
     // Set Removal Tags (RemoveGameplayEffectsWithTags - effects with these tags are removed)
