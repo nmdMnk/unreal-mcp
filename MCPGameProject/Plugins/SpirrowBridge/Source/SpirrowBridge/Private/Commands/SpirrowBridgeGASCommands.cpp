@@ -538,12 +538,36 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(co
     FString PackagePath = Path / Name;
     FString AssetPath = PackagePath + TEXT(".") + Name;
 
-    // Check if asset already exists
+    // Check if asset already exists - multiple checks for safety
+    // 1. Check via EditorAssetLibrary
     if (UEditorAssetLibrary::DoesAssetExist(AssetPath))
     {
         Response->SetBoolField(TEXT("success"), false);
         Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Asset already exists: %s"), *AssetPath));
         return Response;
+    }
+
+    // 2. Check if package already exists
+    UPackage* ExistingPackage = FindPackage(nullptr, *PackagePath);
+    if (ExistingPackage)
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Package already exists: %s"), *PackagePath));
+        return Response;
+    }
+
+    // 3. Check if Blueprint object exists in memory
+    UBlueprint* ExistingBlueprint = FindObject<UBlueprint>(ANY_PACKAGE, *Name);
+    if (ExistingBlueprint)
+    {
+        // Check if it's in the same path
+        FString ExistingPath = ExistingBlueprint->GetPathName();
+        if (ExistingPath.Contains(Path))
+        {
+            Response->SetBoolField(TEXT("success"), false);
+            Response->SetStringField(TEXT("error"), FString::Printf(TEXT("GameplayEffect Blueprint already exists in memory: %s"), *ExistingPath));
+            return Response;
+        }
     }
 
     // Create the package
@@ -795,8 +819,42 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGASCharacter(cons
         }
     }
 
-    // Create package and asset
+    // Check if asset already exists - multiple checks for safety
     FString PackageName = PathStr / Name;
+    FString AssetPath = PackageName + TEXT(".") + Name;
+
+    // 1. Check via EditorAssetLibrary
+    if (UEditorAssetLibrary::DoesAssetExist(AssetPath))
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Asset already exists: %s"), *AssetPath));
+        return Response;
+    }
+
+    // 2. Check if package already exists
+    UPackage* ExistingPackage = FindPackage(nullptr, *PackageName);
+    if (ExistingPackage)
+    {
+        Response->SetBoolField(TEXT("success"), false);
+        Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Package already exists: %s"), *PackageName));
+        return Response;
+    }
+
+    // 3. Check if Blueprint object exists in memory
+    UBlueprint* ExistingBlueprint = FindObject<UBlueprint>(ANY_PACKAGE, *Name);
+    if (ExistingBlueprint)
+    {
+        // Check if it's in the same path
+        FString ExistingPath = ExistingBlueprint->GetPathName();
+        if (ExistingPath.Contains(PathStr))
+        {
+            Response->SetBoolField(TEXT("success"), false);
+            Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Blueprint already exists in memory: %s"), *ExistingPath));
+            return Response;
+        }
+    }
+
+    // Create package and asset
     UPackage* Package = CreatePackage(*PackageName);
     if (!Package)
     {
