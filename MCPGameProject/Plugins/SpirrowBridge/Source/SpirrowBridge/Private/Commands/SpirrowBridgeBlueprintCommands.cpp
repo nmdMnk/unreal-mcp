@@ -32,6 +32,9 @@
 #include "IAssetTools.h"
 // GAS Components
 #include "AbilitySystemComponent.h"
+// Widget Blueprint support
+#include "Blueprint/WidgetBlueprint.h"
+#include "WidgetBlueprintFactory.h"
 
 FSpirrowBridgeBlueprintCommands::FSpirrowBridgeBlueprintCommands()
 {
@@ -135,33 +138,34 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleCreateBlueprint(c
     if (!ParentClass.IsEmpty())
     {
         FString ClassName = ParentClass;
-        if (!ClassName.StartsWith(TEXT("A")))
-        {
-            ClassName = TEXT("A") + ClassName;
-        }
-
         UClass* FoundClass = nullptr;
 
         // Method 1: Direct StaticClass lookup for common engine classes
-        if (ClassName == TEXT("APawn"))
+        if (ClassName == TEXT("Pawn") || ClassName == TEXT("APawn"))
         {
             FoundClass = APawn::StaticClass();
             UE_LOG(LogTemp, Log, TEXT("[Method 1] Found parent class via StaticClass: APawn"));
         }
-        else if (ClassName == TEXT("AActor"))
+        else if (ClassName == TEXT("Actor") || ClassName == TEXT("AActor"))
         {
             FoundClass = AActor::StaticClass();
             UE_LOG(LogTemp, Log, TEXT("[Method 1] Found parent class via StaticClass: AActor"));
         }
-        else if (ClassName == TEXT("ACharacter"))
+        else if (ClassName == TEXT("Character") || ClassName == TEXT("ACharacter"))
         {
             FoundClass = ACharacter::StaticClass();
             UE_LOG(LogTemp, Log, TEXT("[Method 1] Found parent class via StaticClass: ACharacter"));
+        }
+        else if (ClassName == TEXT("UserWidget") || ClassName == TEXT("UUserWidget"))
+        {
+            FoundClass = UUserWidget::StaticClass();
+            UE_LOG(LogTemp, Log, TEXT("[Method 1] Found parent class via StaticClass: UUserWidget"));
         }
 
         // Method 2: Search through all loaded classes using TObjectIterator
         if (!FoundClass)
         {
+            // Try with original name
             UE_LOG(LogTemp, Log, TEXT("[Method 2] Searching for class '%s' using TObjectIterator..."), *ClassName);
             for (TObjectIterator<UClass> It; It; ++It)
             {
@@ -176,40 +180,62 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleCreateBlueprint(c
             }
         }
 
-        // Method 3: Try LoadClass with various module paths
+        // Method 2b: Try with 'A' prefix for Actor classes
+        if (!FoundClass && !ClassName.StartsWith(TEXT("A")) && !ClassName.StartsWith(TEXT("U")))
+        {
+            FString ClassNameWithA = TEXT("A") + ClassName;
+            UE_LOG(LogTemp, Log, TEXT("[Method 2b] Searching for class '%s' using TObjectIterator..."), *ClassNameWithA);
+            for (TObjectIterator<UClass> It; It; ++It)
+            {
+                UClass* Class = *It;
+                if (Class->GetName() == ClassNameWithA)
+                {
+                    FoundClass = Class;
+                    UE_LOG(LogTemp, Log, TEXT("[Method 2b] Found parent class via TObjectIterator with A prefix: %s (Path: %s)"),
+                        *ClassNameWithA, *Class->GetPathName());
+                    break;
+                }
+            }
+        }
+
+        // Method 2c: Try with 'U' prefix for UObject classes
+        if (!FoundClass && !ClassName.StartsWith(TEXT("U")))
+        {
+            FString ClassNameWithU = TEXT("U") + ClassName;
+            UE_LOG(LogTemp, Log, TEXT("[Method 2c] Searching for class '%s' using TObjectIterator..."), *ClassNameWithU);
+            for (TObjectIterator<UClass> It; It; ++It)
+            {
+                UClass* Class = *It;
+                if (Class->GetName() == ClassNameWithU)
+                {
+                    FoundClass = Class;
+                    UE_LOG(LogTemp, Log, TEXT("[Method 2c] Found parent class via TObjectIterator with U prefix: %s (Path: %s)"),
+                        *ClassNameWithU, *Class->GetPathName());
+                    break;
+                }
+            }
+        }
+
+        // Method 3: Try LoadObject with various module paths (for UObject, not just AActor)
         if (!FoundClass)
         {
-            UE_LOG(LogTemp, Log, TEXT("[Method 3] Attempting LoadClass for '%s'..."), *ClassName);
+            UE_LOG(LogTemp, Log, TEXT("[Method 3] Attempting LoadObject for '%s'..."), *ClassName);
 
             // Get project module name
             FString ProjectModuleName = FApp::GetProjectName();
 
-            // Build list of paths to try - both with and without 'A' prefix
+            // Build list of paths to try
             TArray<FString> ModulePaths;
 
-            // With 'A' prefix (ClassName already has it)
+            // Try original name
             ModulePaths.Add(FString::Printf(TEXT("/Script/Engine.%s"), *ClassName));
-            ModulePaths.Add(FString::Printf(TEXT("/Script/Game.%s"), *ClassName));
+            ModulePaths.Add(FString::Printf(TEXT("/Script/UMG.%s"), *ClassName));
             ModulePaths.Add(FString::Printf(TEXT("/Script/%s.%s"), *ProjectModuleName, *ClassName));
-
-            // Without 'A' prefix - this is how UE actually registers classes in reflection!
-            if (ClassName.StartsWith(TEXT("A")))
-            {
-                FString ClassNameWithoutPrefix = ClassName.RightChop(1);  // Remove 'A' prefix
-                ModulePaths.Add(FString::Printf(TEXT("/Script/Engine.%s"), *ClassNameWithoutPrefix));
-                ModulePaths.Add(FString::Printf(TEXT("/Script/Game.%s"), *ClassNameWithoutPrefix));
-                ModulePaths.Add(FString::Printf(TEXT("/Script/%s.%s"), *ProjectModuleName, *ClassNameWithoutPrefix));
-            }
-
-            // Also try the original name as provided by user (without any prefix manipulation)
-            ModulePaths.Add(FString::Printf(TEXT("/Script/Engine.%s"), *ParentClass));
-            ModulePaths.Add(FString::Printf(TEXT("/Script/Game.%s"), *ParentClass));
-            ModulePaths.Add(FString::Printf(TEXT("/Script/%s.%s"), *ProjectModuleName, *ParentClass));
 
             for (const FString& ModulePath : ModulePaths)
             {
-                UE_LOG(LogTemp, Log, TEXT("[Method 3] Trying: %s"), *ModulePath);
-                FoundClass = LoadClass<AActor>(nullptr, *ModulePath);
+                UE_LOG(LogTemp, Log, TEXT("[Method 3] Trying LoadObject: %s"), *ModulePath);
+                FoundClass = LoadObject<UClass>(nullptr, *ModulePath);
                 if (FoundClass)
                 {
                     UE_LOG(LogTemp, Log, TEXT("[Method 3] SUCCESS: Loaded class from '%s'"), *ModulePath);
@@ -222,36 +248,72 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleCreateBlueprint(c
         {
             SelectedParentClass = FoundClass;
             UE_LOG(LogTemp, Log, TEXT("Successfully set parent class to '%s' (Final Path: %s)"),
-                *ClassName, *FoundClass->GetPathName());
+                *FoundClass->GetName(), *FoundClass->GetPathName());
         }
         else
         {
             UE_LOG(LogTemp, Warning, TEXT("Could not find specified parent class '%s' after trying all methods, defaulting to AActor"),
-                *ClassName);
+                *ParentClass);
         }
     }
-    
-    Factory->ParentClass = SelectedParentClass;
 
-    // Create the blueprint
-    UPackage* Package = CreatePackage(*(PackagePath + AssetName));
-    UBlueprint* NewBlueprint = Cast<UBlueprint>(Factory->FactoryCreateNew(UBlueprint::StaticClass(), Package, *AssetName, RF_Standalone | RF_Public, nullptr, GWarn));
-
-    if (NewBlueprint)
+    // === Handle different Blueprint types based on parent class ===
+    if (SelectedParentClass->IsChildOf(UUserWidget::StaticClass()))
     {
-        // Notify the asset registry
-        FAssetRegistryModule::AssetCreated(NewBlueprint);
+        // Create Widget Blueprint
+        UWidgetBlueprintFactory* WidgetFactory = NewObject<UWidgetBlueprintFactory>();
+        WidgetFactory->ParentClass = SelectedParentClass;
 
-        // Mark the package dirty
-        Package->MarkPackageDirty();
+        UPackage* Package = CreatePackage(*(PackagePath + AssetName));
+        UBlueprint* NewBlueprint = Cast<UBlueprint>(WidgetFactory->FactoryCreateNew(
+            UWidgetBlueprint::StaticClass(),
+            Package,
+            *AssetName,
+            RF_Standalone | RF_Public,
+            nullptr,
+            GWarn
+        ));
 
-        TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
-        ResultObj->SetStringField(TEXT("name"), AssetName);
-        ResultObj->SetStringField(TEXT("path"), PackagePath + AssetName);
-        return ResultObj;
+        if (NewBlueprint)
+        {
+            FAssetRegistryModule::AssetCreated(NewBlueprint);
+            Package->MarkPackageDirty();
+
+            TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+            ResultObj->SetStringField(TEXT("name"), AssetName);
+            ResultObj->SetStringField(TEXT("path"), PackagePath + AssetName);
+            ResultObj->SetStringField(TEXT("type"), TEXT("WidgetBlueprint"));
+            UE_LOG(LogTemp, Log, TEXT("Successfully created Widget Blueprint: %s"), *AssetName);
+            return ResultObj;
+        }
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create Widget Blueprint"));
     }
+    else
+    {
+        // Create regular Blueprint (Actor-based)
+        Factory->ParentClass = SelectedParentClass;
 
-    return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create blueprint"));
+        UPackage* Package = CreatePackage(*(PackagePath + AssetName));
+        UBlueprint* NewBlueprint = Cast<UBlueprint>(Factory->FactoryCreateNew(UBlueprint::StaticClass(), Package, *AssetName, RF_Standalone | RF_Public, nullptr, GWarn));
+
+        if (NewBlueprint)
+        {
+            // Notify the asset registry
+            FAssetRegistryModule::AssetCreated(NewBlueprint);
+
+            // Mark the package dirty
+            Package->MarkPackageDirty();
+
+            TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+            ResultObj->SetStringField(TEXT("name"), AssetName);
+            ResultObj->SetStringField(TEXT("path"), PackagePath + AssetName);
+            ResultObj->SetStringField(TEXT("type"), TEXT("Blueprint"));
+            UE_LOG(LogTemp, Log, TEXT("Successfully created Blueprint: %s"), *AssetName);
+            return ResultObj;
+        }
+
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create blueprint"));
+    }
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintCommands::HandleAddComponentToBlueprint(const TSharedPtr<FJsonObject>& Params)

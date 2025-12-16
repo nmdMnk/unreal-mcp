@@ -158,6 +158,56 @@
 
 ## 最新の更新履歴
 
+### 2025-12-16: Widget Blueprint 対応 - create_blueprint で UUserWidget 親クラスをサポート
+
+**新機能**:
+- `create_blueprint` コマンドで UUserWidget を親クラスとして指定可能に
+- Widget Blueprint の自動生成に対応
+- UUserWidget 派生クラス（カスタムWidget基底クラス）にも対応
+
+**親クラス検索の強化**:
+- Method 1: UserWidget および UUserWidget の直接参照に対応
+- Method 2: U プレフィックス付きクラスの TObjectIterator 検索を追加
+- Method 3: LoadClass<AActor> から LoadObject<UClass> への変更により、非Actor系クラスをサポート
+- /Script/UMG モジュールパスの追加
+
+**Blueprint タイプ判定**:
+- 親クラスが UUserWidget を継承している場合、UWidgetBlueprintFactory を使用
+- それ以外の場合、従来通り UBlueprintFactory を使用
+
+**使用例**:
+```python
+# UUserWidget ベースの Widget Blueprint を作成
+create_blueprint(
+    name="WBP_MainMenu",
+    parent_class="UserWidget",  # または "UUserWidget"
+    path="/Game/UI"
+)
+
+# カスタム Widget 基底クラスから派生
+create_blueprint(
+    name="WBP_Crosshair",
+    parent_class="CrosshairWidget",  # プロジェクト内の UUserWidget 派生クラス
+    path="/Game/UI/HUD"
+)
+```
+
+**変更範囲**:
+- C++ SpirrowBridgeBlueprintCommands.cpp: HandleCreateBlueprint 関数を更新
+  - 親クラス検索ロジックの拡張（U プレフィックス対応）
+  - Widget Blueprint 作成分岐の追加
+- インクルード追加: Blueprint/WidgetBlueprint.h, WidgetBlueprintFactory.h
+- Build.cs: UMGEditor モジュール依存は既に存在（変更不要）
+
+**技術詳細**:
+- UWidgetBlueprintFactory による Widget Blueprint 生成
+- IsChildOf(UUserWidget::StaticClass()) による型判定
+- 複数の検索メソッド（StaticClass、TObjectIterator、LoadObject）による堅牢な親クラス解決
+
+**下位互換性**:
+- Actor系 Blueprint の作成動作は変更なし
+- 既存コードへの影響なし
+
 ### 2025-12-15: GAS Phase 1-B - GAS アセット一覧取得機能
 
 **新機能**:

@@ -89,6 +89,7 @@ y = branch_index * 150
 
 ### 作成フロー
 
+#### Actor Blueprint の場合
 1. **Blueprint作成**: `create_blueprint`
 2. **コンポーネント追加**: `add_component_to_blueprint`
 3. **メッシュ/プロパティ設定**: `set_static_mesh_properties`, `set_component_property`
@@ -96,6 +97,14 @@ y = branch_index * 150
 5. **関数ノード追加**: `add_blueprint_function_node`
 6. **ノード接続**: `connect_blueprint_nodes`
 7. **コンパイル**: `compile_blueprint`
+
+#### Widget Blueprint の場合
+1. **Widget Blueprint作成**: `create_blueprint` (parent_class に UserWidget 系を指定)
+2. **Widget要素追加**: UMG Editor で手動追加（現在MCPツールは未対応）
+3. **イベントノード追加**: `add_blueprint_event_node`
+4. **関数ノード追加**: `add_blueprint_function_node`
+5. **ノード接続**: `connect_blueprint_nodes`
+6. **コンパイル**: `compile_blueprint`
 
 ### 関数ノードのtarget指定
 
@@ -416,6 +425,7 @@ search_knowledge("質量 設定", category="physics")
 
 ## 更新履歴
 
+- 2025-12-16: create_blueprint で UUserWidget を親クラスとして指定可能に。Widget Blueprint の自動生成に対応
 - 2025-12-15: GAS Phase 1-B 実装。GAS アセット一覧取得機能（list_gas_assets）を追加
 - 2025-12-15: GAS Phase 1-A 実装。Gameplay Tags 管理機能（add_gameplay_tags, list_gameplay_tags, remove_gameplay_tag）を追加
 - 2025-12-15: Config（ini）ファイル操作対応を追加。get_config_value, set_config_value, list_config_sections ツールを実装
