@@ -34,7 +34,7 @@
 #include "AbilitySystemComponent.h"
 // Widget Blueprint support
 #include "Blueprint/WidgetBlueprint.h"
-#include "WidgetBlueprintFactory.h"
+#include "Factories/WidgetBlueprintFactory.h"
 
 FSpirrowBridgeBlueprintCommands::FSpirrowBridgeBlueprintCommands()
 {
