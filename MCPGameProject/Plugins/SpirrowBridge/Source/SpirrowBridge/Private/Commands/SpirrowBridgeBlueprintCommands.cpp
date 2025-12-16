@@ -33,8 +33,8 @@
 // GAS Components
 #include "AbilitySystemComponent.h"
 // Widget Blueprint support
-#include "Blueprint/WidgetBlueprint.h"
-#include "Factories/WidgetBlueprintFactory.h"
+#include "WidgetBlueprint.h"
+#include "WidgetBlueprintFactory.h"
 
 FSpirrowBridgeBlueprintCommands::FSpirrowBridgeBlueprintCommands()
 {
