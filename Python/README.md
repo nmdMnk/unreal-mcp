@@ -1,40 +1,90 @@
 # Unreal MCP
 
-Python bridge for interacting with Unreal Engine 5.5 using the Model Context Protocol (MCP).
+Model Context Protocol (MCP) を使用して Unreal Engine 5.5 と連携するための Python ブリッジです。
 
-## Setup
+## セットアップ
 
-1. Make sure Python 3.10+ is installed
-2. Install `uv` if you haven't already:
+1. Python 3.10 以上がインストールされていることを確認してください
+2. `uv` をインストールします（まだの場合）:
    ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
-3. Create and activate a virtual environment:
+3. 仮想環境を作成して有効化します:
    ```bash
    uv venv
-   source .venv/bin/activate  # On Unix/macOS
-   # or
-   .venv\Scripts\activate     # On Windows
+   source .venv/bin/activate  # Unix/macOS の場合
+   # または
+   .venv\Scripts\activate     # Windows の場合
    ```
-4. Install dependencies:
+4. 依存関係をインストールします:
    ```bash
    uv pip install -e .
    ```
 
-At this point, you can configure your MCP Client (Claude Desktop, Cursor, Windsurf) to use the Unreal MCP Server as per the [Configuring your MCP Client](README.md#configuring-your-mcp-client).
+この時点で、MCP クライアント（Claude Desktop、Cursor、Windsurf）を設定して Unreal MCP Server を使用できます。詳細は [MCP クライアントの設定](README.md#configuring-your-mcp-client) を参照してください。
 
-## Testing Scripts
+## 設定
 
-There are several scripts in the [scripts](./scripts) folder. They are useful for testing the tools and the Unreal Bridge via a direct connection. This means that you do not need to have an MCP Server running.
+MCP サーバは `.env` ファイルまたは環境変数による設定をサポートしています。設定値は以下の優先順位で読み込まれます:
 
-You should make sure you have installed dependencies and/or are running in the `uv` virtual environment in order for the scripts to work.
+1. **環境変数**（最優先）
+2. **`.env` ファイル**
+3. **デフォルト値**（フォールバック）
 
+### .env ファイルのセットアップ
 
-## Troubleshooting
+1. サンプル設定ファイルをコピーします:
+   ```bash
+   cp .env.example .env
+   ```
 
-- Make sure Unreal Engine editor is loaded loaded and running before running the server.
-- Check logs in `unreal_mcp.log` for detailed error information
+2. `.env` ファイルを編集して設定をカスタマイズします:
+   ```bash
+   # .env の記述例
+   RAG_SERVER_URL=http://localhost:8100
+   UNREAL_HOST=127.0.0.1
+   UNREAL_PORT=55557
+   ```
 
-## Development
+### 利用可能な設定オプション
 
-To add new tools, modify the `SpirrowBridgeBridge.py` file to add new command handlers, and update the `unreal_mcp_server.py` file to expose them through the HTTP API. 
+| 変数名 | 説明 | デフォルト値 |
+|--------|------|-------------|
+| `RAG_SERVER_URL` | RAG ナレッジサーバの URL | `http://localhost:8100` |
+| `UNREAL_HOST` | Unreal Engine 接続用ホストアドレス | `127.0.0.1` |
+| `UNREAL_PORT` | Unreal Engine TCP 接続用ポート | `55557` |
+
+### 環境変数の使用
+
+設定値は環境変数として直接設定することもできます:
+
+```bash
+# Unix/macOS
+export RAG_SERVER_URL=http://localhost:9999
+python unreal_mcp_server.py
+
+# Windows (PowerShell)
+$env:RAG_SERVER_URL="http://localhost:9999"
+python unreal_mcp_server.py
+
+# Windows (CMD)
+set RAG_SERVER_URL=http://localhost:9999
+python unreal_mcp_server.py
+```
+
+**注意:** 環境変数は `.env` ファイルの設定よりも優先されます。
+
+## テストスクリプト
+
+[scripts](./scripts) フォルダにいくつかのテストスクリプトがあります。これらは MCP Server を起動せずに、直接接続でツールと Unreal Bridge をテストするのに便利です。
+
+スクリプトを実行するには、依存関係がインストールされていること、または `uv` 仮想環境内で実行していることを確認してください。
+
+## トラブルシューティング
+
+- サーバを実行する前に、Unreal Engine エディタが起動して実行中であることを確認してください
+- 詳細なエラー情報は `unreal_mcp.log` のログを確認してください
+
+## 開発
+
+新しいツールを追加するには、`SpirrowBridgeBridge.py` ファイルを変更して新しいコマンドハンドラを追加し、`unreal_mcp_server.py` ファイルを更新して HTTP API 経由で公開してください。

@@ -261,9 +261,27 @@ start_mcp_server.bat
 
 #### ローカル設定ファイル（環境固有の設定）
 
-環境固有の設定（RAGサーバーURLなど）は、ローカル設定ファイルで管理できます。これらのファイルはgitに追跡されないため、各環境で異なる設定を安全に保存できます。
+環境固有の設定（RAGサーバーURLなど）は、以下の2つの方法で管理できます。これらのファイルはgitに追跡されないため、各環境で異なる設定を安全に保存できます。
 
-**セットアップ方法**:
+##### 方法1: .env ファイル（推奨）
+
+1. テンプレートをコピー：
+   ```bash
+   cp .env.example .env
+   ```
+
+2. `.env` ファイルを編集して設定を変更：
+   ```bash
+   # .env の例
+   RAG_SERVER_URL=http://your-rag-server:8100
+   UNREAL_HOST=127.0.0.1
+   UNREAL_PORT=55557
+   ```
+
+3. MCPサーバーを起動すると、自動的に設定が読み込まれます
+
+##### 方法2: シェルスクリプト設定ファイル
+
 1. テンプレートをコピー：
    ```powershell
    # PowerShell用
@@ -281,9 +299,16 @@ start_mcp_server.bat
 
 3. 起動スクリプトを実行すると、自動的に設定が読み込まれます
 
+**設定の優先順位**:
+1. 環境変数（最優先）
+2. `.env` ファイル
+3. `config.local.ps1` / `config.local.bat`
+4. デフォルト値
+
 **利用可能な設定**:
 - `RAG_SERVER_URL` - RAGサーバーの接続先（デフォルト: `http://localhost:8100`）
-- 他の環境変数も追加可能
+- `UNREAL_HOST` - Unreal Engine接続用ホスト（デフォルト: `127.0.0.1`）
+- `UNREAL_PORT` - Unreal Engine接続用ポート（デフォルト: `55557`）
 
 ### 起動モード
 
@@ -382,12 +407,30 @@ MCPクライアントに応じて、適切な場所に設定を配置してく�
 
 ### RAGサーバーの設定（オプション）
 
-RAGナレッジ管理機能を使用する場合、環境変数でRAGサーバーのURLを指定できます：
+RAGナレッジ管理機能を使用する場合、以下の3つの方法でRAGサーバーのURLを指定できます：
+
+#### 方法1: .env ファイル（推奨）
+
+1. `.env.example` から `.env` ファイルを作成：
+   ```bash
+   cp .env.example .env
+   ```
+
+2. `.env` ファイルでRAGサーバーのURLを設定：
+   ```bash
+   RAG_SERVER_URL=http://your-rag-server:8100
+   ```
+
+この方法が最もシンプルで、MCPクライアントの設定変更が不要です。
+
+#### 方法2: MCPクライアントの環境変数設定
+
+MCPクライアントの設定ファイルで環境変数を指定：
 
 ```json
 {
   "mcpServers": {
-    "unrealMCP": {
+    "spirrow-unrealwise": {
       "command": "uv",
       "args": [
         "--directory",
@@ -402,6 +445,24 @@ RAGナレッジ管理機能を使用する場合、環境変数でRAGサーバ�
   }
 }
 ```
+
+#### 方法3: システム環境変数
+
+システムまたはシェルの環境変数として設定：
+
+```bash
+# Unix/macOS
+export RAG_SERVER_URL=http://your-rag-server:8100
+
+# Windows (PowerShell)
+$env:RAG_SERVER_URL="http://your-rag-server:8100"
+```
+
+**設定の優先順位**:
+1. システム環境変数（最優先）
+2. MCPクライアントの `env` 設定
+3. `.env` ファイル
+4. デフォルト値（`http://localhost:8100`）
 
 環境変数を設定しない場合、デフォルトで `http://localhost:8100` に接続を試みます。
 

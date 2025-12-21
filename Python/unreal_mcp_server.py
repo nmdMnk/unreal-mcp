@@ -8,9 +8,17 @@ import logging
 import socket
 import sys
 import json
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+# Priority: 1. Environment variables (highest)
+#           2. .env file
+#           3. Hardcoded defaults (lowest)
+load_dotenv()
 
 # Configure logging with more detailed format
 logging.basicConfig(
@@ -23,9 +31,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("SpirrowBridge")
 
-# Configuration
-UNREAL_HOST = "127.0.0.1"
-UNREAL_PORT = 55557
+# Configuration - can be overridden via environment variables or .env file
+UNREAL_HOST = os.getenv("UNREAL_HOST", "127.0.0.1")
+UNREAL_PORT = int(os.getenv("UNREAL_PORT", "55557"))
+
+# Log configuration on startup
+logger.info(f"Configuration loaded - UNREAL_HOST: {UNREAL_HOST}, UNREAL_PORT: {UNREAL_PORT}")
 
 class UnrealConnection:
     """Connection to an Unreal Engine instance."""
