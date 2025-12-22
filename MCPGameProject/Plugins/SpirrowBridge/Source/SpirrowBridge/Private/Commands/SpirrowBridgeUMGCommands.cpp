@@ -28,6 +28,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "K2Node_Event.h"
+#include "Misc/PackageName.h"
 
 FSpirrowBridgeUMGCommands::FSpirrowBridgeUMGCommands()
 {
@@ -77,22 +78,63 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleCommand(const FString& 
 
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleCreateUMGWidgetBlueprint(const TSharedPtr<FJsonObject>& Params)
 {
-	// Get required parameters
+	// Get required parameters - support both "widget_name" and "name" for compatibility
 	FString BlueprintName;
-	if (!Params->TryGetStringField(TEXT("name"), BlueprintName))
+	if (!Params->TryGetStringField(TEXT("widget_name"), BlueprintName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+		// Fallback to "name" for backward compatibility
+		if (!Params->TryGetStringField(TEXT("name"), BlueprintName))
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+		}
+	}
+
+	// Get optional path parameter (default: /Game/UI)
+	FString PackagePath = TEXT("/Game/UI");
+	Params->TryGetStringField(TEXT("path"), PackagePath);
+	
+	// Ensure path ends without trailing slash for consistent formatting
+	if (PackagePath.EndsWith(TEXT("/")))
+	{
+		PackagePath = PackagePath.LeftChop(1);
+	}
+
+	// Get optional parent class (default: UserWidget)
+	FString ParentClassName = TEXT("UserWidget");
+	Params->TryGetStringField(TEXT("parent_class"), ParentClassName);
+
+	// Find the parent class
+	UClass* ParentClass = nullptr;
+	if (ParentClassName == TEXT("UserWidget"))
+	{
+		ParentClass = UUserWidget::StaticClass();
+	}
+	else
+	{
+		// Try to find custom widget class using FindFirstObject (UE 5.1+ replacement for ANY_PACKAGE)
+		ParentClass = FindFirstObject<UClass>(*ParentClassName, EFindFirstObjectOptions::None);
+		if (!ParentClass)
+		{
+			// Try with full path
+			FString FullParentPath = FString::Printf(TEXT("/Script/UMG.%s"), *ParentClassName);
+			ParentClass = LoadObject<UClass>(nullptr, *FullParentPath);
+		}
+		if (!ParentClass)
+		{
+			// Fallback to UserWidget
+			UE_LOG(LogTemp, Warning, TEXT("Parent class '%s' not found, using UserWidget"), *ParentClassName);
+			ParentClass = UUserWidget::StaticClass();
+		}
 	}
 
 	// Create the full asset path
-	FString PackagePath = TEXT("/Game/Widgets/");
 	FString AssetName = BlueprintName;
-	FString FullPath = PackagePath + AssetName;
+	FString FullPath = PackagePath + TEXT("/") + AssetName;
 
 	// Check if asset already exists
 	if (UEditorAssetLibrary::DoesAssetExist(FullPath))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Widget Blueprint '%s' already exists"), *BlueprintName));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Widget Blueprint '%s' already exists at '%s'"), *BlueprintName, *FullPath));
 	}
 
 	// Create package
@@ -104,11 +146,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleCreateUMGWidgetBlueprin
 
 	// Create Widget Blueprint using KismetEditorUtilities
 	UBlueprint* NewBlueprint = FKismetEditorUtilities::CreateBlueprint(
-		UUserWidget::StaticClass(),  // Parent class
+		ParentClass,                 // Parent class (dynamic)
 		Package,                     // Outer package
 		FName(*AssetName),           // Blueprint name
 		BPTYPE_Normal,               // Blueprint type
-		UBlueprint::StaticClass(),   // Blueprint class
+		UWidgetBlueprint::StaticClass(),   // Blueprint class - use UWidgetBlueprint for widgets
 		UBlueprintGeneratedClass::StaticClass(), // Generated class
 		FName("CreateUMGWidget")     // Creation method name
 	);
@@ -134,10 +176,20 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleCreateUMGWidgetBlueprin
 	// Compile the blueprint
 	FKismetEditorUtilities::CompileBlueprint(WidgetBlueprint);
 
+	// Save the asset using UE 5.0+ API
+	FString PackageFileName = FPackageName::LongPackageNameToFilename(FullPath, FPackageName::GetAssetPackageExtension());
+	FSavePackageArgs SaveArgs;
+	SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
+	SaveArgs.Error = GError;
+	SaveArgs.SaveFlags = SAVE_NoError;
+	UPackage::SavePackage(Package, WidgetBlueprint, *PackageFileName, SaveArgs);
+
 	// Create success response
 	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetBoolField(TEXT("success"), true);
 	ResultObj->SetStringField(TEXT("name"), BlueprintName);
 	ResultObj->SetStringField(TEXT("path"), FullPath);
+	ResultObj->SetStringField(TEXT("parent_class"), ParentClass->GetName());
 	return ResultObj;
 }
 
