@@ -306,7 +306,13 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("add_vertical_box_to_widget") ||
                      CommandType == TEXT("add_horizontal_box_to_widget") ||
                      CommandType == TEXT("reparent_widget_element") ||
-                     CommandType == TEXT("remove_widget_element"))
+                     CommandType == TEXT("remove_widget_element") ||
+                     // Phase 2: Variable & Function Operations
+                     CommandType == TEXT("add_widget_variable") ||
+                     CommandType == TEXT("set_widget_variable_default") ||
+                     CommandType == TEXT("add_widget_function") ||
+                     CommandType == TEXT("add_widget_event") ||
+                     CommandType == TEXT("bind_widget_to_variable"))
             {
                 ResultJson = UMGCommands->HandleCommand(CommandType, Params);
             }

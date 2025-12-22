@@ -1021,4 +1021,368 @@ def register_umg_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    # Phase 2: Variable & Function Operations
+    @mcp.tool()
+    def add_widget_variable(
+        ctx: Context,
+        widget_name: str,
+        variable_name: str,
+        variable_type: str,
+        default_value: str = None,
+        is_exposed: bool = False,
+        category: str = None,
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add a variable to a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            variable_name: Name for the new variable (e.g., "CurrentTrapName")
+            variable_type: Type of the variable - "Boolean", "Integer", "Float", "String",
+                          "Vector", "Text", "TimerHandle", "Texture2D", "Object", etc.
+            default_value: Default value for the variable (type-appropriate string)
+            is_exposed: Whether to expose the variable in the editor
+            category: Category name for the variable in the editor
+            path: Content browser path to the widget
+
+        Returns:
+            Dict containing success status and variable details
+
+        Supported Types:
+            - Primitives: Boolean, Integer, Float, String, Name, Text
+            - Math: Vector, Vector2D, Rotator, Transform
+            - Visuals: LinearColor, Texture2D
+            - System: TimerHandle, Object
+            - Custom: Any Blueprint class or struct name
+
+        Example:
+            add_widget_variable(
+                widget_name="WBP_TT_TrapSelector",
+                variable_name="bIsVisible",
+                variable_type="Boolean",
+                default_value="false",
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "variable_name": variable_name,
+                "variable_type": variable_type,
+                "is_exposed": is_exposed,
+                "path": path
+            }
+
+            if default_value is not None:
+                params["default_value"] = default_value
+            if category is not None:
+                params["category"] = category
+
+            logger.info(f"Adding widget variable with params: {params}")
+            response = unreal.send_command("add_widget_variable", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add widget variable response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding widget variable: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def set_widget_variable_default(
+        ctx: Context,
+        widget_name: str,
+        variable_name: str,
+        default_value: str,
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Set the default value for a widget variable.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            variable_name: Name of the variable to modify
+            default_value: Default value (type-appropriate string format)
+                          - Boolean: "true" or "false"
+                          - Integer: "123"
+                          - Float: "1.5"
+                          - String: "Hello"
+                          - Vector: "(X=0,Y=0,Z=100)"
+            path: Content browser path to the widget
+
+        Returns:
+            Dict containing success status
+
+        Example:
+            set_widget_variable_default(
+                widget_name="WBP_TT_TrapSelector",
+                variable_name="DefaultTrapName",
+                default_value="Explosion Trap",
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "variable_name": variable_name,
+                "default_value": default_value,
+                "path": path
+            }
+
+            logger.info(f"Setting widget variable default with params: {params}")
+            response = unreal.send_command("set_widget_variable_default", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Set widget variable default response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error setting widget variable default: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def add_widget_function(
+        ctx: Context,
+        widget_name: str,
+        function_name: str,
+        inputs: List[Dict[str, str]] = None,
+        outputs: List[Dict[str, str]] = None,
+        is_pure: bool = False,
+        category: str = None,
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add a custom function to a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            function_name: Name for the new function (e.g., "UpdateTrapSelection")
+            inputs: List of input parameters, each with "name" and "type" keys
+                   Example: [{"name": "TrapName", "type": "String"}, {"name": "TrapCount", "type": "Integer"}]
+            outputs: List of output parameters (return values)
+                    Example: [{"name": "Success", "type": "Boolean"}]
+            is_pure: Whether this is a pure function (no execution pins, can be called anywhere)
+            category: Category name for the function
+            path: Content browser path to the widget
+
+        Returns:
+            Dict containing success status and function details
+
+        Example:
+            add_widget_function(
+                widget_name="WBP_TT_TrapSelector",
+                function_name="UpdateTrapDisplay",
+                inputs=[
+                    {"name": "TrapName", "type": "String"},
+                    {"name": "TrapCount", "type": "Integer"},
+                    {"name": "TrapIcon", "type": "Texture2D"}
+                ],
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "function_name": function_name,
+                "is_pure": is_pure,
+                "path": path
+            }
+
+            if inputs is not None:
+                params["inputs"] = inputs
+            if outputs is not None:
+                params["outputs"] = outputs
+            if category is not None:
+                params["category"] = category
+
+            logger.info(f"Adding widget function with params: {params}")
+            response = unreal.send_command("add_widget_function", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add widget function response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding widget function: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def add_widget_event(
+        ctx: Context,
+        widget_name: str,
+        event_name: str,
+        inputs: List[Dict[str, str]] = None,
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add a custom event to a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            event_name: Name for the new event (e.g., "OnTrapSelected")
+            inputs: List of input parameters, each with "name" and "type" keys
+                   Example: [{"name": "TrapIndex", "type": "Integer"}]
+            path: Content browser path to the widget
+
+        Returns:
+            Dict containing success status and event details
+
+        Example:
+            add_widget_event(
+                widget_name="WBP_TT_TrapSelector",
+                event_name="OnTrapSelected",
+                inputs=[{"name": "TrapIndex", "type": "Integer"}],
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "event_name": event_name,
+                "path": path
+            }
+
+            if inputs is not None:
+                params["inputs"] = inputs
+
+            logger.info(f"Adding widget event with params: {params}")
+            response = unreal.send_command("add_widget_event", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add widget event response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding widget event: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def bind_widget_to_variable(
+        ctx: Context,
+        widget_name: str,
+        element_name: str,
+        property_name: str,
+        variable_name: str,
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Bind a widget element property to a variable.
+
+        Creates a binding function that returns the variable value, which UMG
+        will automatically call to update the widget property.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            element_name: Name of the widget element to bind (e.g., "TrapNameText")
+            property_name: Property to bind (e.g., "Text", "Visibility", "Percent")
+            variable_name: Name of the variable to bind to
+            path: Content browser path to the widget
+
+        Returns:
+            Dict containing success status and binding function name
+
+        Common bindings:
+            - TextBlock.Text -> Text variable
+            - TextBlock.Visibility -> enum variable
+            - ProgressBar.Percent -> Float variable
+            - Image.ColorAndOpacity -> LinearColor variable
+
+        Note: Phase 2 creates the binding function. Full automatic binding may require
+              manual setup in UMG editor or will be available in Phase 3.
+
+        Example:
+            # First create a variable
+            add_widget_variable(
+                widget_name="WBP_TT_TrapSelector",
+                variable_name="CurrentTrapName",
+                variable_type="Text",
+                path="/Game/TrapxTrap/UI"
+            )
+
+            # Then bind it to a TextBlock
+            bind_widget_to_variable(
+                widget_name="WBP_TT_TrapSelector",
+                element_name="TrapNameText",
+                property_name="Text",
+                variable_name="CurrentTrapName",
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "element_name": element_name,
+                "property_name": property_name,
+                "variable_name": variable_name,
+                "path": path
+            }
+
+            logger.info(f"Binding widget to variable with params: {params}")
+            response = unreal.send_command("bind_widget_to_variable", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Bind widget to variable response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error binding widget to variable: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("UMG tools registered successfully") 

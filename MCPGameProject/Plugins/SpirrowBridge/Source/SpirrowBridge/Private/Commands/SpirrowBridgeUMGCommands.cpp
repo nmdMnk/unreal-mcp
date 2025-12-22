@@ -26,6 +26,7 @@
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Components/Button.h"
 #include "K2Node_FunctionEntry.h"
+#include "K2Node_FunctionResult.h"
 #include "K2Node_CallFunction.h"
 #include "K2Node_VariableGet.h"
 #include "K2Node_VariableSet.h"
@@ -33,6 +34,8 @@
 #include "Kismet2/KismetEditorUtilities.h"
 #include "K2Node_Event.h"
 #include "Misc/PackageName.h"
+#include "EdGraphSchema_K2.h"
+#include "UObject/StructOnScope.h"
 
 FSpirrowBridgeUMGCommands::FSpirrowBridgeUMGCommands()
 {
@@ -104,6 +107,27 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleCommand(const FString& 
 	else if (CommandName == TEXT("remove_widget_element"))
 	{
 		return HandleRemoveWidgetElement(Params);
+	}
+	// Phase 2: Variable & Function Operations
+	else if (CommandName == TEXT("add_widget_variable"))
+	{
+		return HandleAddWidgetVariable(Params);
+	}
+	else if (CommandName == TEXT("set_widget_variable_default"))
+	{
+		return HandleSetWidgetVariableDefault(Params);
+	}
+	else if (CommandName == TEXT("add_widget_function"))
+	{
+		return HandleAddWidgetFunction(Params);
+	}
+	else if (CommandName == TEXT("add_widget_event"))
+	{
+		return HandleAddWidgetEvent(Params);
+	}
+	else if (CommandName == TEXT("bind_widget_to_variable"))
+	{
+		return HandleBindWidgetToVariable(Params);
 	}
 
 	return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown UMG command: %s"), *CommandName));
@@ -2077,5 +2101,634 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleRemoveWidgetElement(con
 	ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
 	ResultObj->SetStringField(TEXT("removed_element"), ElementName);
 	ResultObj->SetStringField(TEXT("former_parent"), ParentName);
+	return ResultObj;
+}
+
+// ============================================================================
+// Phase 2: Variable & Function Operations
+// ============================================================================
+
+// Helper function to setup pin types for variables and function parameters
+bool FSpirrowBridgeUMGCommands::SetupPinType(const FString& TypeName, FEdGraphPinType& OutPinType)
+{
+	OutPinType.PinCategory = NAME_None;
+	OutPinType.PinSubCategory = NAME_None;
+	OutPinType.PinSubCategoryObject = nullptr;
+	OutPinType.ContainerType = EPinContainerType::None;
+	OutPinType.bIsReference = false;
+
+	if (TypeName == TEXT("Boolean") || TypeName == TEXT("Bool"))
+	{
+		OutPinType.PinCategory = UEdGraphSchema_K2::PC_Boolean;
+	}
+	else if (TypeName == TEXT("Integer") || TypeName == TEXT("Int"))
+	{
+		OutPinType.PinCategory = UEdGraphSchema_K2::PC_Int;
+	}
+	else if (TypeName == TEXT("Float") || TypeName == TEXT("Double"))
+	{
+		OutPinType.PinCategory = UEdGraphSchema_K2::PC_Real;
+		OutPinType.PinSubCategory = UEdGraphSchema_K2::PC_Double;
+	}
+	else if (TypeName == TEXT("String"))
+	{
+		OutPinType.PinCategory = UEdGraphSchema_K2::PC_String;
+	}
+	else if (TypeName == TEXT("Name"))
+	{
+		OutPinType.PinCategory = UEdGraphSchema_K2::PC_Name;
+	}
+	else if (TypeName == TEXT("Text"))
+	{
+		OutPinType.PinCategory = UEdGraphSchema_K2::PC_Text;
+	}
+	else if (TypeName == TEXT("Vector"))
+	{
+		OutPinType.PinCategory = UEdGraphSchema_K2::PC_Struct;
+		OutPinType.PinSubCategoryObject = TBaseStructure<FVector>::Get();
+	}
+	else if (TypeName == TEXT("Vector2D"))
+	{
+		OutPinType.PinCategory = UEdGraphSchema_K2::PC_Struct;
+		OutPinType.PinSubCategoryObject = TBaseStructure<FVector2D>::Get();
+	}
+	else if (TypeName == TEXT("Rotator"))
+	{
+		OutPinType.PinCategory = UEdGraphSchema_K2::PC_Struct;
+		OutPinType.PinSubCategoryObject = TBaseStructure<FRotator>::Get();
+	}
+	else if (TypeName == TEXT("Transform"))
+	{
+		OutPinType.PinCategory = UEdGraphSchema_K2::PC_Struct;
+		OutPinType.PinSubCategoryObject = TBaseStructure<FTransform>::Get();
+	}
+	else if (TypeName == TEXT("LinearColor") || TypeName == TEXT("Color"))
+	{
+		OutPinType.PinCategory = UEdGraphSchema_K2::PC_Struct;
+		OutPinType.PinSubCategoryObject = TBaseStructure<FLinearColor>::Get();
+	}
+	else if (TypeName == TEXT("TimerHandle"))
+	{
+		OutPinType.PinCategory = UEdGraphSchema_K2::PC_Struct;
+		OutPinType.PinSubCategoryObject = FTimerHandle::StaticStruct();
+	}
+	else if (TypeName == TEXT("Texture2D"))
+	{
+		OutPinType.PinCategory = UEdGraphSchema_K2::PC_Object;
+		OutPinType.PinSubCategoryObject = UTexture2D::StaticClass();
+	}
+	else if (TypeName == TEXT("Object"))
+	{
+		OutPinType.PinCategory = UEdGraphSchema_K2::PC_Object;
+		OutPinType.PinSubCategoryObject = UObject::StaticClass();
+	}
+	else
+	{
+		// Try to find custom class or struct
+		UClass* FoundClass = FindObject<UClass>(nullptr, *TypeName);
+		if (FoundClass)
+		{
+			OutPinType.PinCategory = UEdGraphSchema_K2::PC_Object;
+			OutPinType.PinSubCategoryObject = FoundClass;
+		}
+		else
+		{
+			UScriptStruct* FoundStruct = FindObject<UScriptStruct>(nullptr, *TypeName);
+			if (FoundStruct)
+			{
+				OutPinType.PinCategory = UEdGraphSchema_K2::PC_Struct;
+				OutPinType.PinSubCategoryObject = FoundStruct;
+			}
+			else
+			{
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleAddWidgetVariable(const TSharedPtr<FJsonObject>& Params)
+{
+	// Get required parameters
+	FString WidgetName;
+	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+	}
+
+	FString VariableName;
+	if (!Params->TryGetStringField(TEXT("variable_name"), VariableName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'variable_name' parameter"));
+	}
+
+	FString VariableType;
+	if (!Params->TryGetStringField(TEXT("variable_type"), VariableType))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'variable_type' parameter"));
+	}
+
+	// Get optional parameters
+	FString Path = TEXT("/Game/UI");
+	Params->TryGetStringField(TEXT("path"), Path);
+
+	FString DefaultValue;
+	bool bHasDefault = Params->TryGetStringField(TEXT("default_value"), DefaultValue);
+
+	bool bIsExposed = false;
+	Params->TryGetBoolField(TEXT("is_exposed"), bIsExposed);
+
+	FString Category;
+	Params->TryGetStringField(TEXT("category"), Category);
+
+	// Load Widget Blueprint
+	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
+	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
+	if (!WidgetBP)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Widget Blueprint '%s' not found at path '%s'"), *WidgetName, *AssetPath));
+	}
+
+	// Setup Pin Type
+	FEdGraphPinType PinType;
+	if (!SetupPinType(VariableType, PinType))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Unsupported variable type: %s"), *VariableType));
+	}
+
+	// Add variable to Blueprint
+	FBlueprintEditorUtils::AddMemberVariable(WidgetBP, FName(*VariableName), PinType);
+
+	// Find and configure the newly created variable
+	FBPVariableDescription* NewVar = nullptr;
+	for (FBPVariableDescription& Variable : WidgetBP->NewVariables)
+	{
+		if (Variable.VarName == FName(*VariableName))
+		{
+			NewVar = &Variable;
+			break;
+		}
+	}
+
+	if (NewVar)
+	{
+		// Set editor exposure
+		if (bIsExposed)
+		{
+			NewVar->PropertyFlags |= CPF_Edit | CPF_BlueprintVisible;
+		}
+
+		// Set category
+		if (!Category.IsEmpty())
+		{
+			NewVar->Category = FText::FromString(Category);
+		}
+
+		// Set default value
+		if (bHasDefault)
+		{
+			NewVar->DefaultValue = DefaultValue;
+		}
+	}
+
+	// Mark Blueprint as modified and compile
+	FBlueprintEditorUtils::MarkBlueprintAsModified(WidgetBP);
+	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+	// Create success response
+	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetBoolField(TEXT("success"), true);
+	ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
+	ResultObj->SetStringField(TEXT("variable_name"), VariableName);
+	ResultObj->SetStringField(TEXT("variable_type"), VariableType);
+	return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleSetWidgetVariableDefault(const TSharedPtr<FJsonObject>& Params)
+{
+	FString WidgetName, VariableName, DefaultValue, Path = TEXT("/Game/UI");
+
+	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName) ||
+		!Params->TryGetStringField(TEXT("variable_name"), VariableName) ||
+		!Params->TryGetStringField(TEXT("default_value"), DefaultValue))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing required parameters"));
+	}
+	Params->TryGetStringField(TEXT("path"), Path);
+
+	// Load Widget Blueprint
+	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
+	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
+	if (!WidgetBP)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Widget Blueprint '%s' not found"), *WidgetName));
+	}
+
+	// Find variable
+	FBPVariableDescription* Variable = nullptr;
+	for (FBPVariableDescription& Var : WidgetBP->NewVariables)
+	{
+		if (Var.VarName == FName(*VariableName))
+		{
+			Variable = &Var;
+			break;
+		}
+	}
+
+	if (!Variable)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Variable '%s' not found in Widget Blueprint"), *VariableName));
+	}
+
+	// Set default value
+	Variable->DefaultValue = DefaultValue;
+
+	// Mark Blueprint as modified and compile
+	FBlueprintEditorUtils::MarkBlueprintAsModified(WidgetBP);
+	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetBoolField(TEXT("success"), true);
+	ResultObj->SetStringField(TEXT("variable_name"), VariableName);
+	ResultObj->SetStringField(TEXT("default_value"), DefaultValue);
+	return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleAddWidgetFunction(const TSharedPtr<FJsonObject>& Params)
+{
+	FString WidgetName, FunctionName, Path = TEXT("/Game/UI");
+	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName) ||
+		!Params->TryGetStringField(TEXT("function_name"), FunctionName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing required parameters"));
+	}
+	Params->TryGetStringField(TEXT("path"), Path);
+
+	bool bIsPure = false;
+	Params->TryGetBoolField(TEXT("is_pure"), bIsPure);
+
+	// Load Widget Blueprint
+	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
+	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
+	if (!WidgetBP)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Widget Blueprint not found"));
+	}
+
+	// Check if function already exists
+	for (UEdGraph* Graph : WidgetBP->FunctionGraphs)
+	{
+		if (Graph->GetFName() == FName(*FunctionName))
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				FString::Printf(TEXT("Function '%s' already exists"), *FunctionName));
+		}
+	}
+
+	// Create function graph
+	UEdGraph* FuncGraph = FBlueprintEditorUtils::CreateNewGraph(
+		WidgetBP,
+		FName(*FunctionName),
+		UEdGraph::StaticClass(),
+		UEdGraphSchema_K2::StaticClass()
+	);
+
+	if (!FuncGraph)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create function graph"));
+	}
+
+	// Add function to Blueprint - This automatically creates the Entry node
+	FBlueprintEditorUtils::AddFunctionGraph<UClass>(WidgetBP, FuncGraph, false, nullptr);
+
+	// Find the existing Entry node (created by AddFunctionGraph)
+	UK2Node_FunctionEntry* EntryNode = nullptr;
+	for (UEdGraphNode* Node : FuncGraph->Nodes)
+	{
+		EntryNode = Cast<UK2Node_FunctionEntry>(Node);
+		if (EntryNode)
+		{
+			break;
+		}
+	}
+
+	if (!EntryNode)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to find function entry node"));
+	}
+
+	// Add input parameters to the existing Entry node
+	const TArray<TSharedPtr<FJsonValue>>* InputsArray;
+	if (Params->TryGetArrayField(TEXT("inputs"), InputsArray))
+	{
+		for (const TSharedPtr<FJsonValue>& InputValue : *InputsArray)
+		{
+			const TSharedPtr<FJsonObject>* InputObj;
+			if (InputValue->TryGetObject(InputObj))
+			{
+				FString ParamName, ParamType;
+				(*InputObj)->TryGetStringField(TEXT("name"), ParamName);
+				(*InputObj)->TryGetStringField(TEXT("type"), ParamType);
+
+				if (!ParamName.IsEmpty() && !ParamType.IsEmpty())
+				{
+					FEdGraphPinType PinType;
+					if (SetupPinType(ParamType, PinType))
+					{
+						EntryNode->CreateUserDefinedPin(FName(*ParamName), PinType, EGPD_Output);
+					}
+				}
+			}
+		}
+	}
+
+	// Add output parameters if provided - Create Result node only if needed
+	const TArray<TSharedPtr<FJsonValue>>* OutputsArray;
+	if (Params->TryGetArrayField(TEXT("outputs"), OutputsArray) && OutputsArray->Num() > 0)
+	{
+		// Check if Result node already exists
+		UK2Node_FunctionResult* ResultNode = nullptr;
+		for (UEdGraphNode* Node : FuncGraph->Nodes)
+		{
+			ResultNode = Cast<UK2Node_FunctionResult>(Node);
+			if (ResultNode)
+			{
+				break;
+			}
+		}
+
+		// Create Result node only if it doesn't exist
+		if (!ResultNode)
+		{
+			ResultNode = NewObject<UK2Node_FunctionResult>(FuncGraph);
+			FuncGraph->AddNode(ResultNode, false, false);
+			ResultNode->NodePosX = 400;
+			ResultNode->NodePosY = 0;
+			ResultNode->AllocateDefaultPins();
+		}
+
+		for (const TSharedPtr<FJsonValue>& OutputValue : *OutputsArray)
+		{
+			const TSharedPtr<FJsonObject>* OutputObj;
+			if (OutputValue->TryGetObject(OutputObj))
+			{
+				FString ParamName, ParamType;
+				(*OutputObj)->TryGetStringField(TEXT("name"), ParamName);
+				(*OutputObj)->TryGetStringField(TEXT("type"), ParamType);
+
+				if (!ParamName.IsEmpty() && !ParamType.IsEmpty())
+				{
+					FEdGraphPinType PinType;
+					if (SetupPinType(ParamType, PinType))
+					{
+						ResultNode->CreateUserDefinedPin(FName(*ParamName), PinType, EGPD_Input);
+					}
+				}
+			}
+		}
+	}
+
+	// Mark Blueprint as modified and compile
+	FBlueprintEditorUtils::MarkBlueprintAsModified(WidgetBP);
+	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetBoolField(TEXT("success"), true);
+	ResultObj->SetStringField(TEXT("function_name"), FunctionName);
+	ResultObj->SetStringField(TEXT("graph_id"), FuncGraph->GraphGuid.ToString());
+	return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleAddWidgetEvent(const TSharedPtr<FJsonObject>& Params)
+{
+	FString WidgetName, EventName, Path = TEXT("/Game/UI");
+	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName) ||
+		!Params->TryGetStringField(TEXT("event_name"), EventName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing required parameters"));
+	}
+	Params->TryGetStringField(TEXT("path"), Path);
+
+	// Load Widget Blueprint
+	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
+	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
+	if (!WidgetBP)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Widget Blueprint not found"));
+	}
+
+	// Find or create Event Graph
+	UEdGraph* EventGraph = nullptr;
+	for (UEdGraph* Graph : WidgetBP->UbergraphPages)
+	{
+		if (Graph->GetFName() == TEXT("EventGraph"))
+		{
+			EventGraph = Graph;
+			break;
+		}
+	}
+
+	if (!EventGraph)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Event Graph not found"));
+	}
+
+	// Create Custom Event node
+	UK2Node_Event* EventNode = NewObject<UK2Node_Event>(EventGraph);
+	EventGraph->AddNode(EventNode, false, false);
+	EventNode->CustomFunctionName = FName(*EventName);
+	EventNode->bIsEditable = true;
+	EventNode->NodePosX = 0;
+	EventNode->NodePosY = 0;
+	EventNode->AllocateDefaultPins();
+
+	// Add input parameters if provided
+	const TArray<TSharedPtr<FJsonValue>>* InputsArray;
+	if (Params->TryGetArrayField(TEXT("inputs"), InputsArray))
+	{
+		for (const TSharedPtr<FJsonValue>& InputValue : *InputsArray)
+		{
+			const TSharedPtr<FJsonObject>* InputObj;
+			if (InputValue->TryGetObject(InputObj))
+			{
+				FString ParamName, ParamType;
+				(*InputObj)->TryGetStringField(TEXT("name"), ParamName);
+				(*InputObj)->TryGetStringField(TEXT("type"), ParamType);
+
+				FEdGraphPinType PinType;
+				if (SetupPinType(ParamType, PinType))
+				{
+					EventNode->CreateUserDefinedPin(FName(*ParamName), PinType, EGPD_Output);
+				}
+			}
+		}
+	}
+
+	// Mark Blueprint as modified and compile
+	FBlueprintEditorUtils::MarkBlueprintAsModified(WidgetBP);
+	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetBoolField(TEXT("success"), true);
+	ResultObj->SetStringField(TEXT("event_name"), EventName);
+	ResultObj->SetStringField(TEXT("node_id"), EventNode->NodeGuid.ToString());
+	return ResultObj;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleBindWidgetToVariable(const TSharedPtr<FJsonObject>& Params)
+{
+	FString WidgetName, ElementName, PropertyName, VariableName, Path = TEXT("/Game/UI");
+	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName) ||
+		!Params->TryGetStringField(TEXT("element_name"), ElementName) ||
+		!Params->TryGetStringField(TEXT("property_name"), PropertyName) ||
+		!Params->TryGetStringField(TEXT("variable_name"), VariableName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing required parameters"));
+	}
+	Params->TryGetStringField(TEXT("path"), Path);
+
+	// Load Widget Blueprint
+	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
+	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
+	if (!WidgetBP)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Widget Blueprint not found"));
+	}
+
+	// Find widget element
+	UWidget* Element = WidgetBP->WidgetTree->FindWidget(FName(*ElementName));
+	if (!Element)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Widget element not found"));
+	}
+
+	// Generate binding function name
+	FString FunctionName = FString::Printf(TEXT("Get%s%s"), *VariableName, *PropertyName);
+
+	// Check if binding function already exists
+	UEdGraph* FuncGraph = nullptr;
+	for (UEdGraph* Graph : WidgetBP->FunctionGraphs)
+	{
+		if (Graph->GetFName() == FName(*FunctionName))
+		{
+			FuncGraph = Graph;
+			break;
+		}
+	}
+
+	// Create binding function if it doesn't exist
+	if (!FuncGraph)
+	{
+		// Find the variable to determine return type
+		FBPVariableDescription* Variable = nullptr;
+		for (FBPVariableDescription& Var : WidgetBP->NewVariables)
+		{
+			if (Var.VarName == FName(*VariableName))
+			{
+				Variable = &Var;
+				break;
+			}
+		}
+
+		if (!Variable)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				FString::Printf(TEXT("Variable '%s' not found in Widget Blueprint"), *VariableName));
+		}
+
+		// Create function graph
+		FuncGraph = FBlueprintEditorUtils::CreateNewGraph(
+			WidgetBP,
+			FName(*FunctionName),
+			UEdGraph::StaticClass(),
+			UEdGraphSchema_K2::StaticClass()
+		);
+
+		if (!FuncGraph)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create binding function"));
+		}
+
+		// Add function to Blueprint - This automatically creates the Entry node
+		FBlueprintEditorUtils::AddFunctionGraph<UClass>(WidgetBP, FuncGraph, false, nullptr);
+
+		// Find the existing Entry node (created by AddFunctionGraph)
+		UK2Node_FunctionEntry* EntryNode = nullptr;
+		for (UEdGraphNode* Node : FuncGraph->Nodes)
+		{
+			EntryNode = Cast<UK2Node_FunctionEntry>(Node);
+			if (EntryNode)
+			{
+				break;
+			}
+		}
+
+		if (!EntryNode)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to find function entry node"));
+		}
+
+		// Create Variable Get node
+		UK2Node_VariableGet* GetVarNode = NewObject<UK2Node_VariableGet>(FuncGraph);
+		GetVarNode->VariableReference.SetSelfMember(FName(*VariableName));
+		FuncGraph->AddNode(GetVarNode, false, false);
+		GetVarNode->NodePosX = 200;
+		GetVarNode->NodePosY = 0;
+		GetVarNode->AllocateDefaultPins();
+
+		// Check if Result node already exists
+		UK2Node_FunctionResult* ResultNode = nullptr;
+		for (UEdGraphNode* Node : FuncGraph->Nodes)
+		{
+			ResultNode = Cast<UK2Node_FunctionResult>(Node);
+			if (ResultNode)
+			{
+				break;
+			}
+		}
+
+		// Create Result node only if it doesn't exist
+		if (!ResultNode)
+		{
+			ResultNode = NewObject<UK2Node_FunctionResult>(FuncGraph);
+			FuncGraph->AddNode(ResultNode, false, false);
+			ResultNode->NodePosX = 400;
+			ResultNode->NodePosY = 0;
+			ResultNode->AllocateDefaultPins();
+
+			// Add return value pin
+			FEdGraphPinType ReturnPinType = Variable->VarType;
+			ResultNode->CreateUserDefinedPin(TEXT("ReturnValue"), ReturnPinType, EGPD_Input);
+		}
+
+		// Connect nodes: Entry exec -> (nothing for pure function)
+		// GetVar output -> Result ReturnValue
+		UEdGraphPin* GetVarOutputPin = GetVarNode->FindPin(FName(*VariableName), EGPD_Output);
+		UEdGraphPin* ResultInputPin = ResultNode->FindPin(TEXT("ReturnValue"), EGPD_Input);
+
+		if (GetVarOutputPin && ResultInputPin)
+		{
+			GetVarOutputPin->MakeLinkTo(ResultInputPin);
+		}
+	}
+
+	// Note: Property binding setup is complex and depends on UMG internal APIs
+	// For Phase 2, we create the binding function but leave full binding integration for Phase 3
+	// The user can manually bind in the UMG editor or we'll implement full binding in Phase 3
+
+	// Mark Blueprint as modified and compile
+	FBlueprintEditorUtils::MarkBlueprintAsModified(WidgetBP);
+	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetBoolField(TEXT("success"), true);
+	ResultObj->SetStringField(TEXT("binding_function"), FunctionName);
+	ResultObj->SetStringField(TEXT("note"), TEXT("Binding function created. Manual binding in UMG editor may be required for Phase 2."));
 	return ResultObj;
 }

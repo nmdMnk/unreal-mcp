@@ -134,4 +134,14 @@ private:
     TSharedPtr<FJsonObject> HandleAddHorizontalBoxToWidget(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleReparentWidgetElement(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleRemoveWidgetElement(const TSharedPtr<FJsonObject>& Params);
+
+    // Phase 2: Variable & Function Operations
+    TSharedPtr<FJsonObject> HandleAddWidgetVariable(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleSetWidgetVariableDefault(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleAddWidgetFunction(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleAddWidgetEvent(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleBindWidgetToVariable(const TSharedPtr<FJsonObject>& Params);
+
+    // Helper function for setting up pin types
+    bool SetupPinType(const FString& TypeName, FEdGraphPinType& OutPinType);
 }; 
