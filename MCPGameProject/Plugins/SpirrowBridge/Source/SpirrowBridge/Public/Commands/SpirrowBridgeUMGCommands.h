@@ -125,4 +125,13 @@ private:
      * @return JSON response with the added widget details
      */
     TSharedPtr<FJsonObject> HandleAddProgressBarToWidget(const TSharedPtr<FJsonObject>& Params);
+
+    // Phase 1: Designer Operations
+    TSharedPtr<FJsonObject> HandleGetWidgetElements(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleSetWidgetSlotProperty(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleSetWidgetElementProperty(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleAddVerticalBoxToWidget(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleAddHorizontalBoxToWidget(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleReparentWidgetElement(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleRemoveWidgetElement(const TSharedPtr<FJsonObject>& Params);
 }; 

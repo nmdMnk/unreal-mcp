@@ -554,4 +554,471 @@ def register_umg_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    # Phase 1: Designer Operations
+    @mcp.tool()
+    def get_widget_elements(
+        ctx: Context,
+        widget_name: str,
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Get all elements in a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            path: Content browser path to the widget
+
+        Returns:
+            Dict containing list of elements with their names, types, and hierarchy
+
+        Example:
+            get_widget_elements(
+                widget_name="WBP_TT_TrapSelector",
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "path": path
+            }
+
+            logger.info(f"Getting widget elements with params: {params}")
+            response = unreal.send_command("get_widget_elements", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Get widget elements response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error getting widget elements: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def set_widget_slot_property(
+        ctx: Context,
+        widget_name: str,
+        element_name: str,
+        position: List[float] = None,
+        size: List[float] = None,
+        anchor: str = None,
+        alignment: List[float] = None,
+        z_order: int = None,
+        auto_size: bool = None,
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Set Canvas Slot properties for a widget element.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            element_name: Name of the element to modify
+            position: [X, Y] position offset from anchor
+            size: [Width, Height] size override
+            anchor: Anchor preset - "TopLeft", "TopCenter", "TopRight",
+                    "MiddleLeft", "Center", "MiddleRight",
+                    "BottomLeft", "BottomCenter", "BottomRight"
+            alignment: [X, Y] alignment values 0.0-1.0
+            z_order: Z-order for rendering priority
+            auto_size: Whether to auto-size based on content
+            path: Content browser path to the widget
+
+        Returns:
+            Dict containing success status and updated properties
+
+        Example:
+            set_widget_slot_property(
+                widget_name="WBP_TT_TrapSelector",
+                element_name="TrapIcon",
+                position=[0, -100],
+                size=[64, 64],
+                anchor="BottomCenter",
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "element_name": element_name,
+                "path": path
+            }
+
+            # Only include non-None parameters
+            if position is not None:
+                params["position"] = position
+            if size is not None:
+                params["size"] = size
+            if anchor is not None:
+                params["anchor"] = anchor
+            if alignment is not None:
+                params["alignment"] = alignment
+            if z_order is not None:
+                params["z_order"] = z_order
+            if auto_size is not None:
+                params["auto_size"] = auto_size
+
+            logger.info(f"Setting widget slot property with params: {params}")
+            response = unreal.send_command("set_widget_slot_property", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Set widget slot property response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error setting widget slot property: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def set_widget_element_property(
+        ctx: Context,
+        widget_name: str,
+        element_name: str,
+        property_name: str,
+        property_value: str,
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Set a property on a widget element.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            element_name: Name of the element to modify
+            property_name: Name of the property to set
+            property_value: Value to set (JSON string for complex types)
+            path: Content browser path to the widget
+
+        Returns:
+            Dict containing success status
+
+        Common properties:
+            - Visibility: "Visible", "Hidden", "Collapsed", "HitTestInvisible", "SelfHitTestInvisible"
+            - Text (TextBlock): "Hello World"
+            - ColorAndOpacity: "[1.0, 0.5, 0.0, 1.0]" (RGBA)
+            - Justification: "Left", "Center", "Right"
+
+        Example:
+            set_widget_element_property(
+                widget_name="WBP_TT_TrapSelector",
+                element_name="TrapNameText",
+                property_name="Visibility",
+                property_value="Hidden",
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "element_name": element_name,
+                "property_name": property_name,
+                "property_value": property_value,
+                "path": path
+            }
+
+            logger.info(f"Setting widget element property with params: {params}")
+            response = unreal.send_command("set_widget_element_property", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Set widget element property response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error setting widget element property: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def add_vertical_box_to_widget(
+        ctx: Context,
+        widget_name: str,
+        box_name: str,
+        parent_name: str = None,
+        anchor: str = "Center",
+        alignment: List[float] = [0.5, 0.5],
+        position: List[float] = [0, 0],
+        size: List[float] = None,
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add a VerticalBox container to a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            box_name: Name for the new VerticalBox
+            parent_name: Parent element name (null for root canvas)
+            anchor: Anchor preset
+            alignment: [X, Y] alignment values
+            position: [X, Y] position offset
+            size: [Width, Height] size override (null for auto-size)
+            path: Content browser path to the widget
+
+        Returns:
+            Dict containing success status and box properties
+
+        Example:
+            add_vertical_box_to_widget(
+                widget_name="WBP_TT_TrapSelector",
+                box_name="MainContainer",
+                anchor="BottomCenter",
+                alignment=[0.5, 1.0],
+                position=[0, -50],
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "box_name": box_name,
+                "anchor": anchor,
+                "alignment": alignment,
+                "position": position,
+                "path": path
+            }
+
+            if parent_name is not None:
+                params["parent_name"] = parent_name
+            if size is not None:
+                params["size"] = size
+
+            logger.info(f"Adding VerticalBox to widget with params: {params}")
+            response = unreal.send_command("add_vertical_box_to_widget", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add VerticalBox response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding VerticalBox to widget: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def add_horizontal_box_to_widget(
+        ctx: Context,
+        widget_name: str,
+        box_name: str,
+        parent_name: str = None,
+        anchor: str = "Center",
+        alignment: List[float] = [0.5, 0.5],
+        position: List[float] = [0, 0],
+        size: List[float] = None,
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add a HorizontalBox container to a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            box_name: Name for the new HorizontalBox
+            parent_name: Parent element name (null for root canvas)
+            anchor: Anchor preset
+            alignment: [X, Y] alignment values
+            position: [X, Y] position offset
+            size: [Width, Height] size override (null for auto-size)
+            path: Content browser path to the widget
+
+        Returns:
+            Dict containing success status and box properties
+
+        Example:
+            add_horizontal_box_to_widget(
+                widget_name="WBP_TT_TrapSelector",
+                box_name="IconRow",
+                parent_name="MainContainer",
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "box_name": box_name,
+                "anchor": anchor,
+                "alignment": alignment,
+                "position": position,
+                "path": path
+            }
+
+            if parent_name is not None:
+                params["parent_name"] = parent_name
+            if size is not None:
+                params["size"] = size
+
+            logger.info(f"Adding HorizontalBox to widget with params: {params}")
+            response = unreal.send_command("add_horizontal_box_to_widget", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add HorizontalBox response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding HorizontalBox to widget: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def reparent_widget_element(
+        ctx: Context,
+        widget_name: str,
+        element_name: str,
+        new_parent_name: str,
+        slot_index: int = -1,
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Move a widget element to a new parent.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            element_name: Name of the element to move
+            new_parent_name: Name of the new parent element
+            slot_index: Index in parent's children (-1 for end)
+            path: Content browser path to the widget
+
+        Returns:
+            Dict containing success status and new hierarchy
+
+        Example:
+            reparent_widget_element(
+                widget_name="WBP_TT_TrapSelector",
+                element_name="TrapIcon",
+                new_parent_name="MainContainer",
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "element_name": element_name,
+                "new_parent_name": new_parent_name,
+                "slot_index": slot_index,
+                "path": path
+            }
+
+            logger.info(f"Reparenting widget element with params: {params}")
+            response = unreal.send_command("reparent_widget_element", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Reparent widget element response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error reparenting widget element: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def remove_widget_element(
+        ctx: Context,
+        widget_name: str,
+        element_name: str,
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Remove a widget element from the Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            element_name: Name of the element to remove
+            path: Content browser path to the widget
+
+        Returns:
+            Dict containing success status
+
+        Example:
+            remove_widget_element(
+                widget_name="WBP_TT_TrapSelector",
+                element_name="OldElement",
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "element_name": element_name,
+                "path": path
+            }
+
+            logger.info(f"Removing widget element with params: {params}")
+            response = unreal.send_command("remove_widget_element", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Remove widget element response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error removing widget element: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("UMG tools registered successfully") 

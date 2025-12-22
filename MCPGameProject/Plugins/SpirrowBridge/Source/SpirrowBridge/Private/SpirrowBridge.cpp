@@ -298,7 +298,15 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("add_widget_to_viewport") ||
                      CommandType == TEXT("add_text_to_widget") ||
                      CommandType == TEXT("add_image_to_widget") ||
-                     CommandType == TEXT("add_progressbar_to_widget"))
+                     CommandType == TEXT("add_progressbar_to_widget") ||
+                     // Phase 1: Designer Operations
+                     CommandType == TEXT("get_widget_elements") ||
+                     CommandType == TEXT("set_widget_slot_property") ||
+                     CommandType == TEXT("set_widget_element_property") ||
+                     CommandType == TEXT("add_vertical_box_to_widget") ||
+                     CommandType == TEXT("add_horizontal_box_to_widget") ||
+                     CommandType == TEXT("reparent_widget_element") ||
+                     CommandType == TEXT("remove_widget_element"))
             {
                 ResultJson = UMGCommands->HandleCommand(CommandType, Params);
             }
