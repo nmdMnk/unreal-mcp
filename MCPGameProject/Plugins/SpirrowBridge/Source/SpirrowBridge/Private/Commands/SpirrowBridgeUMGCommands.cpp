@@ -2867,6 +2867,38 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleCreateWidgetAnimation(c
 	return ResultObj;
 }
 
+// Helper: Find Float Track by Property Name
+static UMovieSceneFloatTrack* FindFloatTrackByPropertyName(UMovieScene* MovieScene, const FGuid& BindingGuid, const FString& PropertyName)
+{
+	if (!MovieScene)
+	{
+		return nullptr;
+	}
+
+	// Find binding by GUID
+	const FMovieSceneBinding* Binding = MovieScene->FindBinding(BindingGuid);
+	if (!Binding)
+	{
+		return nullptr;
+	}
+
+	// Search through binding's tracks
+	for (UMovieSceneTrack* Track : Binding->GetTracks())
+	{
+		if (UMovieSceneFloatTrack* FloatTrack = Cast<UMovieSceneFloatTrack>(Track))
+		{
+			// Match by track name or property path
+			if (FloatTrack->GetTrackName().ToString() == PropertyName ||
+				FloatTrack->GetPropertyPath().ToString() == PropertyName)
+			{
+				return FloatTrack;
+			}
+		}
+	}
+
+	return nullptr;
+}
+
 // Phase 3: Add Animation Track
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleAddAnimationTrack(const TSharedPtr<FJsonObject>& Params)
 {
@@ -2991,10 +3023,32 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleAddAnimationTrack(const
 			TrackDisplayName = TEXT("ColorAndOpacity");
 		}
 	}
+	else if (PropertyName.StartsWith(TEXT("RenderTransform.")))
+	{
+		// RenderTransform property (Translation.X, Translation.Y, Scale.X, Scale.Y, Angle)
+		UMovieSceneFloatTrack* Track = MovieScene->AddTrack<UMovieSceneFloatTrack>(BindingGuid);
+		if (!Track)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create float track for RenderTransform"));
+		}
+
+		// Set property name and path
+		Track->SetPropertyNameAndPath(FName(*PropertyName), PropertyName);
+
+		// Create section
+		UMovieSceneFloatSection* Section = Cast<UMovieSceneFloatSection>(Track->CreateNewSection());
+		if (Section)
+		{
+			Section->SetRange(TRange<FFrameNumber>::All());
+			Track->AddSection(*Section);
+		}
+
+		TrackDisplayName = PropertyName;
+	}
 	else
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			FString::Printf(TEXT("Unsupported property: %s. Supported: Opacity, RenderOpacity, ColorAndOpacity"), *PropertyName));
+			FString::Printf(TEXT("Unsupported property: %s. Supported: Opacity, RenderOpacity, ColorAndOpacity, RenderTransform.*"), *PropertyName));
 	}
 
 	// Save
@@ -3177,6 +3231,40 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleAddAnimationKeyframe(co
 			Channels[1]->AddKeys({FrameNumber}, {GValue});
 			Channels[2]->AddKeys({FrameNumber}, {BValue});
 			Channels[3]->AddKeys({FrameNumber}, {AValue});
+		}
+	}
+	else if (PropertyName.StartsWith(TEXT("RenderTransform.")))
+	{
+		// RenderTransform property (Translation.X, Translation.Y, Scale.X, Scale.Y, Angle)
+		double Value = Params->GetNumberField(TEXT("value"));
+
+		// Find Float track by property name
+		UMovieSceneFloatTrack* Track = FindFloatTrackByPropertyName(MovieScene, BindingGuid, PropertyName);
+		if (!Track)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				FString::Printf(TEXT("Float track not found for property: %s. Add a track first."), *PropertyName));
+		}
+
+		// Get section
+		if (Track->GetAllSections().Num() == 0)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("No section found in track"));
+		}
+
+		UMovieSceneFloatSection* Section = Cast<UMovieSceneFloatSection>(Track->GetAllSections()[0]);
+		if (!Section)
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Invalid section"));
+		}
+
+		// Get channel and add keyframe
+		FMovieSceneFloatChannel* Channel = Section->GetChannelProxy().GetChannel<FMovieSceneFloatChannel>(0);
+		if (Channel)
+		{
+			FMovieSceneFloatValue KeyValue(Value);
+			KeyValue.InterpMode = InterpMode;
+			Channel->AddKeys({FrameNumber}, {KeyValue});
 		}
 	}
 	else

@@ -1481,17 +1481,32 @@ def register_umg_tools(mcp: FastMCP):
             property_name: Property to animate:
                 - "Opacity" or "RenderOpacity": Float track for opacity
                 - "ColorAndOpacity": Color track for tint color
+                - "RenderTransform.Translation.X": Float track for X translation
+                - "RenderTransform.Translation.Y": Float track for Y translation
+                - "RenderTransform.Scale.X": Float track for X scale
+                - "RenderTransform.Scale.Y": Float track for Y scale
+                - "RenderTransform.Angle": Float track for rotation angle (degrees)
             path: Content browser path to the widget (default: "/Game/UI")
 
         Returns:
             Dict containing success status and track details
 
         Example:
+            # Fade animation
             add_animation_track(
                 widget_name="WBP_TT_TrapSelector",
                 animation_name="FadeIn",
                 target_widget="MainContainer",
                 property_name="Opacity",
+                path="/Game/TrapxTrap/UI"
+            )
+
+            # Slide animation
+            add_animation_track(
+                widget_name="WBP_TT_TrapSelector",
+                animation_name="SlideIn",
+                target_widget="MainContainer",
+                property_name="RenderTransform.Translation.X",
                 path="/Game/TrapxTrap/UI"
             )
         """
@@ -1550,6 +1565,9 @@ def register_umg_tools(mcp: FastMCP):
             value: Value for the keyframe:
                 - Opacity: float (0.0 - 1.0)
                 - ColorAndOpacity: [R, G, B, A] array (each 0.0 - 1.0)
+                - RenderTransform.Translation.X/Y: float (pixels)
+                - RenderTransform.Scale.X/Y: float (1.0 = 100%)
+                - RenderTransform.Angle: float (degrees)
             interpolation: Interpolation mode - "Linear", "Cubic", or "Constant"
             path: Content browser path to the widget
 
@@ -1567,13 +1585,25 @@ def register_umg_tools(mcp: FastMCP):
                 value=0.0,
                 path="/Game/TrapxTrap/UI"
             )
+
+            # Slide from left
             add_animation_keyframe(
                 widget_name="WBP_TT_TrapSelector",
-                animation_name="FadeIn",
+                animation_name="SlideIn",
                 target_widget="MainContainer",
-                property_name="Opacity",
-                time=0.5,
-                value=1.0,
+                property_name="RenderTransform.Translation.X",
+                time=0.0,
+                value=-200.0,  # Start 200px left
+                path="/Game/TrapxTrap/UI"
+            )
+            add_animation_keyframe(
+                widget_name="WBP_TT_TrapSelector",
+                animation_name="SlideIn",
+                target_widget="MainContainer",
+                property_name="RenderTransform.Translation.X",
+                time=0.3,
+                value=0.0,  # End at origin
+                interpolation="Cubic",
                 path="/Game/TrapxTrap/UI"
             )
         """
