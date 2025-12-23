@@ -150,6 +150,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleCommand(const FString& 
 	{
 		return HandleAddAnimationKeyframe(Params);
 	}
+	else if (CommandName == TEXT("get_widget_animations"))
+	{
+		return HandleGetWidgetAnimations(Params);
+	}
 
 	return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown UMG command: %s"), *CommandName));
 }
@@ -3190,6 +3194,137 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleAddAnimationKeyframe(co
 	Response->SetNumberField(TEXT("time"), Time);
 	Response->SetNumberField(TEXT("frame"), FrameNumber.Value);
 	Response->SetStringField(TEXT("interpolation"), Interpolation);
+
+	return Response;
+}
+
+// Phase 3: Get Widget Animations
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleGetWidgetAnimations(const TSharedPtr<FJsonObject>& Params)
+{
+	// Get parameters
+	FString WidgetName = Params->GetStringField(TEXT("widget_name"));
+	FString Path = Params->HasField(TEXT("path")) ?
+		Params->GetStringField(TEXT("path")) : TEXT("/Game/UI");
+
+	// Load Widget Blueprint
+	FString AssetPath = FString::Printf(TEXT("%s/%s.%s"), *Path, *WidgetName, *WidgetName);
+	UWidgetBlueprint* WidgetBP = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
+	if (!WidgetBP)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Widget Blueprint not found: %s"), *AssetPath));
+	}
+
+	// Build animations array
+	TArray<TSharedPtr<FJsonValue>> AnimationsArray;
+
+	for (UWidgetAnimation* Animation : WidgetBP->Animations)
+	{
+		if (!Animation) continue;
+
+		TSharedPtr<FJsonObject> AnimObj = MakeShareable(new FJsonObject());
+		AnimObj->SetStringField(TEXT("name"), Animation->GetName());
+
+		UMovieScene* MovieScene = Animation->GetMovieScene();
+		if (MovieScene)
+		{
+			// Get animation length
+			FFrameRate TickResolution = MovieScene->GetTickResolution();
+			FFrameRate DisplayRate = MovieScene->GetDisplayRate();
+			TRange<FFrameNumber> PlaybackRange = MovieScene->GetPlaybackRange();
+
+			double StartTime = TickResolution.AsSeconds(PlaybackRange.GetLowerBoundValue());
+			double EndTime = TickResolution.AsSeconds(PlaybackRange.GetUpperBoundValue());
+			double Length = EndTime - StartTime;
+
+			AnimObj->SetNumberField(TEXT("length"), Length);
+
+			// Check if looping (this info is typically stored externally, default to false)
+			AnimObj->SetBoolField(TEXT("is_looping"), false);
+
+			// Get tracks
+			TArray<TSharedPtr<FJsonValue>> TracksArray;
+
+			for (int32 i = 0; i < MovieScene->GetPossessableCount(); ++i)
+			{
+				const FMovieScenePossessable& Possessable = MovieScene->GetPossessable(i);
+				FGuid BindingGuid = Possessable.GetGuid();
+				FString TargetName = Possessable.GetName();
+
+				// Check for Float tracks (Opacity)
+				if (UMovieSceneFloatTrack* FloatTrack = MovieScene->FindTrack<UMovieSceneFloatTrack>(BindingGuid))
+				{
+					TSharedPtr<FJsonObject> TrackObj = MakeShareable(new FJsonObject());
+					TrackObj->SetStringField(TEXT("target_widget"), TargetName);
+					TrackObj->SetStringField(TEXT("property"), FloatTrack->GetTrackName().ToString());
+					TrackObj->SetStringField(TEXT("type"), TEXT("Float"));
+
+					int32 KeyframeCount = 0;
+					if (FloatTrack->GetAllSections().Num() > 0)
+					{
+						UMovieSceneFloatSection* Section = Cast<UMovieSceneFloatSection>(FloatTrack->GetAllSections()[0]);
+						if (Section)
+						{
+							FMovieSceneFloatChannel* Channel = Section->GetChannelProxy().GetChannel<FMovieSceneFloatChannel>(0);
+							if (Channel)
+							{
+								KeyframeCount = Channel->GetNumKeys();
+							}
+						}
+					}
+					TrackObj->SetNumberField(TEXT("keyframe_count"), KeyframeCount);
+
+					TracksArray.Add(MakeShareable(new FJsonValueObject(TrackObj)));
+				}
+
+				// Check for Color tracks (ColorAndOpacity)
+				if (UMovieSceneColorTrack* ColorTrack = MovieScene->FindTrack<UMovieSceneColorTrack>(BindingGuid))
+				{
+					TSharedPtr<FJsonObject> TrackObj = MakeShareable(new FJsonObject());
+					TrackObj->SetStringField(TEXT("target_widget"), TargetName);
+					TrackObj->SetStringField(TEXT("property"), ColorTrack->GetTrackName().ToString());
+					TrackObj->SetStringField(TEXT("type"), TEXT("Color"));
+
+					int32 KeyframeCount = 0;
+					if (ColorTrack->GetAllSections().Num() > 0)
+					{
+						UMovieSceneColorSection* Section = Cast<UMovieSceneColorSection>(ColorTrack->GetAllSections()[0]);
+						if (Section)
+						{
+							// Get keyframe count from first channel (R)
+							TArrayView<FMovieSceneFloatChannel*> Channels = Section->GetChannelProxy().GetChannels<FMovieSceneFloatChannel>();
+							if (Channels.Num() > 0)
+							{
+								KeyframeCount = Channels[0]->GetNumKeys();
+							}
+						}
+					}
+					TrackObj->SetNumberField(TEXT("keyframe_count"), KeyframeCount);
+
+					TracksArray.Add(MakeShareable(new FJsonValueObject(TrackObj)));
+				}
+			}
+
+			AnimObj->SetNumberField(TEXT("track_count"), TracksArray.Num());
+			AnimObj->SetArrayField(TEXT("tracks"), TracksArray);
+		}
+		else
+		{
+			AnimObj->SetNumberField(TEXT("length"), 0.0);
+			AnimObj->SetBoolField(TEXT("is_looping"), false);
+			AnimObj->SetNumberField(TEXT("track_count"), 0);
+			AnimObj->SetArrayField(TEXT("tracks"), TArray<TSharedPtr<FJsonValue>>());
+		}
+
+		AnimationsArray.Add(MakeShareable(new FJsonValueObject(AnimObj)));
+	}
+
+	// Response
+	TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject());
+	Response->SetBoolField(TEXT("success"), true);
+	Response->SetStringField(TEXT("widget_name"), WidgetName);
+	Response->SetNumberField(TEXT("animation_count"), AnimationsArray.Num());
+	Response->SetArrayField(TEXT("animations"), AnimationsArray);
 
 	return Response;
 }

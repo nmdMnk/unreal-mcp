@@ -15,32 +15,33 @@
 
 **Phase 1 (Designer操作)**: 11ツール ✅
 **Phase 2 (変数・関数)**: 5ツール ✅
-**Phase 3 (Animation)**: 3ツール ✅
+**Phase 3 (Animation)**: 4ツール ✅
 - `create_widget_animation` - アニメーション作成
 - `add_animation_track` - Opacity/ColorAndOpacity トラック追加
 - `add_animation_keyframe` - キーフレーム追加（Linear/Cubic/Constant）
+- `get_widget_animations` - アニメーション一覧取得 ← NEW
 
-**合計: 19ツール実装完了**
+**合計: 20ツール実装完了**
 
 ### Phase 3 残り機能（未実装）
 
-| 優先度 | ツール | 説明 |
-|--------|--------|------|
-| 高 | `get_widget_animations` | アニメーション一覧取得 |
-| 高 | `add_widget_array_variable` | 配列型変数追加 |
-| 中 | `set_widget_array_default` | 配列デフォルト値設定 |
-| 中 | RenderTransform トラック | Translation/Scale/Angle 対応 |
-| 低 | `create_property_binding` | 完全なプロパティバインディング |
-| 低 | `add_widget_graph_node` | ノード追加 |
-| 低 | `connect_widget_nodes` | ノード接続 |
+| 優先度 | ツール | 説明 | プロンプト |
+|--------|--------|------|-----------|
+| 1️⃣ | `add_widget_array_variable` | 配列型変数追加 | ✅ 作成済み |
+| 2️⃣ | RenderTransform トラック | Translation/Scale/Angle 対応 | 未作成 |
+| 3️⃣ | `set_widget_array_default` | 配列デフォルト値設定 | 未作成 |
 
 ---
 
 ## 設計ドキュメント
 
-- **Phase 3 設計**: `Docs/UMGPhase3_Animation_Prompt.md`
-- **Animation Track 詳細**: `Docs/UMGPhase3_AnimationTrack_Prompt.md`
-- **引き継ぎ**: `Docs/UMGPhase3_Handover_Prompt.md`
+| ドキュメント | 内容 |
+|-------------|------|
+| `Docs/UMGPhase3_Animation_Prompt.md` | Phase 3 全体設計 |
+| `Docs/UMGPhase3_AnimationTrack_Prompt.md` | Animation Track 詳細 |
+| `Docs/UMGPhase3_GetWidgetAnimations_Prompt.md` | アニメーション一覧取得 |
+| `Docs/UMGPhase3_ArrayVariable_Prompt.md` | 配列型変数追加 ← 次の実装 |
+| `Docs/UMGPhase3_Handover_Prompt.md` | 引き継ぎドキュメント |
 
 ---
 
@@ -48,43 +49,45 @@
 
 1. プロジェクトコンテキスト確認:
 ```
-get_project_context("TrapxTrapCpp")
+get_project_context("SpirrowUnrealWise")
 ```
 
-2. 設計ドキュメント確認:
+2. 次の実装プロンプト確認:
 ```
-Docs/UMGPhase3_Handover_Prompt.md を参照
+Docs/UMGPhase3_ArrayVariable_Prompt.md を参照
 ```
-
-3. 残り機能から実装を選択
 
 ---
 
-## 次に実装推奨
+## 次に実装: add_widget_array_variable
 
-### オプション A: 配列型変数サポート
+### 概要
 
-```python
-add_widget_array_variable(
-    widget_name: str,
-    variable_name: str,
-    element_type: str,  # String, Integer, etc.
-    is_exposed: bool = False,
-    category: str = None,
-    path: str = "/Game/UI"
-)
-```
+Widget Blueprint に配列型変数（TArray<T>）を追加するツール。
 
-### オプション B: RenderTransform トラック対応
+### パラメータ
 
-`add_animation_track` を拡張して以下をサポート:
-- `RenderTransform.Translation` - [X, Y]
-- `RenderTransform.Scale` - [X, Y]  
-- `RenderTransform.Angle` - float (degrees)
+| パラメータ | 型 | 必須 | 説明 |
+|-----------|-----|------|------|
+| widget_name | str | ✅ | Widget Blueprint名 |
+| variable_name | str | ✅ | 変数名 |
+| element_type | str | ✅ | 要素型（String, Integer, Float等） |
+| is_exposed | bool | | エディタ公開フラグ |
+| category | str | | 変数カテゴリ |
+| path | str | | Content Browser パス |
 
-### オプション C: get_widget_animations
+### 実装ポイント
 
-アニメーション一覧を取得するユーティリティツール。
+- 既存の `SetupPinType` 関数を再利用
+- `ContainerType = EPinContainerType::Array` を設定
+- Blueprint コンパイル必須
+
+### 更新ファイル
+
+1. `SpirrowBridgeUMGCommands.h` - 関数宣言
+2. `SpirrowBridgeUMGCommands.cpp` - 実装 + ルーティング
+3. `SpirrowBridge.cpp` - ExecuteCommand ルーティング
+4. `Python/tools/umg_tools.py` - ツール定義
 
 ---
 

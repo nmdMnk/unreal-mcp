@@ -1611,4 +1611,59 @@ def register_umg_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    @mcp.tool()
+    def get_widget_animations(
+        ctx: Context,
+        widget_name: str,
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Get all animations in a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            path: Content browser path to the widget
+
+        Returns:
+            Dict containing list of animations with their details including:
+                - name: Animation name
+                - length: Duration in seconds
+                - is_looping: Whether the animation loops
+                - track_count: Number of animation tracks
+                - tracks: Array of track details (target_widget, property, type, keyframe_count)
+
+        Example:
+            get_widget_animations(
+                widget_name="WBP_TT_TrapSelector",
+                path="/Game/TrapxTrap/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "path": path
+            }
+
+            logger.info(f"Getting widget animations with params: {params}")
+            response = unreal.send_command("get_widget_animations", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Get widget animations response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error getting widget animations: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("UMG tools registered successfully") 

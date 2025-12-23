@@ -2,43 +2,17 @@
 
 ## プロジェクト情報
 
-- **プロジェクトパス**: `C:\Users\takahito ito\Documents\Unreal Projects\TrapxTrapCpp 5.7`
+- **MCPプロジェクトパス**: `C:\Users\takahito ito\Documents\Unreal Projects\spirrow-unrealwise`
+- **ゲームプロジェクトパス**: `C:\Users\takahito ito\Documents\Unreal Projects\TrapxTrapCpp 5.7`
 - **プラグイン**: `Plugins/SpirrowBridge`
 - **テスト用Widget**: `WBP_TT_TrapSelector` (`/Game/TrapxTrap/UI`)
 - **最終更新**: 2025-12-24
 
 ---
 
-## Phase 3 Animation 機能 - 完了 ✅
+## 実装状況サマリー
 
-### 実装完了ツール
-
-| ツール名 | 説明 | テスト結果 |
-|----------|------|------------|
-| `create_widget_animation` | Widget Animation 新規作成 | ✅ 成功 |
-| `add_animation_track` | アニメーショントラック追加 | ✅ 成功 |
-| `add_animation_keyframe` | キーフレーム追加 | ✅ 成功 |
-
-### サポートプロパティ
-
-| プロパティ | 値の形式 | トラッククラス |
-|-----------|---------|---------------|
-| `Opacity` / `RenderOpacity` | float (0.0-1.0) | UMovieSceneFloatTrack |
-| `ColorAndOpacity` | [R, G, B, A] (各 0.0-1.0) | UMovieSceneColorTrack |
-
-### 補間モード
-
-| モード | 説明 |
-|--------|------|
-| `Linear` | 線形補間（デフォルト） |
-| `Cubic` | スムーズ補間 |
-| `Constant` | ステップ（瞬時変化） |
-
----
-
-## Phase 1 + 2 + 3 完了機能一覧
-
-### Phase 1: Designer 操作（11ツール）
+### Phase 1: Designer操作 - 11ツール ✅
 
 | ツール | 説明 |
 |--------|------|
@@ -54,7 +28,7 @@
 | `reparent_widget_element` | 親変更 |
 | `remove_widget_element` | 要素削除 |
 
-### Phase 2: 変数・関数操作（5ツール）
+### Phase 2: 変数・関数操作 - 5ツール ✅
 
 | ツール | 説明 |
 |--------|------|
@@ -64,157 +38,69 @@
 | `add_widget_event` | イベント作成 |
 | `bind_widget_to_variable` | バインディング関数作成 |
 
-### Phase 3: Animation（3ツール）✅ NEW
+### Phase 3: Animation - 4ツール ✅
 
-| ツール | 説明 |
-|--------|------|
-| `create_widget_animation` | アニメーション作成 |
-| `add_animation_track` | トラック追加 |
-| `add_animation_keyframe` | キーフレーム追加 |
+| ツール | 説明 | テスト結果 |
+|--------|------|------------|
+| `create_widget_animation` | アニメーション作成 | ✅ 成功 |
+| `add_animation_track` | トラック追加 (Opacity/Color) | ✅ 成功 |
+| `add_animation_keyframe` | キーフレーム追加 | ✅ 成功 |
+| `get_widget_animations` | アニメーション一覧取得 | ✅ 成功 |
 
-**合計: 19ツール実装完了**
-
----
-
-## テスト結果（Phase 3 Animation）
-
-### FadeIn アニメーション
-
-```python
-# アニメーション作成
-create_widget_animation(
-    widget_name="WBP_TT_TrapSelector",
-    animation_name="FadeIn",
-    length=0.5,
-    path="/Game/TrapxTrap/UI"
-)
-
-# Opacity トラック追加
-add_animation_track(
-    widget_name="WBP_TT_TrapSelector",
-    animation_name="FadeIn",
-    target_widget="MainContainer",
-    property_name="Opacity",
-    path="/Game/TrapxTrap/UI"
-)
-
-# キーフレーム: 0秒で透明
-add_animation_keyframe(
-    widget_name="WBP_TT_TrapSelector",
-    animation_name="FadeIn",
-    target_widget="MainContainer",
-    property_name="Opacity",
-    time=0.0,
-    value=0.0,
-    path="/Game/TrapxTrap/UI"
-)
-
-# キーフレーム: 0.5秒で不透明
-add_animation_keyframe(
-    widget_name="WBP_TT_TrapSelector",
-    animation_name="FadeIn",
-    target_widget="MainContainer",
-    property_name="Opacity",
-    time=0.5,
-    value=1.0,
-    path="/Game/TrapxTrap/UI"
-)
-```
-
-### PulseLoop アニメーション（Color）
-
-```python
-# ColorAndOpacity トラック追加
-add_animation_track(
-    widget_name="WBP_TT_TrapSelector",
-    animation_name="PulseLoop",
-    target_widget="TrapNameText",
-    property_name="ColorAndOpacity",
-    path="/Game/TrapxTrap/UI"
-)
-
-# キーフレーム: 0秒で白
-add_animation_keyframe(
-    widget_name="WBP_TT_TrapSelector",
-    animation_name="PulseLoop",
-    target_widget="TrapNameText",
-    property_name="ColorAndOpacity",
-    time=0.0,
-    value=[1.0, 1.0, 1.0, 1.0],
-    path="/Game/TrapxTrap/UI"
-)
-
-# キーフレーム: 0.5秒でオレンジ
-add_animation_keyframe(
-    widget_name="WBP_TT_TrapSelector",
-    animation_name="PulseLoop",
-    target_widget="TrapNameText",
-    property_name="ColorAndOpacity",
-    time=0.5,
-    value=[1.0, 0.5, 0.0, 1.0],
-    path="/Game/TrapxTrap/UI"
-)
-
-# キーフレーム: 1秒で白（Cubic補間）
-add_animation_keyframe(
-    widget_name="WBP_TT_TrapSelector",
-    animation_name="PulseLoop",
-    target_widget="TrapNameText",
-    property_name="ColorAndOpacity",
-    time=1.0,
-    value=[1.0, 1.0, 1.0, 1.0],
-    interpolation="Cubic",
-    path="/Game/TrapxTrap/UI"
-)
-```
-
----
-
-## 修正済み不具合
-
-### Phase 3 で修正したビルドエラー
-
-1. **MovieScene モジュール依存**
-   - 問題: `UMovieScene` のリンカーエラー
-   - 修正: Build.cs に `"MovieScene"`, `"MovieSceneTracks"` 追加
-
-2. **TArray64 対応**
-   - 問題: `PNGCompressImageArray` の引数型不一致
-   - 修正: `TArray<uint8>` → `TArray64<uint8>`
-
-3. **非推奨 API 警告抑制**
-   - `RemoveGameplayEffectsWithTags` - PRAGMA で抑制
-   - `NonInstanced` - PRAGMA で抑制
-
-4. **Python unreal モジュールエラー**
-   - 問題: MCP サーバーで `unreal` モジュール参照
-   - 修正: `send_command()` 経由に変更
+**合計: 20ツール実装完了**
 
 ---
 
 ## Phase 3 残り機能（未実装）
 
-### 優先度: 中
+### 優先度順
 
-| ツール | 説明 | 状態 |
-|--------|------|------|
-| `get_widget_animations` | アニメーション一覧取得 | 未実装 |
-| `add_widget_array_variable` | 配列型変数追加 | 未実装 |
-| `set_widget_array_default` | 配列デフォルト値設定 | 未実装 |
+| 優先度 | ツール | 説明 | プロンプト |
+|--------|--------|------|-----------|
+| 1️⃣ | `add_widget_array_variable` | 配列型変数追加 | `Docs/UMGPhase3_ArrayVariable_Prompt.md` ✅ |
+| 2️⃣ | RenderTransform トラック | Translation/Scale/Angle対応 | 未作成 |
+| 3️⃣ | `set_widget_array_default` | 配列デフォルト値設定 | 未作成 |
 
-### 優先度: 低
+---
 
-| ツール | 説明 | 状態 |
-|--------|------|------|
-| `create_property_binding` | 完全なプロパティバインディング | 未実装 |
-| `create_visibility_binding` | Visibility バインディング | 未実装 |
-| `add_widget_graph_node` | Widget BP グラフにノード追加 | 未実装 |
-| `connect_widget_nodes` | ノード接続 | 未実装 |
+## 次の実装: add_widget_array_variable
 
-### 制限事項
+### 概要
 
-- `RenderTransform` トラック未対応（Translation, Scale, Angle）
-- ループ設定は `create_widget_animation` のパラメータで受け取るが、再生時に指定が必要
+Widget Blueprintに配列型変数（TArray<T>）を追加するツール。
+
+### 実装プロンプト
+
+`Docs/UMGPhase3_ArrayVariable_Prompt.md`
+
+### サポート要素型
+
+| 型名 | UE内部型 | 用途例 |
+|------|---------|--------|
+| Boolean | bool | フラグリスト |
+| Integer | int32 | ID一覧 |
+| Float | float | 数値リスト |
+| String | FString | 名前リスト |
+| Text | FText | ローカライズテキスト |
+| Vector | FVector | 座標リスト |
+| Vector2D | FVector2D | 2D座標リスト |
+| LinearColor | FLinearColor | カラーリスト |
+| Texture2D | UTexture2D* | アイコンリスト |
+
+### 実装ポイント
+
+1. **既存の `SetupPinType` 関数を再利用** - 要素型の設定
+2. **ContainerType = EPinContainerType::Array** - 配列として設定
+3. **Blueprint コンパイル必須** - 変数追加後に自動実行
+
+### 更新が必要なファイル
+
+| # | ファイル | 更新内容 |
+|---|----------|----------|
+| 1 | `SpirrowBridgeUMGCommands.h` | `HandleAddWidgetArrayVariable` 宣言 |
+| 2 | `SpirrowBridgeUMGCommands.cpp` | 関数実装 + HandleCommand ルーティング |
+| 3 | `SpirrowBridge.cpp` | ExecuteCommand ルーティング |
+| 4 | `Python/tools/umg_tools.py` | `add_widget_array_variable` ツール定義 |
 
 ---
 
@@ -235,9 +121,39 @@ spirrow-unrealwise/
 │   └── tools/
 │       └── umg_tools.py
 └── Docs/
-    ├── UMGPhase3_Handover_Prompt.md  ← このファイル
+    ├── UMGPhase3_Handover_Prompt.md      ← このファイル
+    ├── UMGPhase3_Continue_Prompt.md
     ├── UMGPhase3_Animation_Prompt.md
-    └── UMGPhase3_AnimationTrack_Prompt.md
+    ├── UMGPhase3_AnimationTrack_Prompt.md
+    ├── UMGPhase3_GetWidgetAnimations_Prompt.md
+    └── UMGPhase3_ArrayVariable_Prompt.md  ← 次の実装
+```
+
+---
+
+## テスト結果（最新）
+
+### get_widget_animations テスト
+
+```python
+get_widget_animations(
+    widget_name="WBP_TT_TrapSelector",
+    path="/Game/TrapxTrap/UI"
+)
+```
+
+結果:
+```json
+{
+  "success": true,
+  "animation_count": 4,
+  "animations": [
+    {"name": "FadeIn", "length": 0.5, "track_count": 1, "tracks": [...]},
+    {"name": "PulseLoop", "length": 1.0, "track_count": 1, "tracks": [...]},
+    {"name": "SlideIn", "length": 0.3, "track_count": 0},
+    {"name": "TestSlide", "length": 0.5, "track_count": 0}
+  ]
+}
 ```
 
 ---
@@ -246,33 +162,14 @@ spirrow-unrealwise/
 
 ```python
 # プロジェクトコンテキスト確認
-get_project_context("TrapxTrapCpp")
+get_project_context("SpirrowUnrealWise")
 
-# Widget 確認
-get_widget_elements(
-    widget_name="WBP_TT_TrapSelector",
-    path="/Game/TrapxTrap/UI"
-)
+# 実装プロンプト確認
+# Docs/UMGPhase3_ArrayVariable_Prompt.md を参照
 ```
-
----
-
-## 次のステップ候補
-
-1. **Phase 3 残り機能を実装**
-   - 配列型変数サポート
-   - RenderTransform トラック対応
-
-2. **Phase 4 を開始**
-   - 動的 Widget 生成
-   - より複雑なノード操作
-
-3. **ゲーム開発に戻る**
-   - TrapxTrap のトラップシステム実装
-   - UI 統合
 
 ---
 
 **作成日**: 2025-12-22
 **最終更新**: 2025-12-24
-**フェーズ**: UMG Phase 3 - Animation 機能完了
+**フェーズ**: UMG Phase 3 - Array Variables（次の実装）
