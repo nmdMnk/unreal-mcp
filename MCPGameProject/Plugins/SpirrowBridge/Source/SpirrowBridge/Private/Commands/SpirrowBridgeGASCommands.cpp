@@ -726,9 +726,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(co
         UE_LOG(LogTemp, Display, TEXT("Added TargetTagsGameplayEffectComponent with %d tags"), TagContainer.Added.Num());
     }
 
-    // Set Removal Tags (RemoveGameplayEffectsWithTags - effects with these tags are removed)
+    // Set Removal Tags (with deprecation warning suppressed)
     if (RemovalTagsArray && RemovalTagsArray->Num() > 0)
     {
+        PRAGMA_DISABLE_DEPRECATION_WARNINGS
         for (const TSharedPtr<FJsonValue>& TagValue : *RemovalTagsArray)
         {
             FString TagString = TagValue->AsString();
@@ -737,7 +738,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(co
             {
                 EffectCDO->RemoveGameplayEffectsWithTags.Added.AddTag(Tag);
             }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("Invalid gameplay tag: %s"), *TagString);
+            }
         }
+        PRAGMA_ENABLE_DEPRECATION_WARNINGS
+        UE_LOG(LogTemp, Display, TEXT("Added %d removal tags"), RemovalTagsArray->Num());
     }
 
     // Mark package dirty and save
@@ -1362,7 +1369,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayAbility(c
         void* InstancingPropPtr = InstancingProp->ContainerPtrToValuePtr<void>(AbilityCDO);
         if (InstancingPolicyStr == TEXT("NonInstanced"))
         {
-            *static_cast<TEnumAsByte<EGameplayAbilityInstancingPolicy::Type>*>(InstancingPropPtr) = EGameplayAbilityInstancingPolicy::NonInstanced;
+            *static_cast<TEnumAsByte<EGameplayAbilityInstancingPolicy::Type>*>(InstancingPropPtr) = EGameplayAbilityInstancingPolicy::InstancedPerActor;
         }
         else if (InstancingPolicyStr == TEXT("InstancedPerActor"))
         {

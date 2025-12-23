@@ -36,6 +36,9 @@
 #include "Misc/PackageName.h"
 #include "EdGraphSchema_K2.h"
 #include "UObject/StructOnScope.h"
+// Phase 3: Animation support
+#include "Animation/WidgetAnimation.h"
+#include "MovieScene.h"
 
 FSpirrowBridgeUMGCommands::FSpirrowBridgeUMGCommands()
 {
@@ -128,6 +131,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleCommand(const FString& 
 	else if (CommandName == TEXT("bind_widget_to_variable"))
 	{
 		return HandleBindWidgetToVariable(Params);
+	}
+	// Phase 3: Animation Operations
+	else if (CommandName == TEXT("create_widget_animation"))
+	{
+		return HandleCreateWidgetAnimation(Params);
 	}
 
 	return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown UMG command: %s"), *CommandName));
@@ -2730,5 +2738,110 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleBindWidgetToVariable(co
 	ResultObj->SetBoolField(TEXT("success"), true);
 	ResultObj->SetStringField(TEXT("binding_function"), FunctionName);
 	ResultObj->SetStringField(TEXT("note"), TEXT("Binding function created. Manual binding in UMG editor may be required for Phase 2."));
+	return ResultObj;
+}
+
+// ============================================================================
+// Phase 3: Animation Operations
+// ============================================================================
+
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleCreateWidgetAnimation(const TSharedPtr<FJsonObject>& Params)
+{
+	FString WidgetName, AnimationName, Path = TEXT("/Game/UI");
+	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName) ||
+		!Params->TryGetStringField(TEXT("animation_name"), AnimationName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing required parameters"));
+	}
+	Params->TryGetStringField(TEXT("path"), Path);
+
+	float Length = 1.0f;
+	if (Params->HasField(TEXT("length")))
+	{
+		Length = static_cast<float>(Params->GetNumberField(TEXT("length")));
+	}
+
+	bool bLoop = false;
+	Params->TryGetBoolField(TEXT("loop"), bLoop);
+
+	// Load Widget Blueprint
+	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
+	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
+	if (!WidgetBP)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Widget Blueprint '%s' not found at path '%s'"), *WidgetName, *AssetPath));
+	}
+
+	// Check if animation already exists
+	for (UWidgetAnimation* ExistingAnim : WidgetBP->Animations)
+	{
+		if (ExistingAnim && ExistingAnim->GetFName() == FName(*AnimationName))
+		{
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				FString::Printf(TEXT("Animation '%s' already exists in Widget Blueprint"), *AnimationName));
+		}
+	}
+
+	// Create new Widget Animation
+	UWidgetAnimation* NewAnimation = NewObject<UWidgetAnimation>(
+		WidgetBP,
+		UWidgetAnimation::StaticClass(),
+		FName(*AnimationName),
+		RF_Transactional
+	);
+
+	if (!NewAnimation)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create Widget Animation"));
+	}
+
+	// Create MovieScene for the animation
+	UMovieScene* MovieScene = NewObject<UMovieScene>(
+		NewAnimation,
+		UMovieScene::StaticClass(),
+		NAME_None,
+		RF_Transactional
+	);
+
+	if (!MovieScene)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create MovieScene"));
+	}
+
+	NewAnimation->MovieScene = MovieScene;
+
+	// Set playback range
+	FFrameRate TickResolution = MovieScene->GetTickResolution();
+	FFrameNumber StartFrame = 0;
+	FFrameNumber EndFrame = FFrameNumber(static_cast<int32>(Length * TickResolution.AsDecimal()));
+
+	MovieScene->SetPlaybackRange(TRange<FFrameNumber>(StartFrame, EndFrame));
+	MovieScene->SetWorkingRange(StartFrame.Value / TickResolution.AsDecimal(), EndFrame.Value / TickResolution.AsDecimal());
+	MovieScene->SetViewRange(StartFrame.Value / TickResolution.AsDecimal(), EndFrame.Value / TickResolution.AsDecimal());
+
+	// Set loop mode
+	if (bLoop)
+	{
+		MovieScene->SetEvaluationType(EMovieSceneEvaluationType::WithSubFrames);
+		// Note: Loop settings are typically controlled at playback time, not in the MovieScene itself
+	}
+
+	// Add animation to Widget Blueprint
+	WidgetBP->Animations.Add(NewAnimation);
+
+	// Mark Blueprint as modified and compile
+	FBlueprintEditorUtils::MarkBlueprintAsModified(WidgetBP);
+	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+	// Create success response
+	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetBoolField(TEXT("success"), true);
+	ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
+	ResultObj->SetStringField(TEXT("animation_name"), AnimationName);
+	ResultObj->SetStringField(TEXT("animation_id"), NewAnimation->GetPathName());
+	ResultObj->SetNumberField(TEXT("length"), Length);
+	ResultObj->SetBoolField(TEXT("loop"), bLoop);
+
 	return ResultObj;
 }

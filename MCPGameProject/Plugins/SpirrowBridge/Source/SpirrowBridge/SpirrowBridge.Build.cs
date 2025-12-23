@@ -48,6 +48,8 @@ public class SpirrowBridge : ModuleRules
 				"Slate",
 				"SlateCore",
 				"UMG",
+				"MovieScene",
+				"MovieSceneTracks",
 				"Kismet",
 				"KismetCompiler",
 				"BlueprintGraph",

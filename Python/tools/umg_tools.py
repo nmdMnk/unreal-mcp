@@ -1385,4 +1385,81 @@ def register_umg_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    # Phase 3: Animation Operations
+    @mcp.tool()
+    def create_widget_animation(
+        ctx: Context,
+        widget_name: str,
+        animation_name: str,
+        length: float = 1.0,
+        loop: bool = False,
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Create a new Widget Animation in a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            animation_name: Name for the new animation (e.g., "FadeIn", "SlideOut")
+            length: Animation length in seconds (default: 1.0)
+            loop: Whether the animation should loop (default: False)
+            path: Content browser path to the widget
+
+        Returns:
+            Dict containing success status and animation details
+
+        Example:
+            # Create a 0.5 second fade-in animation
+            create_widget_animation(
+                widget_name="WBP_TT_TrapSelector",
+                animation_name="FadeIn",
+                length=0.5,
+                loop=False,
+                path="/Game/TrapxTrap/UI"
+            )
+
+            # Create a looping background pulse animation
+            create_widget_animation(
+                widget_name="WBP_MainMenu",
+                animation_name="PulseBackground",
+                length=2.0,
+                loop=True,
+                path="/Game/UI"
+            )
+
+        Note:
+            After creating the animation, use add_animation_track and add_animation_keyframe
+            to define the actual animation behavior (opacity changes, transforms, etc.)
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "animation_name": animation_name,
+                "length": length,
+                "loop": loop,
+                "path": path
+            }
+
+            logger.info(f"Creating widget animation with params: {params}")
+            response = unreal.send_command("create_widget_animation", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Create widget animation response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error creating widget animation: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("UMG tools registered successfully") 
