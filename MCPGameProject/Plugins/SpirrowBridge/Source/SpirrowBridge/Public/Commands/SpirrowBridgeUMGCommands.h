@@ -151,6 +151,12 @@ private:
     // Phase 3: Array Variable Operations
     TSharedPtr<FJsonObject> HandleAddWidgetArrayVariable(const TSharedPtr<FJsonObject>& Params);
 
+    // Phase 4-A: Interactive Widgets
+    TSharedPtr<FJsonObject> HandleAddButtonToWidgetV2(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleBindWidgetComponentEvent(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleAddSliderToWidget(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleAddCheckBoxToWidget(const TSharedPtr<FJsonObject>& Params);
+
     // Helper function for setting up pin types
     bool SetupPinType(const FString& TypeName, FEdGraphPinType& OutPinType);
 }; 

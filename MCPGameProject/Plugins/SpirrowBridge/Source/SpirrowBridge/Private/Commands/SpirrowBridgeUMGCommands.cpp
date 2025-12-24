@@ -44,6 +44,10 @@
 #include "Sections/MovieSceneFloatSection.h"
 #include "Sections/MovieSceneColorSection.h"
 #include "Channels/MovieSceneFloatChannel.h"
+// Phase 4-A: Interactive Widgets
+#include "Components/Slider.h"
+#include "Components/CheckBox.h"
+#include "K2Node_ComponentBoundEvent.h"
 
 FSpirrowBridgeUMGCommands::FSpirrowBridgeUMGCommands()
 {
@@ -157,6 +161,23 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleCommand(const FString& 
 	else if (CommandName == TEXT("add_widget_array_variable"))
 	{
 		return HandleAddWidgetArrayVariable(Params);
+	}
+	// Phase 4-A: Interactive Widgets
+	else if (CommandName == TEXT("add_button_to_widget_v2"))
+	{
+		return HandleAddButtonToWidgetV2(Params);
+	}
+	else if (CommandName == TEXT("bind_widget_component_event"))
+	{
+		return HandleBindWidgetComponentEvent(Params);
+	}
+	else if (CommandName == TEXT("add_slider_to_widget"))
+	{
+		return HandleAddSliderToWidget(Params);
+	}
+	else if (CommandName == TEXT("add_checkbox_to_widget"))
+	{
+		return HandleAddCheckBoxToWidget(Params);
 	}
 
 	return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown UMG command: %s"), *CommandName));
@@ -3513,4 +3534,832 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleAddWidgetArrayVariable(
 	Response->SetBoolField(TEXT("is_exposed"), bIsExposed);
 
 	return Response;
+}
+
+// Phase 4-A: Add Button Widget V2
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleAddButtonToWidgetV2(const TSharedPtr<FJsonObject>& Params)
+{
+	// Get required parameters
+	FString WidgetName;
+	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+	}
+
+	FString ButtonName;
+	if (!Params->TryGetStringField(TEXT("button_name"), ButtonName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'button_name' parameter"));
+	}
+
+	// Get optional parameters
+	FString Path = TEXT("/Game/UI");
+	Params->TryGetStringField(TEXT("path"), Path);
+
+	FString Text;
+	Params->TryGetStringField(TEXT("text"), Text);
+
+	int32 FontSize = 14;
+	if (Params->HasField(TEXT("font_size")))
+	{
+		FontSize = Params->GetIntegerField(TEXT("font_size"));
+	}
+
+	// Get size [Width, Height]
+	FVector2D Size(200.0f, 50.0f);
+	if (Params->HasField(TEXT("size")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* SizeArray;
+		if (Params->TryGetArrayField(TEXT("size"), SizeArray) && SizeArray->Num() >= 2)
+		{
+			Size.X = (*SizeArray)[0]->AsNumber();
+			Size.Y = (*SizeArray)[1]->AsNumber();
+		}
+	}
+
+	// Get text color [R, G, B, A]
+	FLinearColor TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+	if (Params->HasField(TEXT("text_color")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* ColorArray;
+		if (Params->TryGetArrayField(TEXT("text_color"), ColorArray) && ColorArray->Num() >= 4)
+		{
+			TextColor.R = (*ColorArray)[0]->AsNumber();
+			TextColor.G = (*ColorArray)[1]->AsNumber();
+			TextColor.B = (*ColorArray)[2]->AsNumber();
+			TextColor.A = (*ColorArray)[3]->AsNumber();
+		}
+	}
+
+	// Get normal color
+	FLinearColor NormalColor(0.1f, 0.1f, 0.1f, 1.0f);
+	if (Params->HasField(TEXT("normal_color")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* ColorArray;
+		if (Params->TryGetArrayField(TEXT("normal_color"), ColorArray) && ColorArray->Num() >= 4)
+		{
+			NormalColor.R = (*ColorArray)[0]->AsNumber();
+			NormalColor.G = (*ColorArray)[1]->AsNumber();
+			NormalColor.B = (*ColorArray)[2]->AsNumber();
+			NormalColor.A = (*ColorArray)[3]->AsNumber();
+		}
+	}
+
+	// Get hovered color
+	FLinearColor HoveredColor(0.2f, 0.2f, 0.2f, 1.0f);
+	if (Params->HasField(TEXT("hovered_color")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* ColorArray;
+		if (Params->TryGetArrayField(TEXT("hovered_color"), ColorArray) && ColorArray->Num() >= 4)
+		{
+			HoveredColor.R = (*ColorArray)[0]->AsNumber();
+			HoveredColor.G = (*ColorArray)[1]->AsNumber();
+			HoveredColor.B = (*ColorArray)[2]->AsNumber();
+			HoveredColor.A = (*ColorArray)[3]->AsNumber();
+		}
+	}
+
+	// Get pressed color
+	FLinearColor PressedColor(0.05f, 0.05f, 0.05f, 1.0f);
+	if (Params->HasField(TEXT("pressed_color")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* ColorArray;
+		if (Params->TryGetArrayField(TEXT("pressed_color"), ColorArray) && ColorArray->Num() >= 4)
+		{
+			PressedColor.R = (*ColorArray)[0]->AsNumber();
+			PressedColor.G = (*ColorArray)[1]->AsNumber();
+			PressedColor.B = (*ColorArray)[2]->AsNumber();
+			PressedColor.A = (*ColorArray)[3]->AsNumber();
+		}
+	}
+
+	// Get alignment [X, Y]
+	FVector2D Alignment(0.5f, 0.5f);
+	if (Params->HasField(TEXT("alignment")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* AlignmentArray;
+		if (Params->TryGetArrayField(TEXT("alignment"), AlignmentArray) && AlignmentArray->Num() >= 2)
+		{
+			Alignment.X = (*AlignmentArray)[0]->AsNumber();
+			Alignment.Y = (*AlignmentArray)[1]->AsNumber();
+		}
+	}
+
+	// Get anchor
+	FString AnchorStr = TEXT("Center");
+	Params->TryGetStringField(TEXT("anchor"), AnchorStr);
+	FAnchors Anchors(0.5f, 0.5f, 0.5f, 0.5f);  // Center default
+
+	// Parse anchor presets
+	if (AnchorStr == TEXT("TopLeft"))
+	{
+		Anchors = FAnchors(0.0f, 0.0f, 0.0f, 0.0f);
+	}
+	else if (AnchorStr == TEXT("TopCenter"))
+	{
+		Anchors = FAnchors(0.5f, 0.0f, 0.5f, 0.0f);
+	}
+	else if (AnchorStr == TEXT("TopRight"))
+	{
+		Anchors = FAnchors(1.0f, 0.0f, 1.0f, 0.0f);
+	}
+	else if (AnchorStr == TEXT("MiddleLeft"))
+	{
+		Anchors = FAnchors(0.0f, 0.5f, 0.0f, 0.5f);
+	}
+	else if (AnchorStr == TEXT("Center"))
+	{
+		Anchors = FAnchors(0.5f, 0.5f, 0.5f, 0.5f);
+	}
+	else if (AnchorStr == TEXT("MiddleRight"))
+	{
+		Anchors = FAnchors(1.0f, 0.5f, 1.0f, 0.5f);
+	}
+	else if (AnchorStr == TEXT("BottomLeft"))
+	{
+		Anchors = FAnchors(0.0f, 1.0f, 0.0f, 1.0f);
+	}
+	else if (AnchorStr == TEXT("BottomCenter"))
+	{
+		Anchors = FAnchors(0.5f, 1.0f, 0.5f, 1.0f);
+	}
+	else if (AnchorStr == TEXT("BottomRight"))
+	{
+		Anchors = FAnchors(1.0f, 1.0f, 1.0f, 1.0f);
+	}
+
+	// Load Widget Blueprint
+	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
+	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
+	if (!WidgetBP)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Widget Blueprint '%s' not found at path '%s'"), *WidgetName, *AssetPath));
+	}
+
+	// Get WidgetTree
+	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
+	if (!WidgetTree)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+	}
+
+	// Get or create root Canvas Panel
+	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
+	if (!RootCanvas)
+	{
+		RootCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("RootCanvas"));
+		WidgetTree->RootWidget = RootCanvas;
+	}
+
+	// Create Button widget
+	UButton* ButtonWidget = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), FName(*ButtonName));
+	if (!ButtonWidget)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create Button widget"));
+	}
+
+	// Set button style colors
+	FButtonStyle ButtonStyle = ButtonWidget->GetStyle();
+	ButtonStyle.Normal.TintColor = FSlateColor(NormalColor);
+	ButtonStyle.Hovered.TintColor = FSlateColor(HoveredColor);
+	ButtonStyle.Pressed.TintColor = FSlateColor(PressedColor);
+	ButtonWidget->SetStyle(ButtonStyle);
+
+	// Create TextBlock for button text if text is provided
+	if (!Text.IsEmpty())
+	{
+		FString TextBlockName = ButtonName + TEXT("_Text");
+		UTextBlock* TextBlock = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), FName(*TextBlockName));
+		if (TextBlock)
+		{
+			TextBlock->SetText(FText::FromString(Text));
+			TextBlock->SetColorAndOpacity(FSlateColor(TextColor));
+
+			FSlateFontInfo FontInfo = TextBlock->GetFont();
+			FontInfo.Size = FontSize;
+			TextBlock->SetFont(FontInfo);
+
+			// Add TextBlock as child of Button
+			ButtonWidget->AddChild(TextBlock);
+		}
+	}
+
+	// Add to Canvas Panel
+	UCanvasPanelSlot* Slot = RootCanvas->AddChildToCanvas(ButtonWidget);
+	if (Slot)
+	{
+		Slot->SetAnchors(Anchors);
+		Slot->SetAlignment(Alignment);
+		Slot->SetPosition(FVector2D(0, 0));
+		Slot->SetSize(Size);
+	}
+
+	// Mark as modified and compile
+	WidgetBP->Modify();
+	WidgetBP->MarkPackageDirty();
+	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+	// Create success response
+	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetBoolField(TEXT("success"), true);
+	ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
+	ResultObj->SetStringField(TEXT("button_name"), ButtonName);
+	ResultObj->SetStringField(TEXT("text"), Text);
+	return ResultObj;
+}
+
+// Phase 4-A: Bind Widget Component Event
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleBindWidgetComponentEvent(const TSharedPtr<FJsonObject>& Params)
+{
+	// Get required parameters
+	FString WidgetName;
+	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+	}
+
+	FString ComponentName;
+	if (!Params->TryGetStringField(TEXT("component_name"), ComponentName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'component_name' parameter"));
+	}
+
+	FString EventType;
+	if (!Params->TryGetStringField(TEXT("event_type"), EventType))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'event_type' parameter"));
+	}
+
+	// Get optional parameters
+	FString Path = TEXT("/Game/UI");
+	Params->TryGetStringField(TEXT("path"), Path);
+
+	FString FunctionName;
+	if (!Params->TryGetStringField(TEXT("function_name"), FunctionName))
+	{
+		FunctionName = ComponentName + TEXT("_") + EventType;
+	}
+
+	bool bCreateFunction = true;
+	Params->TryGetBoolField(TEXT("create_function"), bCreateFunction);
+
+	// Load Widget Blueprint
+	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
+	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
+	if (!WidgetBP)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Widget Blueprint '%s' not found at path '%s'"), *WidgetName, *AssetPath));
+	}
+
+	// Find widget component
+	UWidget* WidgetComponent = WidgetBP->WidgetTree->FindWidget(FName(*ComponentName));
+	if (!WidgetComponent)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Widget component '%s' not found"), *ComponentName));
+	}
+
+	// Validate event type for component
+	UButton* ButtonWidget = Cast<UButton>(WidgetComponent);
+	USlider* SliderWidget = Cast<USlider>(WidgetComponent);
+	UCheckBox* CheckBoxWidget = Cast<UCheckBox>(WidgetComponent);
+
+	bool bValidEvent = false;
+	FName EventPropertyName;
+
+	if (ButtonWidget)
+	{
+		if (EventType == TEXT("OnClicked"))
+		{
+			EventPropertyName = FName("OnClicked");
+			bValidEvent = true;
+		}
+		else if (EventType == TEXT("OnPressed"))
+		{
+			EventPropertyName = FName("OnPressed");
+			bValidEvent = true;
+		}
+		else if (EventType == TEXT("OnReleased"))
+		{
+			EventPropertyName = FName("OnReleased");
+			bValidEvent = true;
+		}
+		else if (EventType == TEXT("OnHovered"))
+		{
+			EventPropertyName = FName("OnHovered");
+			bValidEvent = true;
+		}
+		else if (EventType == TEXT("OnUnhovered"))
+		{
+			EventPropertyName = FName("OnUnhovered");
+			bValidEvent = true;
+		}
+	}
+	else if (SliderWidget || CheckBoxWidget)
+	{
+		if (EventType == TEXT("OnValueChanged"))
+		{
+			EventPropertyName = FName("OnValueChanged");
+			bValidEvent = true;
+		}
+	}
+
+	if (!bValidEvent)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Invalid event type '%s' for component type"), *EventType));
+	}
+
+	// Find or create Event Graph
+	UEdGraph* EventGraph = nullptr;
+	for (UEdGraph* Graph : WidgetBP->UbergraphPages)
+	{
+		if (Graph->GetFName() == TEXT("EventGraph"))
+		{
+			EventGraph = Graph;
+			break;
+		}
+	}
+
+	if (!EventGraph)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Event Graph not found"));
+	}
+
+	// Create the function if requested
+	UEdGraph* FuncGraph = nullptr;
+	if (bCreateFunction)
+	{
+		// Check if function already exists
+		for (UEdGraph* Graph : WidgetBP->FunctionGraphs)
+		{
+			if (Graph->GetFName() == FName(*FunctionName))
+			{
+				FuncGraph = Graph;
+				break;
+			}
+		}
+
+		if (!FuncGraph)
+		{
+			// Create new function graph
+			FuncGraph = FBlueprintEditorUtils::CreateNewGraph(
+				WidgetBP,
+				FName(*FunctionName),
+				UEdGraph::StaticClass(),
+				UEdGraphSchema_K2::StaticClass()
+			);
+
+			if (FuncGraph)
+			{
+				FBlueprintEditorUtils::AddFunctionGraph<UClass>(WidgetBP, FuncGraph, false, nullptr);
+			}
+		}
+	}
+
+	// Create component bound event using FKismetEditorUtilities
+	FName EventName = FName(*(ComponentName + TEXT("_") + EventType.ToString()));
+	UEdGraphNode* EventNode = FKismetEditorUtilities::CreateNewBoundEventForComponent(
+		WidgetComponent,
+		EventPropertyName,
+		WidgetBP,
+		EventName
+	);
+
+	if (!EventNode)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create event binding"));
+	}
+
+	// If we have a function, connect the event to call it
+	if (FuncGraph && EventNode)
+	{
+		// Find the exec output pin of the event node
+		UEdGraphPin* EventExecPin = nullptr;
+		for (UEdGraphPin* Pin : EventNode->Pins)
+		{
+			if (Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec && Pin->Direction == EGPD_Output)
+			{
+				EventExecPin = Pin;
+				break;
+			}
+		}
+
+		if (EventExecPin)
+		{
+			// Create call function node
+			UK2Node_CallFunction* CallFuncNode = NewObject<UK2Node_CallFunction>(EventGraph);
+			UFunction* TargetFunction = WidgetBP->GeneratedClass->FindFunctionByName(FName(*FunctionName));
+			if (TargetFunction)
+			{
+				CallFuncNode->SetFromFunction(TargetFunction);
+				EventGraph->AddNode(CallFuncNode, false, false);
+				CallFuncNode->NodePosX = EventNode->NodePosX + 300;
+				CallFuncNode->NodePosY = EventNode->NodePosY;
+				CallFuncNode->AllocateDefaultPins();
+
+				// Connect exec pins
+				UEdGraphPin* FuncExecPin = CallFuncNode->FindPin(UEdGraphSchema_K2::PN_Execute);
+				if (FuncExecPin)
+				{
+					EventExecPin->MakeLinkTo(FuncExecPin);
+				}
+			}
+		}
+	}
+
+	// Mark Blueprint as modified and compile
+	FBlueprintEditorUtils::MarkBlueprintAsModified(WidgetBP);
+	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+	// Create success response
+	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetBoolField(TEXT("success"), true);
+	ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
+	ResultObj->SetStringField(TEXT("component_name"), ComponentName);
+	ResultObj->SetStringField(TEXT("event_type"), EventType);
+	ResultObj->SetStringField(TEXT("function_name"), FunctionName);
+	if (EventNode)
+	{
+		ResultObj->SetStringField(TEXT("node_id"), EventNode->NodeGuid.ToString());
+	}
+	return ResultObj;
+}
+
+// Phase 4-A: Add Slider Widget
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleAddSliderToWidget(const TSharedPtr<FJsonObject>& Params)
+{
+	// Get required parameters
+	FString WidgetName;
+	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+	}
+
+	FString SliderName;
+	if (!Params->TryGetStringField(TEXT("slider_name"), SliderName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'slider_name' parameter"));
+	}
+
+	// Get optional parameters
+	FString Path = TEXT("/Game/UI");
+	Params->TryGetStringField(TEXT("path"), Path);
+
+	float Value = 0.0f;
+	if (Params->HasField(TEXT("value")))
+	{
+		Value = Params->GetNumberField(TEXT("value"));
+	}
+
+	float MinValue = 0.0f;
+	if (Params->HasField(TEXT("min_value")))
+	{
+		MinValue = Params->GetNumberField(TEXT("min_value"));
+	}
+
+	float MaxValue = 1.0f;
+	if (Params->HasField(TEXT("max_value")))
+	{
+		MaxValue = Params->GetNumberField(TEXT("max_value"));
+	}
+
+	float StepSize = 0.0f;
+	if (Params->HasField(TEXT("step_size")))
+	{
+		StepSize = Params->GetNumberField(TEXT("step_size"));
+	}
+
+	FString OrientationStr = TEXT("Horizontal");
+	Params->TryGetStringField(TEXT("orientation"), OrientationStr);
+	EOrientation Orientation = (OrientationStr == TEXT("Vertical")) ? Orient_Vertical : Orient_Horizontal;
+
+	// Get size [Width, Height]
+	FVector2D Size(200.0f, 20.0f);
+	if (Params->HasField(TEXT("size")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* SizeArray;
+		if (Params->TryGetArrayField(TEXT("size"), SizeArray) && SizeArray->Num() >= 2)
+		{
+			Size.X = (*SizeArray)[0]->AsNumber();
+			Size.Y = (*SizeArray)[1]->AsNumber();
+		}
+	}
+
+	// Get bar color [R, G, B, A]
+	FLinearColor BarColor(0.2f, 0.2f, 0.2f, 1.0f);
+	if (Params->HasField(TEXT("bar_color")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* ColorArray;
+		if (Params->TryGetArrayField(TEXT("bar_color"), ColorArray) && ColorArray->Num() >= 4)
+		{
+			BarColor.R = (*ColorArray)[0]->AsNumber();
+			BarColor.G = (*ColorArray)[1]->AsNumber();
+			BarColor.B = (*ColorArray)[2]->AsNumber();
+			BarColor.A = (*ColorArray)[3]->AsNumber();
+		}
+	}
+
+	// Get handle color [R, G, B, A]
+	FLinearColor HandleColor(1.0f, 1.0f, 1.0f, 1.0f);
+	if (Params->HasField(TEXT("handle_color")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* ColorArray;
+		if (Params->TryGetArrayField(TEXT("handle_color"), ColorArray) && ColorArray->Num() >= 4)
+		{
+			HandleColor.R = (*ColorArray)[0]->AsNumber();
+			HandleColor.G = (*ColorArray)[1]->AsNumber();
+			HandleColor.B = (*ColorArray)[2]->AsNumber();
+			HandleColor.A = (*ColorArray)[3]->AsNumber();
+		}
+	}
+
+	// Get alignment [X, Y]
+	FVector2D Alignment(0.5f, 0.5f);
+	if (Params->HasField(TEXT("alignment")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* AlignmentArray;
+		if (Params->TryGetArrayField(TEXT("alignment"), AlignmentArray) && AlignmentArray->Num() >= 2)
+		{
+			Alignment.X = (*AlignmentArray)[0]->AsNumber();
+			Alignment.Y = (*AlignmentArray)[1]->AsNumber();
+		}
+	}
+
+	// Get anchor
+	FString AnchorStr = TEXT("Center");
+	Params->TryGetStringField(TEXT("anchor"), AnchorStr);
+	FAnchors Anchors(0.5f, 0.5f, 0.5f, 0.5f);  // Center default
+
+	// Parse anchor presets
+	if (AnchorStr == TEXT("TopLeft")) Anchors = FAnchors(0.0f, 0.0f, 0.0f, 0.0f);
+	else if (AnchorStr == TEXT("TopCenter")) Anchors = FAnchors(0.5f, 0.0f, 0.5f, 0.0f);
+	else if (AnchorStr == TEXT("TopRight")) Anchors = FAnchors(1.0f, 0.0f, 1.0f, 0.0f);
+	else if (AnchorStr == TEXT("MiddleLeft")) Anchors = FAnchors(0.0f, 0.5f, 0.0f, 0.5f);
+	else if (AnchorStr == TEXT("Center")) Anchors = FAnchors(0.5f, 0.5f, 0.5f, 0.5f);
+	else if (AnchorStr == TEXT("MiddleRight")) Anchors = FAnchors(1.0f, 0.5f, 1.0f, 0.5f);
+	else if (AnchorStr == TEXT("BottomLeft")) Anchors = FAnchors(0.0f, 1.0f, 0.0f, 1.0f);
+	else if (AnchorStr == TEXT("BottomCenter")) Anchors = FAnchors(0.5f, 1.0f, 0.5f, 1.0f);
+	else if (AnchorStr == TEXT("BottomRight")) Anchors = FAnchors(1.0f, 1.0f, 1.0f, 1.0f);
+
+	// Load Widget Blueprint
+	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
+	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
+	if (!WidgetBP)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Widget Blueprint '%s' not found at path '%s'"), *WidgetName, *AssetPath));
+	}
+
+	// Get WidgetTree
+	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
+	if (!WidgetTree)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+	}
+
+	// Get or create root Canvas Panel
+	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
+	if (!RootCanvas)
+	{
+		RootCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("RootCanvas"));
+		WidgetTree->RootWidget = RootCanvas;
+	}
+
+	// Create Slider widget
+	USlider* SliderWidget = WidgetTree->ConstructWidget<USlider>(USlider::StaticClass(), FName(*SliderName));
+	if (!SliderWidget)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create Slider widget"));
+	}
+
+	// Set slider properties
+	SliderWidget->SetValue(Value);
+	SliderWidget->SetMinValue(MinValue);
+	SliderWidget->SetMaxValue(MaxValue);
+	SliderWidget->SetStepSize(StepSize);
+	SliderWidget->SetOrientation(Orientation);
+
+	// Set slider style colors
+	FSliderStyle SliderStyle = SliderWidget->GetWidgetStyle();
+	SliderStyle.NormalBarImage.TintColor = FSlateColor(BarColor);
+	SliderStyle.HoveredBarImage.TintColor = FSlateColor(BarColor);
+	SliderStyle.DisabledBarImage.TintColor = FSlateColor(BarColor * 0.5f);
+	SliderStyle.NormalThumbImage.TintColor = FSlateColor(HandleColor);
+	SliderStyle.HoveredThumbImage.TintColor = FSlateColor(HandleColor);
+	SliderStyle.DisabledThumbImage.TintColor = FSlateColor(HandleColor * 0.5f);
+	SliderWidget->SetWidgetStyle(SliderStyle);
+
+	// Add to Canvas Panel
+	UCanvasPanelSlot* Slot = RootCanvas->AddChildToCanvas(SliderWidget);
+	if (Slot)
+	{
+		Slot->SetAnchors(Anchors);
+		Slot->SetAlignment(Alignment);
+		Slot->SetPosition(FVector2D(0, 0));
+		Slot->SetSize(Size);
+	}
+
+	// Mark as modified and compile
+	WidgetBP->Modify();
+	WidgetBP->MarkPackageDirty();
+	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+	// Create success response
+	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetBoolField(TEXT("success"), true);
+	ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
+	ResultObj->SetStringField(TEXT("slider_name"), SliderName);
+	ResultObj->SetNumberField(TEXT("value"), Value);
+	ResultObj->SetNumberField(TEXT("min_value"), MinValue);
+	ResultObj->SetNumberField(TEXT("max_value"), MaxValue);
+	return ResultObj;
+}
+
+// Phase 4-A: Add CheckBox Widget
+TSharedPtr<FJsonObject> FSpirrowBridgeUMGCommands::HandleAddCheckBoxToWidget(const TSharedPtr<FJsonObject>& Params)
+{
+	// Get required parameters
+	FString WidgetName;
+	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+	}
+
+	FString CheckBoxName;
+	if (!Params->TryGetStringField(TEXT("checkbox_name"), CheckBoxName))
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'checkbox_name' parameter"));
+	}
+
+	// Get optional parameters
+	FString Path = TEXT("/Game/UI");
+	Params->TryGetStringField(TEXT("path"), Path);
+
+	bool bIsChecked = false;
+	Params->TryGetBoolField(TEXT("is_checked"), bIsChecked);
+
+	FString LabelText;
+	Params->TryGetStringField(TEXT("label_text"), LabelText);
+
+	// Get checked color [R, G, B, A]
+	FLinearColor CheckedColor(1.0f, 1.0f, 1.0f, 1.0f);
+	if (Params->HasField(TEXT("checked_color")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* ColorArray;
+		if (Params->TryGetArrayField(TEXT("checked_color"), ColorArray) && ColorArray->Num() >= 4)
+		{
+			CheckedColor.R = (*ColorArray)[0]->AsNumber();
+			CheckedColor.G = (*ColorArray)[1]->AsNumber();
+			CheckedColor.B = (*ColorArray)[2]->AsNumber();
+			CheckedColor.A = (*ColorArray)[3]->AsNumber();
+		}
+	}
+
+	// Get unchecked color [R, G, B, A]
+	FLinearColor UncheckedColor(0.5f, 0.5f, 0.5f, 1.0f);
+	if (Params->HasField(TEXT("unchecked_color")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* ColorArray;
+		if (Params->TryGetArrayField(TEXT("unchecked_color"), ColorArray) && ColorArray->Num() >= 4)
+		{
+			UncheckedColor.R = (*ColorArray)[0]->AsNumber();
+			UncheckedColor.G = (*ColorArray)[1]->AsNumber();
+			UncheckedColor.B = (*ColorArray)[2]->AsNumber();
+			UncheckedColor.A = (*ColorArray)[3]->AsNumber();
+		}
+	}
+
+	// Get alignment [X, Y]
+	FVector2D Alignment(0.5f, 0.5f);
+	if (Params->HasField(TEXT("alignment")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* AlignmentArray;
+		if (Params->TryGetArrayField(TEXT("alignment"), AlignmentArray) && AlignmentArray->Num() >= 2)
+		{
+			Alignment.X = (*AlignmentArray)[0]->AsNumber();
+			Alignment.Y = (*AlignmentArray)[1]->AsNumber();
+		}
+	}
+
+	// Get anchor
+	FString AnchorStr = TEXT("Center");
+	Params->TryGetStringField(TEXT("anchor"), AnchorStr);
+	FAnchors Anchors(0.5f, 0.5f, 0.5f, 0.5f);  // Center default
+
+	// Parse anchor presets
+	if (AnchorStr == TEXT("TopLeft")) Anchors = FAnchors(0.0f, 0.0f, 0.0f, 0.0f);
+	else if (AnchorStr == TEXT("TopCenter")) Anchors = FAnchors(0.5f, 0.0f, 0.5f, 0.0f);
+	else if (AnchorStr == TEXT("TopRight")) Anchors = FAnchors(1.0f, 0.0f, 1.0f, 0.0f);
+	else if (AnchorStr == TEXT("MiddleLeft")) Anchors = FAnchors(0.0f, 0.5f, 0.0f, 0.5f);
+	else if (AnchorStr == TEXT("Center")) Anchors = FAnchors(0.5f, 0.5f, 0.5f, 0.5f);
+	else if (AnchorStr == TEXT("MiddleRight")) Anchors = FAnchors(1.0f, 0.5f, 1.0f, 0.5f);
+	else if (AnchorStr == TEXT("BottomLeft")) Anchors = FAnchors(0.0f, 1.0f, 0.0f, 1.0f);
+	else if (AnchorStr == TEXT("BottomCenter")) Anchors = FAnchors(0.5f, 1.0f, 0.5f, 1.0f);
+	else if (AnchorStr == TEXT("BottomRight")) Anchors = FAnchors(1.0f, 1.0f, 1.0f, 1.0f);
+
+	// Load Widget Blueprint
+	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
+	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
+	if (!WidgetBP)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			FString::Printf(TEXT("Widget Blueprint '%s' not found at path '%s'"), *WidgetName, *AssetPath));
+	}
+
+	// Get WidgetTree
+	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
+	if (!WidgetTree)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+	}
+
+	// Get or create root Canvas Panel
+	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
+	if (!RootCanvas)
+	{
+		RootCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("RootCanvas"));
+		WidgetTree->RootWidget = RootCanvas;
+	}
+
+	// If label text is provided, create a HorizontalBox container with CheckBox and TextBlock
+	UWidget* WidgetToAdd = nullptr;
+
+	// Create CheckBox widget
+	UCheckBox* CheckBoxWidget = WidgetTree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass(), FName(*CheckBoxName));
+	if (!CheckBoxWidget)
+	{
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create CheckBox widget"));
+	}
+
+	// Set checkbox initial state
+	CheckBoxWidget->SetIsChecked(bIsChecked);
+
+	// Set checkbox style colors
+	FCheckBoxStyle CheckBoxStyle = CheckBoxWidget->GetWidgetStyle();
+	CheckBoxStyle.CheckedImage.TintColor = FSlateColor(CheckedColor);
+	CheckBoxStyle.CheckedHoveredImage.TintColor = FSlateColor(CheckedColor);
+	CheckBoxStyle.CheckedPressedImage.TintColor = FSlateColor(CheckedColor);
+	CheckBoxStyle.UncheckedImage.TintColor = FSlateColor(UncheckedColor);
+	CheckBoxStyle.UncheckedHoveredImage.TintColor = FSlateColor(UncheckedColor);
+	CheckBoxStyle.UncheckedPressedImage.TintColor = FSlateColor(UncheckedColor);
+	CheckBoxWidget->SetWidgetStyle(CheckBoxStyle);
+
+	if (!LabelText.IsEmpty())
+	{
+		// Create HorizontalBox container
+		FString ContainerName = CheckBoxName + TEXT("_Container");
+		UHorizontalBox* Container = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), FName(*ContainerName));
+
+		// Add CheckBox to container
+		Container->AddChild(CheckBoxWidget);
+
+		// Create and add TextBlock for label
+		FString LabelName = CheckBoxName + TEXT("_Label");
+		UTextBlock* LabelWidget = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), FName(*LabelName));
+		if (LabelWidget)
+		{
+			LabelWidget->SetText(FText::FromString(LabelText));
+			Container->AddChild(LabelWidget);
+
+			// Add padding to label
+			if (UHorizontalBoxSlot* LabelSlot = Cast<UHorizontalBoxSlot>(LabelWidget->Slot))
+			{
+				LabelSlot->SetPadding(FMargin(8.0f, 0.0f, 0.0f, 0.0f));
+				LabelSlot->SetVerticalAlignment(VAlign_Center);
+			}
+		}
+
+		WidgetToAdd = Container;
+	}
+	else
+	{
+		WidgetToAdd = CheckBoxWidget;
+	}
+
+	// Add to Canvas Panel
+	UCanvasPanelSlot* Slot = RootCanvas->AddChildToCanvas(WidgetToAdd);
+	if (Slot)
+	{
+		Slot->SetAnchors(Anchors);
+		Slot->SetAlignment(Alignment);
+		Slot->SetPosition(FVector2D(0, 0));
+		Slot->SetAutoSize(true);
+	}
+
+	// Mark as modified and compile
+	WidgetBP->Modify();
+	WidgetBP->MarkPackageDirty();
+	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
+
+	// Create success response
+	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetBoolField(TEXT("success"), true);
+	ResultObj->SetStringField(TEXT("widget_name"), WidgetName);
+	ResultObj->SetStringField(TEXT("checkbox_name"), CheckBoxName);
+	ResultObj->SetBoolField(TEXT("is_checked"), bIsChecked);
+	ResultObj->SetStringField(TEXT("label_text"), LabelText);
+	return ResultObj;
 }

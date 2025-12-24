@@ -1778,4 +1778,331 @@ def register_umg_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    # Phase 4-A: Interactive Widgets
+    @mcp.tool()
+    def add_button_to_widget(
+        ctx: Context,
+        widget_name: str,
+        button_name: str,
+        text: str = "",
+        font_size: int = 14,
+        text_color: List[float] = [1.0, 1.0, 1.0, 1.0],
+        normal_color: List[float] = [0.1, 0.1, 0.1, 1.0],
+        hovered_color: List[float] = [0.2, 0.2, 0.2, 1.0],
+        pressed_color: List[float] = [0.05, 0.05, 0.05, 1.0],
+        size: List[float] = [200.0, 50.0],
+        anchor: str = "Center",
+        alignment: List[float] = [0.5, 0.5],
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add a Button widget to a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            button_name: Name for the new Button
+            text: Text to display on the button
+            font_size: Font size in points (default: 14)
+            text_color: [R, G, B, A] text color values 0.0-1.0 (default: white)
+            normal_color: [R, G, B, A] normal state background color (default: dark gray)
+            hovered_color: [R, G, B, A] hovered state background color
+            pressed_color: [R, G, B, A] pressed state background color
+            size: [Width, Height] size in pixels (default: [200, 50])
+            anchor: Anchor position - "Center", "TopLeft", "TopCenter", "TopRight",
+                    "MiddleLeft", "MiddleRight", "BottomLeft", "BottomCenter", "BottomRight"
+            alignment: [X, Y] alignment values 0.0-1.0 (default: [0.5, 0.5])
+            path: Content browser path to the widget (default: "/Game/UI")
+
+        Returns:
+            Dict containing success status and button properties
+
+        Example:
+            add_button_to_widget(
+                widget_name="WBP_MainMenu",
+                button_name="StartButton",
+                text="Start Game",
+                font_size=18,
+                size=[250, 60],
+                anchor="Center",
+                path="/Game/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "button_name": button_name,
+                "text": text,
+                "font_size": font_size,
+                "text_color": text_color,
+                "normal_color": normal_color,
+                "hovered_color": hovered_color,
+                "pressed_color": pressed_color,
+                "size": size,
+                "anchor": anchor,
+                "alignment": alignment,
+                "path": path
+            }
+
+            logger.info(f"Adding Button to widget with params: {params}")
+            response = unreal.send_command("add_button_to_widget_v2", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add Button to widget response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding Button to widget: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def bind_widget_component_event(
+        ctx: Context,
+        widget_name: str,
+        component_name: str,
+        event_type: str,
+        function_name: str = "",
+        create_function: bool = True,
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Bind an event on a widget component to a Blueprint function.
+
+        Creates an event binding that calls a function when the specified event fires.
+        Optionally creates the target function automatically.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            component_name: Name of the widget component (e.g., "StartButton")
+            event_type: Type of event to bind:
+                - "OnClicked": Button click event
+                - "OnPressed": Button press event
+                - "OnReleased": Button release event
+                - "OnHovered": Button hover start event
+                - "OnUnhovered": Button hover end event
+                - "OnValueChanged": Slider/CheckBox value change event
+            function_name: Name of the function to bind to (auto-generated if empty)
+            create_function: Whether to automatically create the target function (default: True)
+            path: Content browser path to the widget (default: "/Game/UI")
+
+        Returns:
+            Dict containing success status, function name, and node ID
+
+        Example:
+            bind_widget_component_event(
+                widget_name="WBP_MainMenu",
+                component_name="StartButton",
+                event_type="OnClicked",
+                function_name="HandleStartButtonClicked",
+                path="/Game/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            # Auto-generate function name if not provided
+            if not function_name:
+                function_name = f"{component_name}_{event_type}"
+
+            params = {
+                "widget_name": widget_name,
+                "component_name": component_name,
+                "event_type": event_type,
+                "function_name": function_name,
+                "create_function": create_function,
+                "path": path
+            }
+
+            logger.info(f"Binding widget component event with params: {params}")
+            response = unreal.send_command("bind_widget_component_event", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Bind widget component event response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error binding widget component event: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def add_slider_to_widget(
+        ctx: Context,
+        widget_name: str,
+        slider_name: str,
+        value: float = 0.0,
+        min_value: float = 0.0,
+        max_value: float = 1.0,
+        step_size: float = 0.0,
+        orientation: str = "Horizontal",
+        bar_color: List[float] = [0.2, 0.2, 0.2, 1.0],
+        handle_color: List[float] = [1.0, 1.0, 1.0, 1.0],
+        size: List[float] = [200.0, 20.0],
+        anchor: str = "Center",
+        alignment: List[float] = [0.5, 0.5],
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add a Slider widget to a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            slider_name: Name for the new Slider
+            value: Initial value (0.0-1.0, default: 0.0)
+            min_value: Minimum value (default: 0.0)
+            max_value: Maximum value (default: 1.0)
+            step_size: Step size for discrete values, 0 for continuous (default: 0.0)
+            orientation: "Horizontal" or "Vertical" (default: "Horizontal")
+            bar_color: [R, G, B, A] slider bar color (default: dark gray)
+            handle_color: [R, G, B, A] slider handle color (default: white)
+            size: [Width, Height] size in pixels (default: [200, 20])
+            anchor: Anchor position (default: "Center")
+            alignment: [X, Y] alignment values (default: [0.5, 0.5])
+            path: Content browser path to the widget (default: "/Game/UI")
+
+        Returns:
+            Dict containing success status and slider properties
+
+        Example:
+            add_slider_to_widget(
+                widget_name="WBP_Settings",
+                slider_name="VolumeSlider",
+                value=0.5,
+                min_value=0.0,
+                max_value=1.0,
+                size=[300, 25],
+                path="/Game/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "slider_name": slider_name,
+                "value": value,
+                "min_value": min_value,
+                "max_value": max_value,
+                "step_size": step_size,
+                "orientation": orientation,
+                "bar_color": bar_color,
+                "handle_color": handle_color,
+                "size": size,
+                "anchor": anchor,
+                "alignment": alignment,
+                "path": path
+            }
+
+            logger.info(f"Adding Slider to widget with params: {params}")
+            response = unreal.send_command("add_slider_to_widget", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add Slider to widget response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding Slider to widget: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def add_checkbox_to_widget(
+        ctx: Context,
+        widget_name: str,
+        checkbox_name: str,
+        is_checked: bool = False,
+        label_text: str = "",
+        checked_color: List[float] = [1.0, 1.0, 1.0, 1.0],
+        unchecked_color: List[float] = [0.5, 0.5, 0.5, 1.0],
+        anchor: str = "Center",
+        alignment: List[float] = [0.5, 0.5],
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add a CheckBox widget to a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            checkbox_name: Name for the new CheckBox
+            is_checked: Initial checked state (default: False)
+            label_text: Label text to display next to the checkbox (optional)
+            checked_color: [R, G, B, A] color when checked (default: white)
+            unchecked_color: [R, G, B, A] color when unchecked (default: gray)
+            anchor: Anchor position (default: "Center")
+            alignment: [X, Y] alignment values (default: [0.5, 0.5])
+            path: Content browser path to the widget (default: "/Game/UI")
+
+        Returns:
+            Dict containing success status and checkbox properties
+
+        Example:
+            add_checkbox_to_widget(
+                widget_name="WBP_Settings",
+                checkbox_name="MuteCheckbox",
+                is_checked=False,
+                label_text="Mute Audio",
+                path="/Game/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "checkbox_name": checkbox_name,
+                "is_checked": is_checked,
+                "label_text": label_text,
+                "checked_color": checked_color,
+                "unchecked_color": unchecked_color,
+                "anchor": anchor,
+                "alignment": alignment,
+                "path": path
+            }
+
+            logger.info(f"Adding CheckBox to widget with params: {params}")
+            response = unreal.send_command("add_checkbox_to_widget", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add CheckBox to widget response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding CheckBox to widget: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("UMG tools registered successfully") 
