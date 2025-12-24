@@ -323,7 +323,12 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("add_button_to_widget_v2") ||
                      CommandType == TEXT("bind_widget_component_event") ||
                      CommandType == TEXT("add_slider_to_widget") ||
-                     CommandType == TEXT("add_checkbox_to_widget"))
+                     CommandType == TEXT("add_checkbox_to_widget") ||
+                     // Phase 4-B: Additional Interactive Widgets
+                     CommandType == TEXT("add_combobox_to_widget") ||
+                     CommandType == TEXT("add_editabletext_to_widget") ||
+                     CommandType == TEXT("add_spinbox_to_widget") ||
+                     CommandType == TEXT("add_scrollbox_to_widget"))
             {
                 ResultJson = UMGCommands->HandleCommand(CommandType, Params);
             }

@@ -157,6 +157,12 @@ private:
     TSharedPtr<FJsonObject> HandleAddSliderToWidget(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleAddCheckBoxToWidget(const TSharedPtr<FJsonObject>& Params);
 
+    // Phase 4-B: Additional Interactive Widgets
+    TSharedPtr<FJsonObject> HandleAddComboBoxToWidget(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleAddEditableTextToWidget(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleAddSpinBoxToWidget(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleAddScrollBoxToWidget(const TSharedPtr<FJsonObject>& Params);
+
     // Helper function for setting up pin types
     bool SetupPinType(const FString& TypeName, FEdGraphPinType& OutPinType);
 }; 

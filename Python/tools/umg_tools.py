@@ -2043,4 +2043,308 @@ def register_umg_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    # Phase 4-B: Additional Interactive Widgets
+
+    @mcp.tool()
+    def add_combobox_to_widget(
+        ctx: Context,
+        widget_name: str,
+        combobox_name: str,
+        options: List[str] = [],
+        selected_index: int = 0,
+        font_size: int = 14,
+        size: List[float] = [200.0, 40.0],
+        anchor: str = "Center",
+        alignment: List[float] = [0.5, 0.5],
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add a ComboBox (dropdown) widget to a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            combobox_name: Name for the new ComboBox
+            options: List of string options for the dropdown
+            selected_index: Initial selected index (default: 0)
+            font_size: Font size in points (default: 14)
+            size: [Width, Height] size in pixels (default: [200, 40])
+            anchor: Anchor position - "Center", "TopLeft", "TopCenter", etc.
+            alignment: [X, Y] alignment values 0.0-1.0 (default: [0.5, 0.5])
+            path: Content browser path to the widget (default: "/Game/UI")
+
+        Returns:
+            Dict containing success status and combobox properties
+
+        Example:
+            add_combobox_to_widget(
+                widget_name="WBP_Settings",
+                combobox_name="DifficultyCombo",
+                options=["Easy", "Normal", "Hard"],
+                selected_index=1,
+                path="/Game/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "combobox_name": combobox_name,
+                "options": options,
+                "selected_index": selected_index,
+                "font_size": font_size,
+                "size": size,
+                "anchor": anchor,
+                "alignment": alignment,
+                "path": path
+            }
+
+            logger.info(f"Adding ComboBox to widget with params: {params}")
+            response = unreal.send_command("add_combobox_to_widget", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add ComboBox to widget response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding ComboBox to widget: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def add_editabletext_to_widget(
+        ctx: Context,
+        widget_name: str,
+        text_name: str,
+        hint_text: str = "",
+        is_password: bool = False,
+        is_multiline: bool = False,
+        font_size: int = 14,
+        text_color: List[float] = [1.0, 1.0, 1.0, 1.0],
+        size: List[float] = [200.0, 40.0],
+        anchor: str = "Center",
+        alignment: List[float] = [0.5, 0.5],
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add an EditableText input field to a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            text_name: Name for the new EditableText
+            hint_text: Placeholder text shown when empty
+            is_password: If True, displays asterisks instead of text
+            is_multiline: If True, creates a multi-line text box
+            font_size: Font size in points (default: 14)
+            text_color: [R, G, B, A] text color values 0.0-1.0
+            size: [Width, Height] size in pixels (default: [200, 40])
+            anchor: Anchor position - "Center", "TopLeft", etc.
+            alignment: [X, Y] alignment values 0.0-1.0 (default: [0.5, 0.5])
+            path: Content browser path to the widget (default: "/Game/UI")
+
+        Returns:
+            Dict containing success status and text input properties
+
+        Example:
+            add_editabletext_to_widget(
+                widget_name="WBP_Login",
+                text_name="PlayerNameInput",
+                hint_text="Enter your name...",
+                path="/Game/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "text_name": text_name,
+                "hint_text": hint_text,
+                "is_password": is_password,
+                "is_multiline": is_multiline,
+                "font_size": font_size,
+                "text_color": text_color,
+                "size": size,
+                "anchor": anchor,
+                "alignment": alignment,
+                "path": path
+            }
+
+            logger.info(f"Adding EditableText to widget with params: {params}")
+            response = unreal.send_command("add_editabletext_to_widget", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add EditableText to widget response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding EditableText to widget: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def add_spinbox_to_widget(
+        ctx: Context,
+        widget_name: str,
+        spinbox_name: str,
+        value: float = 0.0,
+        min_value: float = 0.0,
+        max_value: float = 100.0,
+        delta: float = 1.0,
+        size: List[float] = [150.0, 40.0],
+        anchor: str = "Center",
+        alignment: List[float] = [0.5, 0.5],
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add a SpinBox (numeric input with +/- buttons) to a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            spinbox_name: Name for the new SpinBox
+            value: Initial value (default: 0.0)
+            min_value: Minimum allowed value (default: 0.0)
+            max_value: Maximum allowed value (default: 100.0)
+            delta: Increment/decrement step size (default: 1.0)
+            size: [Width, Height] size in pixels (default: [150, 40])
+            anchor: Anchor position - "Center", "TopLeft", etc.
+            alignment: [X, Y] alignment values 0.0-1.0 (default: [0.5, 0.5])
+            path: Content browser path to the widget (default: "/Game/UI")
+
+        Returns:
+            Dict containing success status and spinbox properties
+
+        Example:
+            add_spinbox_to_widget(
+                widget_name="WBP_Settings",
+                spinbox_name="VolumeSpinBox",
+                value=50,
+                min_value=0,
+                max_value=100,
+                path="/Game/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "spinbox_name": spinbox_name,
+                "value": value,
+                "min_value": min_value,
+                "max_value": max_value,
+                "delta": delta,
+                "size": size,
+                "anchor": anchor,
+                "alignment": alignment,
+                "path": path
+            }
+
+            logger.info(f"Adding SpinBox to widget with params: {params}")
+            response = unreal.send_command("add_spinbox_to_widget", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add SpinBox to widget response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding SpinBox to widget: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def add_scrollbox_to_widget(
+        ctx: Context,
+        widget_name: str,
+        scrollbox_name: str,
+        orientation: str = "Vertical",
+        scroll_bar_visibility: str = "Visible",
+        size: List[float] = [300.0, 200.0],
+        anchor: str = "Center",
+        alignment: List[float] = [0.5, 0.5],
+        path: str = "/Game/UI"
+    ) -> Dict[str, Any]:
+        """
+        Add a ScrollBox container to a Widget Blueprint.
+
+        Args:
+            widget_name: Name of the Widget Blueprint
+            scrollbox_name: Name for the new ScrollBox
+            orientation: Scroll direction - "Vertical" or "Horizontal" (default: "Vertical")
+            scroll_bar_visibility: "Visible", "Hidden", "Collapsed" (default: "Visible")
+            size: [Width, Height] size in pixels (default: [300, 200])
+            anchor: Anchor position - "Center", "TopLeft", etc.
+            alignment: [X, Y] alignment values 0.0-1.0 (default: [0.5, 0.5])
+            path: Content browser path to the widget (default: "/Game/UI")
+
+        Returns:
+            Dict containing success status and scrollbox properties
+
+        Example:
+            add_scrollbox_to_widget(
+                widget_name="WBP_Chat",
+                scrollbox_name="MessageScrollBox",
+                orientation="Vertical",
+                size=[400, 300],
+                path="/Game/UI"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "widget_name": widget_name,
+                "scrollbox_name": scrollbox_name,
+                "orientation": orientation,
+                "scroll_bar_visibility": scroll_bar_visibility,
+                "size": size,
+                "anchor": anchor,
+                "alignment": alignment,
+                "path": path
+            }
+
+            logger.info(f"Adding ScrollBox to widget with params: {params}")
+            response = unreal.send_command("add_scrollbox_to_widget", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add ScrollBox to widget response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding ScrollBox to widget: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("UMG tools registered successfully") 
