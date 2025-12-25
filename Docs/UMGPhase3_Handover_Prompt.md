@@ -43,11 +43,11 @@
 | ツール | 説明 | テスト結果 |
 |--------|------|------------|
 | `create_widget_animation` | アニメーション作成 | ✅ 成功 |
-| `add_animation_track` | トラック追加 (Opacity/Color) | ✅ 成功 |
+| `add_animation_track` | トラック追加 | ✅ 成功 |
 | `add_animation_keyframe` | キーフレーム追加 | ✅ 成功 |
 | `get_widget_animations` | アニメーション一覧取得 | ✅ 成功 |
 
-### Phase 3: Array Variables - 1ツール ✅ NEW
+### Phase 3: Array Variables - 1ツール ✅
 
 | ツール | 説明 | テスト結果 |
 |--------|------|------------|
@@ -57,9 +57,63 @@
 
 ---
 
-## add_widget_array_variable テスト結果
+## アニメーション対応プロパティ一覧
 
-### テストケース
+### 基本プロパティ
+
+| プロパティ名 | 値の形式 | トラックタイプ | 用途 |
+|-------------|---------|--------------|------|
+| `Opacity` / `RenderOpacity` | float (0.0-1.0) | Float | フェードイン/アウト |
+| `ColorAndOpacity` | [R, G, B, A] | Color | 色変化 |
+
+### RenderTransform プロパティ ✅ NEW
+
+| プロパティ名 | 値の形式 | トラックタイプ | 用途 |
+|-------------|---------|--------------|------|
+| `RenderTransform.Translation.X` | float (px) | Float | 横方向移動 |
+| `RenderTransform.Translation.Y` | float (px) | Float | 縦方向移動 |
+| `RenderTransform.Scale.X` | float (1.0=100%) | Float | 横方向スケール |
+| `RenderTransform.Scale.Y` | float (1.0=100%) | Float | 縦方向スケール |
+| `RenderTransform.Angle` | float (度) | Float | 回転 |
+
+---
+
+## RenderTransform テスト結果
+
+### テスト1: SlideInX（Translation.X）
+
+```python
+create_widget_animation(widget_name="WBP_TT_TrapSelector", animation_name="SlideInX", length=0.3)
+add_animation_track(..., property_name="RenderTransform.Translation.X")
+add_animation_keyframe(..., time=0.0, value=-200.0)  # 画面外左
+add_animation_keyframe(..., time=0.3, value=0.0, interpolation="Cubic")  # 元の位置
+```
+結果: ✅ 成功
+
+### テスト2: PopIn（Scale.X/Y）
+
+```python
+create_widget_animation(widget_name="WBP_TT_TrapSelector", animation_name="PopIn", length=0.3)
+add_animation_track(..., property_name="RenderTransform.Scale.X")
+add_animation_track(..., property_name="RenderTransform.Scale.Y")
+add_animation_keyframe(..., property_name="RenderTransform.Scale.X", time=0.0, value=0.0)
+add_animation_keyframe(..., property_name="RenderTransform.Scale.X", time=0.3, value=1.0)
+```
+結果: ✅ 成功
+
+### テスト3: Spin（Angle）
+
+```python
+create_widget_animation(widget_name="WBP_TT_TrapSelector", animation_name="Spin", length=0.5)
+add_animation_track(..., property_name="RenderTransform.Angle")
+add_animation_keyframe(..., time=0.0, value=0.0)
+add_animation_keyframe(..., time=0.5, value=360.0)
+```
+結果: ✅ 成功
+
+---
+
+## 配列変数テスト結果
 
 | テスト | 要素型 | is_exposed | 結果 |
 |--------|--------|------------|------|
@@ -67,33 +121,15 @@
 | TrapCounts | Integer | false | ✅ 成功 |
 | TrapIcons | Texture2D | true | ✅ 成功 |
 | TrapColors | LinearColor | false | ✅ 成功 |
-| TrapNames (重複) | String | - | ✅ エラー検出 |
-
-### サポート要素型
-
-| 型名 | UE内部型 | テスト状況 |
-|------|---------|-----------|
-| Boolean | bool | 未テスト |
-| Integer | int32 | ✅ 確認済み |
-| Float | float | 未テスト |
-| String | FString | ✅ 確認済み |
-| Text | FText | 未テスト |
-| Vector | FVector | 未テスト |
-| Vector2D | FVector2D | 未テスト |
-| LinearColor | FLinearColor | ✅ 確認済み |
-| Texture2D | UTexture2D* | ✅ 確認済み |
-| Object | UObject* | 未テスト |
+| 重複チェック | - | - | ✅ エラー検出 |
 
 ---
 
 ## Phase 3 残り機能（未実装）
 
-### 優先度順
-
-| 優先度 | ツール | 説明 | プロンプト |
-|--------|--------|------|-----------|
-| 1️⃣ | RenderTransform トラック | Translation/Scale/Angle対応 | 未作成 |
-| 2️⃣ | `set_widget_array_default` | 配列デフォルト値設定 | 未作成 |
+| 優先度 | ツール | 説明 |
+|--------|--------|------|
+| 低 | `set_widget_array_default` | 配列デフォルト値設定 |
 
 ---
 
@@ -114,12 +150,13 @@ spirrow-unrealwise/
 │   └── tools/
 │       └── umg_tools.py
 └── Docs/
-    ├── UMGPhase3_Handover_Prompt.md      ← このファイル
+    ├── UMGPhase3_Handover_Prompt.md         ← このファイル
     ├── UMGPhase3_Continue_Prompt.md
     ├── UMGPhase3_Animation_Prompt.md
     ├── UMGPhase3_AnimationTrack_Prompt.md
     ├── UMGPhase3_GetWidgetAnimations_Prompt.md
-    └── UMGPhase3_ArrayVariable_Prompt.md  ← 実装完了
+    ├── UMGPhase3_ArrayVariable_Prompt.md
+    └── UMGPhase3_RenderTransform_Prompt.md  ← 実装完了
 ```
 
 ---
@@ -135,19 +172,25 @@ get_widget_elements(
     widget_name="WBP_TT_TrapSelector",
     path="/Game/TrapxTrap/UI"
 )
+
+# アニメーション確認
+get_widget_animations(
+    widget_name="WBP_TT_TrapSelector",
+    path="/Game/TrapxTrap/UI"
+)
 ```
 
 ---
 
 ## 次のステップ候補
 
-1. **RenderTransform トラック対応**
-   - `add_animation_track` を拡張
-   - Translation（移動）、Scale（拡大縮小）、Angle（回転）
-
-2. **配列デフォルト値設定**
+1. **配列デフォルト値設定**
    - `set_widget_array_default` ツール追加
    - 配列の初期値を設定
+
+2. **Phase 4 を開始**
+   - 動的 Widget 生成
+   - より複雑なノード操作
 
 3. **ゲーム開発に戻る**
    - TrapxTrap のトラップシステム実装
@@ -157,4 +200,4 @@ get_widget_elements(
 
 **作成日**: 2025-12-22
 **最終更新**: 2025-12-24
-**フェーズ**: UMG Phase 3 - Array Variables 完了
+**フェーズ**: UMG Phase 3 完了（21ツール + RenderTransform拡張）

@@ -82,7 +82,7 @@
 | ツール | 状態 | 備考 |
 |--------|------|------|
 | `create_widget_animation` | ✅ 実装完了 | アニメーション作成 |
-| `add_animation_track` | ✅ 実装完了 | トラック追加（Opacity/ColorAndOpacity） |
+| `add_animation_track` | ✅ 実装完了 | トラック追加（7プロパティ対応） |
 | `add_animation_keyframe` | ✅ 実装完了 | キーフレーム追加（Linear/Cubic/Constant） |
 | `get_widget_animations` | ✅ 実装完了 | アニメーション一覧取得 |
 
@@ -92,12 +92,29 @@
 |--------|------|------|
 | `add_widget_array_variable` | ✅ 実装完了 | 配列型変数追加（TArray<T>） |
 
+#### Phase 4-A: Interactive Widgets (4ツール)
+
+| ツール | 状態 | 備考 |
+|--------|------|------|
+| `add_button_to_widget` | ✅ 実装完了 | 新API（anchor/alignment/path対応）、V2内部コマンド |
+| `bind_widget_component_event` | ✅ 実装完了 | イベントバインディング（OnClicked/OnHovered等） |
+| `add_slider_to_widget` | ✅ 実装完了 | Slider追加（value/min/max/orientation対応） |
+| `add_checkbox_to_widget` | ✅ 実装完了 | CheckBox追加（label_text対応、HorizontalBoxコンテナ） |
+
+#### Phase 4-B: Additional Interactive Widgets (4ツール) 🆕
+
+| ツール | 状態 | 備考 |
+|--------|------|------|
+| `add_combobox_to_widget` | ✅ 実装完了 | ドロップダウン選択（options/selected_index対応） |
+| `add_editabletext_to_widget` | ✅ 実装完了 | テキスト入力（hint_text/password/multiline対応） |
+| `add_spinbox_to_widget` | ✅ 実装完了 | 数値入力（min/max/delta対応） |
+| `add_scrollbox_to_widget` | ✅ 実装完了 | スクロールコンテナ（orientation/visibility対応） |
+
 #### 旧API（参考）
 
 | ツール | 状態 | 備考 |
 |--------|------|------|
 | `add_text_block_to_widget` | 🔲 未確認 | 旧API |
-| `add_button_to_widget` | 🔲 未確認 | 旧API |
 | `bind_widget_event` | 🔲 未確認 | 旧API |
 | `add_widget_to_viewport` | 🔲 未確認 | 旧API |
 | `set_text_block_binding` | 🔲 未確認 | 旧API |
@@ -211,11 +228,85 @@
 
 ## 最新の更新履歴
 
-### 2025-12-24: UMG Phase 3 Animation & Array Variables 完了 - 21ツール到達
+### 2025-12-25: UMG Phase 4-B 完了 - 29ツール（Additional Interactive Widgets 4ツール追加）🆕
+
+**完了機能**:
+- UMG Widget Blueprint 操作ツール Phase 4-B 実装完了
+- 合計29ツール実装
+
+**Phase 4-B: Additional Interactive Widgets (4ツール)**:
+- `add_combobox_to_widget` - ドロップダウン選択（UComboBoxString使用）
+- `add_editabletext_to_widget` - テキスト入力フィールド（UEditableTextBox使用）
+- `add_spinbox_to_widget` - 数値入力（+/-ボタン付き）
+- `add_scrollbox_to_widget` - スクロール可能コンテナ
+
+**テスト結果**:
+- add_combobox_to_widget ✅ DifficultyCombo (TopCenter、4オプション、Normal選択)
+- add_editabletext_to_widget ✅ PlayerNameInput (Center、プレースホルダー付き)
+- add_spinbox_to_widget ✅ VolumeSpinBox (BottomCenter、0-100範囲、ステップ5)
+- add_scrollbox_to_widget ✅ LogScrollBox (MiddleRight、縦スクロール)
+
+**ドキュメント**:
+- `Docs/UMGPhase4B_Prompt.md` - 実装プロンプト
+
+**次の実装候補（Phase 4-C/5）**:
+- ListView（動的リスト表示）
+- TileView（タイル表示）
+- Border（背景付きコンテナ）
+- Overlay（重ね合わせコンテナ）
+
+---
+
+### 2025-12-25: UMG Phase 4-A 完了 - 25ツール（Interactive Widgets 4ツール追加）
+
+**完了機能**:
+- UMG Widget Blueprint 操作ツール Phase 4-A 実装完了
+- 合計25ツール実装
+
+**Phase 4-A: Interactive Widgets (4ツール)**:
+- `add_button_to_widget` - 新API Button追加（anchor/alignment/path対応）
+- `bind_widget_component_event` - イベントバインディング（OnClicked/OnPressed/OnReleased/OnHovered/OnUnhovered/OnValueChanged）
+- `add_slider_to_widget` - Slider追加（value/min_value/max_value/step_size/orientation対応）
+- `add_checkbox_to_widget` - CheckBox追加（label_text対応、HorizontalBoxコンテナ自動生成）
+
+**サポートするイベントタイプ**:
+| イベント | 対応ウィジェット | 説明 |
+|----------|----------------|------|
+| `OnClicked` | Button | クリック時 |
+| `OnPressed` | Button | 押下時 |
+| `OnReleased` | Button | リリース時 |
+| `OnHovered` | Button | ホバー開始 |
+| `OnUnhovered` | Button | ホバー終了 |
+| `OnValueChanged` | Slider, CheckBox | 値変更時 |
+
+**テスト結果**:
+- add_slider_to_widget ✅ VolumeSlider (BottomCenter配置)
+- add_checkbox_to_widget ✅ MuteCheckbox + Label (HorizontalBoxコンテナ)
+- add_button_to_widget (V2) ✅ StartButton + Text (Center配置)
+- bind_widget_component_event ✅ OnClicked → HandleStartButtonClicked
+
+**修正内容**:
+- SpirrowBridge.cpp: Phase 4-A コマンドルーティング追加
+- umg_tools.py: 旧add_button_to_widget定義削除（重複解消）
+
+**ドキュメント**:
+- `Docs/UMGPhase4A_Prompt.md` - 実装プロンプト
+- `Docs/UMGPhase4A_Fix_Prompt.md` - 修正プロンプト
+
+**次の実装予定（Phase 4-B候補）**:
+- ComboBox（ドロップダウン選択）
+- EditableText（テキスト入力フィールド）
+- SpinBox（数値入力）
+- ListView（リスト表示）
+- ScrollBox（スクロール可能コンテナ）
+
+---
+
+### 2025-12-24: UMG Phase 3 完了 - 21ツール + RenderTransform拡張
 
 **完了機能**:
 - UMG Widget Blueprint 操作ツール Phase 1-3 実装完了
-- 合計21ツール実装
+- 合計21ツール実装 + RenderTransformアニメーション拡張
 
 **Phase 1: Designer操作 (11ツール)**:
 - `create_umg_widget_blueprint` - Widget Blueprint作成
@@ -239,31 +330,33 @@
 
 **Phase 3: Animation (4ツール)**:
 - `create_widget_animation` - アニメーション作成
-- `add_animation_track` - トラック追加（Opacity/ColorAndOpacity）
+- `add_animation_track` - トラック追加（7プロパティ対応）
 - `add_animation_keyframe` - キーフレーム追加（Linear/Cubic/Constant）
 - `get_widget_animations` - アニメーション一覧取得
 
-**Phase 3: Array Variables (1ツール)** ← NEW:
+**Phase 3: Array Variables (1ツール)**:
 - `add_widget_array_variable` - 配列型変数追加（TArray<T>）
-  - 対応型: String, Integer, Float, Text, Vector, Vector2D, LinearColor, Texture2D, Object
-  - is_exposed オプションでエディタ公開対応
-  - 重複変数チェック機能
+
+**サポートするアニメーションプロパティ**:
+| プロパティ | 値の形式 | 用途 |
+|-----------|---------|------|
+| `Opacity` / `RenderOpacity` | float (0-1) | フェード |
+| `ColorAndOpacity` | [R,G,B,A] | 色変化 |
+| `RenderTransform.Translation.X` | float (px) | 横移動 |
+| `RenderTransform.Translation.Y` | float (px) | 縦移動 |
+| `RenderTransform.Scale.X` | float | 横スケール |
+| `RenderTransform.Scale.Y` | float | 縦スケール |
+| `RenderTransform.Angle` | float (度) | 回転 |
 
 **テスト結果**:
-- TrapNames (String配列) ✅
-- TrapCounts (Integer配列) ✅
-- TrapIcons (Texture2D配列, exposed) ✅
-- TrapColors (LinearColor配列) ✅
-- 重複エラー検出 ✅
+- SlideInX (Translation.X) ✅
+- PopIn (Scale.X/Y) ✅
+- Spin (Angle) ✅
+- 配列変数 (String/Integer/Texture2D/LinearColor) ✅
 
 **ドキュメント**:
 - `Docs/UMGPhase3_Handover_Prompt.md` - 引き継ぎドキュメント
-- `Docs/UMGPhase3_Continue_Prompt.md` - 継続プロンプト
-- `Docs/UMGPhase3_ArrayVariable_Prompt.md` - 配列変数実装プロンプト（完了）
-
-**次の実装予定**:
-1. RenderTransform トラック - Translation/Scale/Angle対応
-2. `set_widget_array_default` - 配列デフォルト値設定
+- `Docs/UMGPhase3_RenderTransform_Prompt.md` - RenderTransform実装プロンプト（完了）
 
 ---
 
@@ -290,19 +383,6 @@
   - 意味検索による関連テンプレート検索
   - カテゴリ・タグによる分類
 
-**RAG内部関数**:
-- 非同期ツールから同期的にRAGアクセス可能にする内部関数を追加
-  - `search_knowledge_internal`: 同期版RAG検索
-  - `add_knowledge_internal`: 同期版ナレッジ追加
-  - `delete_knowledge_internal`: 同期版ナレッジ削除
-
-**マテリアル作成機能**:
-- Shading Model: DefaultLit（標準）、Unlit（ライティングなし）
-- Blend Mode: Opaque（不透明）、Translucent（半透明）、Masked（マスク）
-- Base Color、Emissive Color、Opacity設定
-- Two Sided（両面描画）対応
-- MaterialExpressionノード自動作成
-
 **使用例**:
 ```python
 # テンプレート一覧取得
@@ -318,431 +398,13 @@ create_material_from_template(
         "opacity": 0.3
     }
 )
-
-# 詳細設定でマテリアル作成
-create_simple_material(
-    name="M_Glow",
-    path="/Game/Materials",
-    shading_model="Unlit",
-    blend_mode="Translucent",
-    emissive_color=[1.0, 0.5, 0.0],
-    emissive_strength=5.0,
-    opacity=0.8
-)
-
-# カスタムテンプレートをRAGに保存
-save_material_template(
-    name="glass",
-    description="透明ガラスマテリアル",
-    template_data={
-        "shading_model": "DefaultLit",
-        "blend_mode": "Translucent",
-        "base_color": [0.9, 0.95, 1.0],
-        "opacity": 0.2,
-        "two_sided": true
-    },
-    category="materials"
-)
 ```
-
-**変更範囲**:
-- Python tools/material_tools.py: 新規作成（6 MCPツール、446行）
-- Python tools/rag_tools.py: RAG内部関数追加（search/add/delete_knowledge_internal）
-- Python unreal_mcp_server.py: register_material_tools追加
-- C++ SpirrowBridgeMaterialCommands.h/.cpp: 新規作成（HandleCreateSimpleMaterial実装）
-- C++ SpirrowBridge.h/.cpp: MaterialCommandsメンバー追加、ルーティング追加
-- templates/materials/*.json: 5つのビルトインテンプレート追加
-
-**技術詳細**:
-- UMaterialFactoryNew による Material 生成
-- MaterialExpressionConstant3Vector（BaseColor/EmissiveColor）
-- MaterialExpressionConstant（Opacity）
-- GetEditorOnlyData()->BaseColor/EmissiveColor/Opacity への接続
-- MSM_Unlit/MSM_DefaultLit によるシェーディングモデル設定
-- BLEND_Opaque/BLEND_Translucent/BLEND_Masked によるブレンドモード設定
-
-### 2025-12-20: UMG Widget Tools 拡張 - Text/Image/ProgressBar追加
-
-**新機能**:
-- UMG Widget操作ツールを3つ追加
-  - `add_text_to_widget`: Text要素追加（アンカー・フォントサイズ・色設定対応）
-  - `add_image_to_widget`: Image要素追加（テクスチャ・サイズ・色調設定対応）
-  - `add_progressbar_to_widget`: ProgressBar追加（パーセント・色・背景色設定対応）
-
-**9ポジションアンカーシステム**:
-- 全ツールで統一された9つのアンカープリセット対応
-  - TopLeft, TopCenter, TopRight
-  - CenterLeft, Center, CenterRight
-  - BottomLeft, BottomCenter, BottomRight
-
-**ProgressBar機能詳細**:
-- Fill Color（進捗バーの色）設定
-- Background Color（背景色）設定
-- Percent（初期値）設定
-- WidgetStyle による色設定
-
-**変更範囲**:
-- Python tools/umg_tools.py: 3ツール追加（add_text_to_widget, add_image_to_widget, add_progressbar_to_widget）
-- C++ SpirrowBridgeUMGCommands.h/.cpp: 3ハンドラ実装
-- C++ SpirrowBridge.cpp: ルーティング追加
-
-### 2025-12-16: Widget Blueprint 対応 - create_blueprint で UUserWidget 親クラスをサポート
-
-**新機能**:
-- `create_blueprint` コマンドで UUserWidget を親クラスとして指定可能に
-- Widget Blueprint の自動生成に対応
-- UUserWidget 派生クラス（カスタムWidget基底クラス）にも対応
-
-**親クラス検索の強化**:
-- Method 1: UserWidget および UUserWidget の直接参照に対応
-- Method 2: U プレフィックス付きクラスの TObjectIterator 検索を追加
-- Method 3: LoadClass<AActor> から LoadObject<UClass> への変更により、非Actor系クラスをサポート
-- /Script/UMG モジュールパスの追加
-
-**Blueprint タイプ判定**:
-- 親クラスが UUserWidget を継承している場合、UWidgetBlueprintFactory を使用
-- それ以外の場合、従来通り UBlueprintFactory を使用
-
-**使用例**:
-```python
-# UUserWidget ベースの Widget Blueprint を作成
-create_blueprint(
-    name="WBP_MainMenu",
-    parent_class="UserWidget",  # または "UUserWidget"
-    path="/Game/UI"
-)
-
-# カスタム Widget 基底クラスから派生
-create_blueprint(
-    name="WBP_Crosshair",
-    parent_class="CrosshairWidget",  # プロジェクト内の UUserWidget 派生クラス
-    path="/Game/UI/HUD"
-)
-```
-
-**変更範囲**:
-- C++ SpirrowBridgeBlueprintCommands.cpp: HandleCreateBlueprint 関数を更新
-  - 親クラス検索ロジックの拡張（U プレフィックス対応）
-  - Widget Blueprint 作成分岐の追加
-- インクルード追加: Blueprint/WidgetBlueprint.h, WidgetBlueprintFactory.h
-- Build.cs: UMGEditor モジュール依存は既に存在（変更不要）
-
-**技術詳細**:
-- UWidgetBlueprintFactory による Widget Blueprint 生成
-- IsChildOf(UUserWidget::StaticClass()) による型判定
-- 複数の検索メソッド（StaticClass、TObjectIterator、LoadObject）による堅牢な親クラス解決
-
-**下位互換性**:
-- Actor系 Blueprint の作成動作は変更なし
-- 既存コードへの影響なし
-
-### 2025-12-15: GAS Phase 1-B - GAS アセット一覧取得機能
-
-**新機能**:
-- GAS関連アセットの一覧取得機能を追加
-  - `list_gas_assets`: プロジェクト内のGameplayEffect、GameplayAbility、GameplayCue、AttributeSetを検索
-
-**対応アセットタイプ**:
-- GameplayEffect Blueprints
-- GameplayAbility Blueprints
-- GameplayCue actors and notifies
-- AttributeSet classes
-
-**主な機能**:
-- アセットタイプフィルタリング（effect/ability/cue/attribute_set/all）
-- コンテンツパスフィルタリング（再帰的検索）
-- クラス階層走査によるGASアセット識別
-- 各アセットの詳細情報取得（名前、パス、クラス、タイプ、親クラス）
-
-**使用例**:
-```python
-# 全GASアセット一覧
-list_gas_assets()
-
-# GameplayEffectのみ
-list_gas_assets(asset_type="effect")
-
-# 特定フォルダ配下
-list_gas_assets(asset_type="ability", path_filter="/Game/Abilities/")
-```
-
-**変更範囲**:
-- Python gas_tools.py: list_gas_assets ツール追加
-- C++ SpirrowBridgeGASCommands: HandleListGASAssets 実装
-- C++ SpirrowBridge: コマンドルーティング更新
-- C++ SpirrowBridge.Build.cs: GameplayAbilities モジュール依存追加
-
-**技術詳細**:
-- AssetRegistry を使用したBlueprint検索
-- クラス階層走査による型判定（Contains チェック）
-- アセットロードによる親クラス取得
-
-### 2025-12-15: GAS Phase 1-A - Gameplay Tags 管理機能
-
-**新機能**:
-- Gameplay Tags の管理機能を追加（DefaultGameplayTags.ini 操作）
-  - `add_gameplay_tags`: 複数のタグを一括追加、コメント設定対応
-  - `list_gameplay_tags`: 全タグの一覧取得、プレフィックスフィルタ対応
-  - `remove_gameplay_tag`: 指定したタグを削除
-
-**INI フォーマット対応**:
-- `+GameplayTagList=(Tag="TagName",DevComment="Comment")` 形式の解析と書き込み
-- 既存タグの保持（追加時の重複チェック）
-- セクション `[/Script/GameplayTags.GameplayTagsSettings]` の自動作成
-
-**主な用途**:
-- GAS（Gameplay Ability System）の Gameplay Tags 定義
-- タグの階層構造管理（例: `Ability.Attack.Melee`, `Ability.Attack.Range`）
-- タグへのコメント追加による設計意図の記録
-
-**使用例**:
-```python
-# タグを追加（コメント付き）
-add_gameplay_tags(
-    tags=["Ability.Attack.Melee", "Ability.Attack.Range", "State.Dead"],
-    comments={
-        "Ability.Attack.Melee": "近接攻撃アビリティ",
-        "Ability.Attack.Range": "遠距離攻撃アビリティ",
-        "State.Dead": "死亡状態タグ"
-    }
-)
-
-# プレフィックスでフィルタして一覧取得
-list_gameplay_tags(filter_prefix="Ability.Attack")
-
-# タグを削除
-remove_gameplay_tag(tag="State.Dead")
-```
-
-**変更範囲**:
-- C++ SpirrowBridgeGASCommands: 新規作成（ヘッダー・実装）
-- C++ SpirrowBridge: ルーティング追加（ExecuteCommand、メンバー変数、初期化・クリーンアップ）
-- Python gas_tools.py: 新規作成
-- Python unreal_mcp_server.py: register_gas_tools追加
-
-**技術詳細**:
-- INI ファイル直接操作（FFileHelper による読み書き）
-- 正規表現を使わない文字列パース（Tag/DevComment 抽出）
-- 既存タグの TSet による重複管理
-
-### 2025-12-15: Config（ini）ファイル操作対応
-
-**新機能**:
-- プロジェクト設定ファイル（.ini）の読み書きをMCP経由で実行可能に
-  - `get_config_value`: 設定値の取得
-  - `set_config_value`: 設定値の変更
-  - `list_config_sections`: セクション一覧取得
-
-**対応ファイル**:
-- DefaultEngine.ini
-- DefaultGame.ini
-- DefaultEditor.ini
-- DefaultInput.ini
-
-**主な用途**:
-- デフォルトGameModeの設定
-- マップ設定の変更
-- プロジェクト設定の自動化
-
-**使用例**:
-```python
-# デフォルトGameModeを設定
-set_config_value(
-    section="/Script/EngineSettings.GameMapsSettings",
-    key="GlobalDefaultGameMode",
-    value="/Game/MyGame/BP_GameMode.BP_GameMode_C"
-)
-
-# 現在の設定を取得
-get_config_value(
-    section="/Script/EngineSettings.GameMapsSettings",
-    key="GlobalDefaultGameMode"
-)
-
-# セクション一覧を取得
-list_config_sections(config_file="DefaultEngine")
-```
-
-**変更範囲**:
-- C++ SpirrowBridgeConfigCommands: 新規作成（ヘッダー・実装）
-- C++ SpirrowBridge: ルーティング追加（ExecuteCommand、メンバー変数）
-- Python config_tools.py: 新規作成
-- Python unreal_mcp_server.py: register_config_tools追加
-
-**注意事項**:
-- Blueprintクラスをパスとして設定する場合は `_C` サフィックスが必要
-- 一部設定はエディタ再起動が必要
-
-### 2025-12-15: ObjectProperty（アセット参照）対応
-
-**新機能**:
-- `SetObjectProperty`関数にアセット参照プロパティ対応を追加
-  - `FObjectProperty`: `TObjectPtr<T>` 型（例: `UInputAction`, `UStaticMesh`）
-  - `FSoftObjectProperty`: `TSoftObjectPtr<T>` 型（ソフト参照）
-  - `FClassProperty`: `TSubclassOf<T>` 型（クラス参照）
-
-**機能詳細**:
-- アセットパス指定でのプロパティ設定
-- 自動パス補完（`.AssetName` サフィックス自動追加）
-- 型検証（期待されるクラスとの互換性確認）
-- 空文字列またはnullで参照をクリア可能
-- 詳細なエラーメッセージ（型不一致、ロード失敗時）
-
-**対応ツール**:
-- `set_blueprint_property`
-- `set_actor_property`
-- `set_actor_component_property`
-- `set_component_property`
-
-**使用例**:
-```python
-# Input Mapping Context の設定
-set_blueprint_property(
-    blueprint_name="BP_PlayerCharacter",
-    property_name="DefaultMappingContext",
-    property_value="/Game/Input/IMC_Default.IMC_Default"
-)
-
-# Input Action の設定
-set_blueprint_property(
-    blueprint_name="BP_PlayerCharacter",
-    property_name="MoveAction",
-    property_value="/Game/Input/IA_Move.IA_Move"
-)
-
-# 参照をクリア
-set_blueprint_property(
-    blueprint_name="BP_PlayerCharacter",
-    property_name="MoveAction",
-    property_value=""  # または null
-)
-```
-
-**変更範囲**:
-- C++ SpirrowBridgeCommonUtils.cpp: SetObjectProperty関数に3つのプロパティタイプ対応を追加
-
-### 2025-12-15: get_blueprint_graph ツール追加
-
-**新機能**:
-- `get_blueprint_graph`: 既存Blueprintのノードグラフ構成を取得
-  - ノード一覧（ID、タイプ、クラス、タイトル、座標、ピン情報）
-  - ノード間の接続情報（ソース/ターゲットのノードID・ピン名）
-  - 変数一覧（名前、型、公開設定）
-  - コンポーネント一覧（名前、クラス）
-  - 親クラス情報
-  - pathパラメータ対応（デフォルト: /Game/Blueprints）
-
-**ノードタイプ判定**:
-- Event（K2Node_Event）
-- Function（K2Node_CallFunction）
-- VariableGet/VariableSet（K2Node_VariableGet/Set）
-- Other（その他のノード）
-
-**変更範囲**:
-- Python blueprint_tools.py: get_blueprint_graph追加
-- C++ SpirrowBridgeBlueprintCommands: HandleGetBlueprintGraph実装
-- ルーティング追加: HandleCommand、SpirrowBridge.cpp ExecuteCommand
-
-### 2025-12-15: duplicate_blueprint & rename_actor ツール追加
-
-**新機能**:
-- `duplicate_blueprint`: 既存Blueprintを複製する機能
-  - ソース・複製先のパス指定対応（デフォルト: /Game/Blueprints）
-  - AssetToolsモジュールを使用した安全な複製
-  - 既存アセットチェックとエラーハンドリング
-- `rename_actor`: レベル内のアクター名を変更する機能
-  - ActorLabelとNameの両方で検索
-
-**変更範囲**:
-- Python blueprint_tools.py: duplicate_blueprint追加
-- Python editor_tools.py: rename_actor追加
-- C++ SpirrowBridgeBlueprintCommands: HandleDuplicateBlueprint実装、AssetToolsモジュール追加
-- C++ SpirrowBridgeEditorCommands: HandleRenameActor実装
-- ルーティング追加: SpirrowBridge.cpp ExecuteCommand更新
-
-### 2025-12-15: set_actor_property 分離 & rationale 自動蓄積機能
-
-**新機能**:
-- `set_actor_component_property`: アクターのコンポーネントプロパティ設定用の専用ツール
-- `rationale` パラメータ: 設計判断の自動RAG蓄積機能
-  - 対応ツール: create_blueprint, add_component_to_blueprint, set_physics_properties, spawn_actor, add_blueprint_event_node, add_blueprint_function_node, add_blueprint_variable, set_actor_property, set_actor_component_property
-
-**変更**:
-- `set_actor_property`: コンポーネント指定機能を分離、アクター自体のプロパティ専用に
-- RAGサーバー接続: 環境変数 `RAG_SERVER_URL` で設定可能
-
-**変更範囲**:
-- Python editor_tools.py: set_actor_property分離、set_actor_component_property追加
-- Python blueprint_tools.py: rationaleパラメータ追加（3ツール）
-- Python node_tools.py: rationaleパラメータ追加（3ツール）
-- Python rag_tools.py: record_rationale関数追加
-- AGENTS.md: rationale使用ガイド追加
-
-### 2025-12-14: SSE Transport サポート & spawn_blueprint_actor 修正
-
-**新機能**:
-- SSE（Server-Sent Events）トランスポートサポート追加
-  - 開発時のMCPサーバー再起動が容易に（Claude Desktop再起動不要）
-  - `--sse` オプションでSSEモード起動
-  - `--port=XXXX` でカスタムポート指定可能
-- SSE用起動スクリプト追加
-  - `start_mcp_server_sse.bat`（コマンドプロンプト用）
-  - `start_mcp_server_sse.ps1`（PowerShell用）
-
-**バグ修正**:
-- `spawn_blueprint_actor`: pathパラメータがC++側で無視されていた問題を修正
-- `create_input_mapping_context`: 既存アセットチェック追加（UEクラッシュ防止）
-
-**変更範囲**:
-- Python unreal_mcp_server.py: SSE/stdioトランスポート切り替え対応
-- C++ SpirrowBridgeEditorCommands.cpp: HandleSpawnBlueprintActorにpathパラメータ追加
-- C++ SpirrowBridgeProjectCommands.cpp: HandleCreateInputMappingContextに既存チェック追加
-- 新規: start_mcp_server_sse.bat, start_mcp_server_sse.ps1
-- README.md: SSEモードのドキュメント追加
-- FEATURE_STATUS.md: ステータス更新
-
-### 2025-12-14: ナレッジアシスタント実装 & バグ修正
-
-**新機能**:
-- `scan_project_classes`: プロジェクト内C++クラス/Blueprint一覧取得
-  - 親クラス・モジュール・パスフィルタ対応
-  - Blueprintタイプフィルタ（Actor/Widget/Anim/Interface等）
-  - REINST_*クラス（Live Coding一時クラス）自動除外
-- `find_relevant_nodes`: やりたいことから関連ノード/クラスを検索
-  - RAGナレッジ検索とプロジェクトクラススキャンを統合
-  - 日本語・英語キーワード自動抽出（30+マッピング）
-  - スマート親クラスフィルタリング
-
-**バグ修正**:
-- `find_relevant_nodes`: async関数を同期関数に変更（httpx → requests）
-- `find_relevant_nodes`: `scan_project_classes`レスポンス解析を修正
-- `create_input_action`: 既存アセットチェック追加（UEクラッシュ防止）
-
-**変更範囲**:
-- C++ SpirrowBridgeBlueprintCommands: `HandleScanProjectClasses`実装
-- C++ SpirrowBridgeProjectCommands: `HandleCreateInputAction`に既存チェック
-- Python knowledge_tools.py: 新規作成（UEクラスマッピング、find_relevant_nodes実装）
-- Python pyproject.toml: httpx依存追加（後にrequests使用に変更）
-- README.md: ナレッジアシスタント機能セクション追加
-
-### 2025-12-14: 全Blueprint関連ツールにpathパラメータ追加
-
-全てのBlueprint関連ツール（26個のツール）にpathパラメータを追加し、カスタムフォルダでのBlueprint操作を可能にしました。
-
-**変更範囲**:
-- C++共通ユーティリティ: FindBlueprint/FindBlueprintByName関数にpath引数追加
-- C++ Blueprint Commands: 6ハンドラ更新
-- C++ Blueprint Node Commands: 8ハンドラ更新
-- Python blueprint_tools.py: 4ツール更新
-- Python node_tools.py: 8ツール更新
-
-**デフォルト動作**: pathパラメータ省略時は従来通り `/Game/Blueprints` を使用するため、既存コードとの互換性を保持
 
 ---
 
 ## テスト環境
 
-- **Unreal Engine**: 5.5+
+- **Unreal Engine**: 5.5+ / 5.7
 - **プロジェクト**: TrapxTrapCpp
 - **RAGサーバー**: AIサーバー :8100
 - **Embedding**: BGE-M3
@@ -750,7 +412,7 @@ set_blueprint_property(
 - **トランスポート**: stdio（デフォルト）/ SSE（開発用）
 - **起動スクリプト**: start_mcp_server.ps1 / start_mcp_server.bat
 - **設定管理**: config.local.ps1 / config.local.bat（環境固有設定）
-- **最終確認日**: 2025-12-15
+- **最終確認日**: 2025-12-25
 
 ---
 
@@ -764,3 +426,4 @@ set_blueprint_property(
 | 🔲 | 未確認 |
 | 📋 | 計画中 |
 | 💡 | アイデア段階 |
+| 🆕 | 新規追加 |

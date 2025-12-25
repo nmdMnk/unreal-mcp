@@ -17,21 +17,32 @@
 **Phase 2 (変数・関数)**: 5ツール ✅
 **Phase 3 (Animation)**: 4ツール ✅
 - `create_widget_animation` - アニメーション作成
-- `add_animation_track` - Opacity/ColorAndOpacity トラック追加
+- `add_animation_track` - トラック追加（全7プロパティ対応）
 - `add_animation_keyframe` - キーフレーム追加（Linear/Cubic/Constant）
 - `get_widget_animations` - アニメーション一覧取得
 
-**Phase 3 (Array Variables)**: 1ツール ✅ NEW
+**Phase 3 (Array Variables)**: 1ツール ✅
 - `add_widget_array_variable` - 配列型変数追加（TArray<T>）
 
 **合計: 21ツール実装完了**
 
+### サポートするアニメーションプロパティ
+
+| プロパティ | 値の形式 | 用途 |
+|-----------|---------|------|
+| `Opacity` / `RenderOpacity` | float (0-1) | フェード |
+| `ColorAndOpacity` | [R,G,B,A] | 色変化 |
+| `RenderTransform.Translation.X` | float (px) | 横移動 |
+| `RenderTransform.Translation.Y` | float (px) | 縦移動 |
+| `RenderTransform.Scale.X` | float | 横スケール |
+| `RenderTransform.Scale.Y` | float | 縦スケール |
+| `RenderTransform.Angle` | float (度) | 回転 |
+
 ### Phase 3 残り機能（未実装）
 
-| 優先度 | ツール | 説明 | プロンプト |
-|--------|--------|------|-----------|
-| 1️⃣ | RenderTransform トラック | Translation/Scale/Angle 対応 | 未作成 |
-| 2️⃣ | `set_widget_array_default` | 配列デフォルト値設定 | 未作成 |
+| 優先度 | ツール | 説明 |
+|--------|--------|------|
+| 低 | `set_widget_array_default` | 配列デフォルト値設定 |
 
 ---
 
@@ -43,6 +54,7 @@
 | `Docs/UMGPhase3_AnimationTrack_Prompt.md` | Animation Track 詳細 | ✅ |
 | `Docs/UMGPhase3_GetWidgetAnimations_Prompt.md` | アニメーション一覧取得 | ✅ 実装完了 |
 | `Docs/UMGPhase3_ArrayVariable_Prompt.md` | 配列型変数追加 | ✅ 実装完了 |
+| `Docs/UMGPhase3_RenderTransform_Prompt.md` | RenderTransformアニメーション | ✅ 実装完了 |
 | `Docs/UMGPhase3_Handover_Prompt.md` | 引き継ぎドキュメント | ✅ |
 
 ---
@@ -54,29 +66,37 @@
 get_project_context("SpirrowUnrealWise")
 ```
 
-2. 残り機能から実装を選択
+2. 残り機能または次フェーズを選択
 
 ---
 
-## 次に実装推奨
+## アニメーション使用例
 
-### オプション A: RenderTransform トラック対応
+### スライドイン
 
-`add_animation_track` を拡張して以下をサポート:
-- `RenderTransform.Translation` - [X, Y] 移動
-- `RenderTransform.Scale` - [X, Y] 拡大縮小
-- `RenderTransform.Angle` - float (度) 回転
-
-### オプション B: set_widget_array_default
-
-配列変数のデフォルト値を設定するツール:
 ```python
-set_widget_array_default(
-    widget_name="WBP_TT_TrapSelector",
-    variable_name="TrapNames",
-    default_values=["Explosion", "Spike", "Freeze"],
-    path="/Game/TrapxTrap/UI"
-)
+create_widget_animation(widget_name="WBP_Test", animation_name="SlideIn", length=0.3)
+add_animation_track(..., property_name="RenderTransform.Translation.X")
+add_animation_keyframe(..., time=0.0, value=-200.0)
+add_animation_keyframe(..., time=0.3, value=0.0, interpolation="Cubic")
+```
+
+### ポップイン（スケール）
+
+```python
+add_animation_track(..., property_name="RenderTransform.Scale.X")
+add_animation_track(..., property_name="RenderTransform.Scale.Y")
+add_animation_keyframe(..., property_name="RenderTransform.Scale.X", time=0.0, value=0.0)
+add_animation_keyframe(..., property_name="RenderTransform.Scale.X", time=0.3, value=1.0)
+# Scale.Y も同様
+```
+
+### 回転
+
+```python
+add_animation_track(..., property_name="RenderTransform.Angle")
+add_animation_keyframe(..., time=0.0, value=0.0)
+add_animation_keyframe(..., time=0.5, value=360.0)
 ```
 
 ---
@@ -87,6 +107,7 @@ set_widget_array_default(
 - UE 5.7 では `TArray64<uint8>` が必要な箇所あり
 - 非推奨 API は `PRAGMA_DISABLE_DEPRECATION_WARNINGS` で抑制済み
 - 配列変数は `ContainerType = EPinContainerType::Array` で設定
+- RenderTransform は個別 Float トラックとして実装
 
 ---
 
