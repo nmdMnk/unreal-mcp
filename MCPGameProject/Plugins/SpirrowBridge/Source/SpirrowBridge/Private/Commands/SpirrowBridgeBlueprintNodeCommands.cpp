@@ -2098,8 +2098,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddForLoopWit
     MacroNode->SetMacroGraph(MacroGraph);
     MacroNode->NodePosX = NodePosition.X;
     MacroNode->NodePosY = NodePosition.Y;
-    MacroNode->AllocateDefaultPins();
     EventGraph->AddNode(MacroNode, false, false);
+    MacroNode->CreateNewGuid();
+    MacroNode->PostPlacedNewNode();
+    MacroNode->AllocateDefaultPins();
 
     // FirstIndex と LastIndex のデフォルト値を設定
     UEdGraphPin* FirstIndexPin = MacroNode->FindPin(TEXT("FirstIndex"));
