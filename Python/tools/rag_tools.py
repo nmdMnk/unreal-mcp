@@ -162,32 +162,33 @@ def delete_knowledge_internal(doc_id: str) -> Dict[str, Any]:
 def get_project_context_internal(project_name: str) -> Optional[Dict[str, Any]]:
     """
     プロジェクトコンテキストを取得する内部関数。
-    カテゴリ `project-context:{project_name}` で検索し、最新1件を返す。
+    doc_id `project_context_{project_name}` で直接検索する。
     """
-    category = f"project-context:{project_name}"
+    target_id = f"project_context_{project_name}"
     try:
-        url = f"{RAG_SERVER_URL}/knowledge/search"
-        payload = {
-            "query": project_name,
-            "n_results": 1,
-            "category": category
-        }
-        
-        response = requests.post(url, json=payload, timeout=10)
-        response.raise_for_status()
-        
+        # list API で全エントリを取得し、IDでフィルタ
+        url = f"{RAG_SERVER_URL}/knowledge/list"
+        response = requests.get(url, timeout=10)
+
+        if not response.ok:
+            logger.warning(f"Failed to list knowledge: {response.status_code}")
+            return None
+
         data = response.json()
-        results = data.get("results", [])
-        
-        if results:
-            doc = results[0].get("document", "")
-            try:
-                return json.loads(doc)
-            except json.JSONDecodeError:
-                logger.warning(f"Failed to parse project context as JSON: {doc}")
-                return {"raw_content": doc}
+        items = data.get("items", [])
+
+        # IDが一致するエントリを検索
+        for item in items:
+            if item.get("id") == target_id:
+                doc = item.get("document", "")
+                try:
+                    return json.loads(doc)
+                except json.JSONDecodeError:
+                    logger.warning(f"Failed to parse project context as JSON: {doc}")
+                    return {"raw_content": doc}
+
         return None
-        
+
     except Exception as e:
         logger.error(f"get_project_context_internal error: {e}")
         return None
@@ -196,34 +197,20 @@ def get_project_context_internal(project_name: str) -> Optional[Dict[str, Any]]:
 def delete_project_context_internal(project_name: str) -> bool:
     """
     既存のプロジェクトコンテキストを削除する内部関数。
-    list_knowledge APIを使用してカテゴリでフィルタリングし、該当IDを削除。
+    doc_idで直接削除する。
     """
-    target_category = f"project-context:{project_name}"
+    doc_id = f"project_context_{project_name}"
     try:
-        # list_knowledge で全エントリを取得
-        url = f"{RAG_SERVER_URL}/knowledge/list"
-        response = requests.get(url, timeout=10)
-        if not response.ok:
+        url = f"{RAG_SERVER_URL}/knowledge/{doc_id}"
+        response = requests.delete(url, timeout=10)
+
+        if response.ok:
+            logger.info(f"Deleted project context: {doc_id}")
+            return True
+        else:
+            logger.warning(f"Failed to delete project context: {response.status_code}")
             return False
-            
-        data = response.json()
-        items = data.get("items", [])
-        
-        # カテゴリが一致するエントリを削除
-        deleted_count = 0
-        for item in items:
-            item_category = item.get("metadata", {}).get("category", "")
-            if item_category == target_category:
-                doc_id = item.get("id")
-                if doc_id:
-                    delete_url = f"{RAG_SERVER_URL}/knowledge/{doc_id}"
-                    requests.delete(delete_url, timeout=5)
-                    logger.info(f"Deleted old context: {doc_id}")
-                    deleted_count += 1
-        
-        logger.info(f"Deleted {deleted_count} old context entries for {project_name}")
-        return True
-        
+
     except Exception as e:
         logger.error(f"delete_project_context_internal error: {e}")
         return False
@@ -551,12 +538,17 @@ def register_rag_tools(mcp: FastMCP):
                 next_tasks=["解除キャンセル処理"]
             )
         """
-        category = f"project-context:{project_name}"
-        
+        doc_id = f"project_context_{project_name}"
+
         try:
-            # 1. 既存のコンテキストを削除
-            delete_project_context_internal(project_name)
-            
+            # 1. 既存のコンテキストを削除（IDで直接削除）
+            delete_url = f"{RAG_SERVER_URL}/knowledge/{doc_id}"
+            try:
+                requests.delete(delete_url, timeout=5)
+                logger.info(f"Deleted existing context: {doc_id}")
+            except Exception:
+                pass  # 存在しない場合は無視
+
             # 2. 新しいコンテキストを作成
             context_data = {
                 "project_name": project_name,
@@ -567,30 +559,32 @@ def register_rag_tools(mcp: FastMCP):
                 "notes": notes or "",
                 "updated_at": datetime.now().isoformat()
             }
-            
-            # 3. RAGに保存
+
+            # 3. RAGに保存（固定のdoc_idを使用）
             document = json.dumps(context_data, ensure_ascii=False, indent=2)
-            
+
             url = f"{RAG_SERVER_URL}/knowledge/add"
             payload = {
                 "document": document,
-                "category": category,
-                "tags": f"project,context,{project_name}"
+                "category": "project-context",
+                "tags": f"project,context,{project_name}",
+                "id": doc_id  # 固定のdoc_idを指定
             }
-            
+
             response = requests.post(url, json=payload, timeout=10)
             response.raise_for_status()
-            
-            logger.info(f"Project context updated for {project_name}")
-            
+
+            logger.info(f"Project context updated for {project_name} with id {doc_id}")
+
             return {
                 "success": True,
                 "project_name": project_name,
                 "current_phase": current_phase,
                 "updated_at": context_data["updated_at"],
+                "doc_id": doc_id,
                 "message": f"Project context for '{project_name}' updated successfully"
             }
-            
+
         except Exception as e:
             error_msg = f"Failed to update project context: {e}"
             logger.error(error_msg)
