@@ -69,8 +69,8 @@
 | `add_print_string_node` | ✅ 動作OK | PrintStringノード追加（デバッグ用）|
 | `add_foreach_loop_node` | 🚫 非推奨 | Blueprintマクロのため実装不可。`add_forloop_with_break_node`使用 |
 | `add_forloop_with_break_node` | ✅ 実装済み | ForLoopWithBreakマクロノード追加（UE 5.7対応）|
-| `add_math_node` | ✅ 実装済み | Math演算ノード追加（UE 5.7 DoubleDouble対応）|
-| `add_comparison_node` | ✅ 実装済み | 比較ノード追加（UE 5.7 DoubleDouble対応）|
+| `add_math_node` | ✅ 動作OK | Math演算ノード追加（Add/Subtract/Multiply/Divide、Float/Int両対応）|
+| `add_comparison_node` | ✅ 動作OK | 比較ノード追加（Greater/Less/Equal等、Float/Int両対応）|
 
 ### UMG Widget操作
 
@@ -251,7 +251,21 @@
 
 ## 最新の更新履歴
 
-### 2025-01-26: Math/Comparison & ForLoopWithBreak 実装完了 🆕
+### 2026-01-01: Math/Comparisonノード動作確認完了 🆕
+
+**テスト結果**:
+- `add_math_node`: Float/Int両対応、Add/Subtract/Multiply/Divide全て動作OK
+- `add_comparison_node`: Float/Int両対応、Greater/Less/Equal/NotEqual/GreaterEqual/LessEqual全て動作OK
+- 変数→Mathノード接続: ピン名A, Bで接続OK
+- ノードツール合計20個中19個が動作OK（残り: ForEachLoopのみ非推奨）
+
+**実装方式**:
+- UK2Node_CallFunction + GET_FUNCTION_NAME_CHECKEDマクロで関数名をコンパイル時検証
+- UKismetMathLibraryの関数を直接呼び出し
+
+---
+
+### 2025-01-26: Math/Comparison & ForLoopWithBreak 実装完了
 
 **完了機能**:
 - Math/Comparisonノードの完全実装（UE 5.7対応）

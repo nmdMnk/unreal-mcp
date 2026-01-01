@@ -1896,13 +1896,15 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddMathNode(c
     MathNode->FunctionReference.SetExternalMember(MathFunction->GetFName(), UKismetMathLibrary::StaticClass());
     MathNode->NodePosX = NodePosition.X;
     MathNode->NodePosY = NodePosition.Y;
-    MathNode->AllocateDefaultPins();
     EventGraph->AddNode(MathNode, false, false);
+    MathNode->CreateNewGuid();
+    MathNode->PostPlacedNewNode();
+    MathNode->AllocateDefaultPins();
 
     // Blueprintをマーク
     FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
 
-    UE_LOG(LogTemp, Log, TEXT("Created math node: %s (%s)"), *Operation, *ValueType);
+    UE_LOG(LogTemp, Log, TEXT("Created math node: %s (%s), NodeGuid: %s"), *Operation, *ValueType, *MathNode->NodeGuid.ToString());
 
     // 結果を返す
     TSharedPtr<FJsonObject> ResultJson = MakeShareable(new FJsonObject());
@@ -2000,13 +2002,15 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintNodeCommands::HandleAddComparison
     CompareNode->FunctionReference.SetExternalMember(ComparisonFunction->GetFName(), UKismetMathLibrary::StaticClass());
     CompareNode->NodePosX = NodePosition.X;
     CompareNode->NodePosY = NodePosition.Y;
-    CompareNode->AllocateDefaultPins();
     EventGraph->AddNode(CompareNode, false, false);
+    CompareNode->CreateNewGuid();
+    CompareNode->PostPlacedNewNode();
+    CompareNode->AllocateDefaultPins();
 
     // Blueprintをマーク
     FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
 
-    UE_LOG(LogTemp, Log, TEXT("Created comparison node: %s (%s)"), *Operation, *ValueType);
+    UE_LOG(LogTemp, Log, TEXT("Created comparison node: %s (%s), NodeGuid: %s"), *Operation, *ValueType, *CompareNode->NodeGuid.ToString());
 
     // 結果を返す
     TSharedPtr<FJsonObject> ResultJson = MakeShareable(new FJsonObject());

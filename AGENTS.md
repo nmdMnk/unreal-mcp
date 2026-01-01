@@ -136,6 +136,13 @@ y = branch_index * 150
 | Vector | `Location`, `Direction` |
 | Actor | `Target`, `OtherActor` |
 
+### Math/Comparisonノードのピン
+
+| ノード種別 | 入力ピン | 出力ピン |
+|-----------|---------|----------|
+| Math (Add, Subtract, Multiply, Divide) | `A`, `B` | `ReturnValue` |
+| Comparison (Greater, Less, Equal等) | `A`, `B` | `ReturnValue` (Boolean) |
+
 ---
 
 ## エラーハンドリング
@@ -477,7 +484,8 @@ search_knowledge("質量 設定", category="physics")
 
 ## 更新履歴
 
-- 2025-12-25: 制御フロー・ユーティリティノードツール追加（add_sequence_node, add_delay_node, add_print_string_node）。Math/Comparison ノードは別実装が必要なため保留
+- 2026-01-01: Math/Comparisonノード動作確認完了。add_math_node (Add/Subtract/Multiply/Divide)、add_comparison_node (Greater/Less/Equal等) がFloat/Int両対応で動作OK。ピン名: A, B, ReturnValue
+- 2025-12-25: 制御フロー・ユーティリティノードツール追加（add_sequence_node, add_delay_node, add_print_string_node）
 - 2025-12-16: create_blueprint で UUserWidget を親クラスとして指定可能に。Widget Blueprint の自動生成に対応
 - 2025-12-15: GAS Phase 1-B 実装。GAS アセット一覧取得機能（list_gas_assets）を追加
 - 2025-12-15: GAS Phase 1-A 実装。Gameplay Tags 管理機能（add_gameplay_tags, list_gameplay_tags, remove_gameplay_tag）を追加
