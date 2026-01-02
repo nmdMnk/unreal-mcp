@@ -1789,7 +1789,7 @@ def register_umg_tools(mcp: FastMCP):
             }
 
             logger.info(f"Adding Button to widget with params: {params}")
-            response = unreal.send_command("add_button_to_widget_v2", params)
+            response = unreal.send_command("add_button_to_widget", params)
 
             if not response:
                 logger.error("No response from Unreal Engine")
