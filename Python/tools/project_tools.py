@@ -252,4 +252,130 @@ def register_project_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    @mcp.tool()
+    def add_mapping_context_to_blueprint(
+        ctx: Context,
+        blueprint_name: str,
+        context_name: str,
+        priority: int = 0,
+        context_path: str = "/Game/Input",
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Add AddMappingContext nodes to a Blueprint's BeginPlay.
+
+        Creates the following node chain:
+        BeginPlay → GetController → CastToPlayerController →
+        GetEnhancedInputLocalPlayerSubsystem → AddMappingContext
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            context_name: Name of the InputMappingContext (e.g., "IMC_Default")
+            priority: Mapping context priority (default: 0)
+            context_path: Path where the IMC asset is located
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Dict containing success status, created node IDs, and message
+
+        Example:
+            add_mapping_context_to_blueprint(
+                blueprint_name="BP_PlayerCharacter",
+                context_name="IMC_Default",
+                priority=0,
+                context_path="/Game/TrapxTrap/Input",
+                path="/Game/TrapxTrap/Blueprints/Characters"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "context_name": context_name,
+                "priority": priority,
+                "context_path": context_path,
+                "path": path
+            }
+
+            logger.info(f"Adding mapping context '{context_name}' to blueprint '{blueprint_name}'")
+            response = unreal.send_command("add_mapping_context_to_blueprint", params)
+
+            if not response:
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Add mapping context response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error adding mapping context to blueprint: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def set_default_mapping_context(
+        ctx: Context,
+        blueprint_name: str,
+        context_name: str,
+        priority: int = 0,
+        context_path: str = "/Game/Input",
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Set the default Input Mapping Context for a PlayerController or Character Blueprint.
+
+        For PlayerController: Sets DefaultMappingContexts property directly
+        For Character/Pawn: Uses add_mapping_context_to_blueprint internally
+
+        Args:
+            blueprint_name: Name of the target Blueprint (PlayerController or Character)
+            context_name: Name of the InputMappingContext (e.g., "IMC_Default")
+            priority: Mapping context priority (default: 0)
+            context_path: Path where the IMC asset is located
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Dict containing success status and message
+
+        Example:
+            set_default_mapping_context(
+                blueprint_name="BP_PlayerController",
+                context_name="IMC_Default",
+                context_path="/Game/TrapxTrap/Input",
+                path="/Game/TrapxTrap/Blueprints/Controllers"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "context_name": context_name,
+                "priority": priority,
+                "context_path": context_path,
+                "path": path
+            }
+
+            logger.info(f"Setting default mapping context '{context_name}' for blueprint '{blueprint_name}'")
+            response = unreal.send_command("set_default_mapping_context", params)
+
+            if not response:
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Set default mapping context response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error setting default mapping context: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("Project tools registered successfully") 

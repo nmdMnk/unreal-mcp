@@ -201,57 +201,41 @@ y = branch_index * 150
 5. compile_blueprint("BP_PhysicsCube")
 ```
 
----
+### 例3: Enhanced Inputセットアップ
 
-## Workflow Rules
+```python
+# 1. Input Action作成
+create_input_action("IA_Jump", value_type="Digital", path="/Game/Input")
+create_input_action("IA_Move", value_type="Axis2D", path="/Game/Input")
 
-### 機能実装フロー
+# 2. Input Mapping Context作成
+create_input_mapping_context("IMC_Default", path="/Game/Input")
 
-```
-1. Claude.ai で機能仕様を詳細に詰める
-2. 仕様確定後、実装プロンプトを作成
-   - ファイル名: Docs/{FeatureName}_Prompt.md
-   - 例: Docs/AddProgressBarToWidget_Prompt.md
-3. Claude Code で実装（Python / C++）
-4. ビルド・再起動
-5. 動作確認
-6. ナレッジに学びを蓄積
-```
+# 3. ActionをIMCにマッピング
+add_action_to_mapping_context(
+    context_name="IMC_Default",
+    action_name="IA_Jump",
+    key="SpaceBar",
+    trigger_type="Pressed"
+)
 
-### プロンプトドキュメントの構成
+# 4. Character BlueprintにAddMappingContextノードを自動追加
+add_mapping_context_to_blueprint(
+    blueprint_name="BP_PlayerCharacter",
+    context_name="IMC_Default",
+    priority=0,
+    context_path="/Game/Input",
+    path="/Game/Characters"
+)
 
-機能追加ごとに Claude Code 用の実装プロンプトを `Docs/` に保存する。
-
-```markdown
-# 機能名: 〇〇 実装
-
-## 概要
-機能の説明
-
-## 仕様
-詳細な仕様（表形式推奨）
-
-## 実装内容
-
-### 1. Python側 (`*.py`)
-コードブロック
-
-### 2. Unreal側 (`*.h` / `*.cpp`)
-コードブロック
-
-## テスト
-テスト手順
-
-## 補足事項
-注意点等
+# 5. コンパイル
+compile_blueprint("BP_PlayerCharacter", path="/Game/Characters")
 ```
 
-### プロンプトドキュメントの利点
-
-- 機能と実装内容の紐付けが明確
-- 後から「なぜこの実装にしたのか」を追跡可能
-- 同様の機能追加で再利用可能
-- AI セッション間の引き継ぎがスムーズ
+**生成されるノードチェーン**:
+```
+BeginPlay → GetController → CastToPlayerController → GetEnhancedInputLocalPlayerSubsystem → AddMappingContext(IMC, Priority)
+```
 
 ---
 
@@ -484,6 +468,7 @@ search_knowledge("質量 設定", category="physics")
 
 ## 更新履歴
 
+- 2026-01-02: Enhanced Input Blueprint統合機能実装完了。add_mapping_context_to_blueprint（BeginPlayにAddMappingContextノードチェーン自動追加）、set_default_mapping_context（PlayerController/Character両対応）を追加
 - 2026-01-01: find_blueprint_nodes修正完了。node_typeをオプショナル化、全ノードタイプ対応（Event/Function/Variable/Branch/Sequence/Macro/InputAction/Self）、詳細情報返却（node_id, node_type, node_class, name, position, pins）
 - 2026-01-01: find_actors_by_name修正完了。レスポンス形式改善（success/pattern/count/actorsフィールド追加）でMCP表示問題を解決
 - 2026-01-01: Math/Comparisonノード動作確認完了。add_math_node (Add/Subtract/Multiply/Divide)、add_comparison_node (Greater/Less/Equal等) がFloat/Int両対応で動作OK。ピン名: A, B, ReturnValue

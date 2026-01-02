@@ -302,7 +302,9 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("create_input_action") ||
                      CommandType == TEXT("create_input_mapping_context") ||
                      CommandType == TEXT("add_action_to_mapping_context") ||
-                     CommandType == TEXT("delete_asset"))
+                     CommandType == TEXT("delete_asset") ||
+                     CommandType == TEXT("add_mapping_context_to_blueprint") ||
+                     CommandType == TEXT("set_default_mapping_context"))
             {
                 ResultJson = ProjectCommands->HandleCommand(CommandType, Params);
             }

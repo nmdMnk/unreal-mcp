@@ -25,4 +25,8 @@ private:
 
     // Asset management handlers
     TSharedPtr<FJsonObject> HandleDeleteAsset(const TSharedPtr<FJsonObject>& Params);
+
+    // Enhanced Input Blueprint integration handlers
+    TSharedPtr<FJsonObject> HandleAddMappingContextToBlueprint(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleSetDefaultMappingContext(const TSharedPtr<FJsonObject>& Params);
 }; 
