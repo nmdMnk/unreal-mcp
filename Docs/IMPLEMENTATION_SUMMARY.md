@@ -4,7 +4,7 @@
 新しいチャットセッション開始時に、コードベースの全体像を把握するために参照してください。
 
 > **最終更新**: 2026-01-03  
-> **バージョン**: 0.6.6 (Phase C/D 完了)
+> **バージョン**: Phase E (エラーハンドリング統一完了)
 
 ---
 
@@ -357,6 +357,58 @@ Config（INI）ファイル操作を担当。
 | `LogCommandWarning` | 警告ログ出力 |
 | `LogCommandInfo` | 情報ログ出力 |
 
+#### エラーコード一覧 (Phase E 統一)
+
+| カテゴリ | コード | 値 | 説明 |
+|---------|------|-----|------|
+| **General** | `Success` | 0 | 成功 |
+| (1000-1099) | `UnknownError` | 1000 | 不明なエラー |
+| | `UnknownCommand` | 1001 | 不明なコマンド |
+| | `InvalidParams` | 1002 | 無効なパラメータ |
+| | `MissingRequiredParam` | 1003 | 必須パラメータ不足 |
+| | `InvalidParamType` | 1004 | パラメータ型不正 |
+| | `InvalidParamValue` | 1005 | パラメータ値不正 |
+| | `InvalidParameter` | 1006 | 無効なパラメータ |
+| | `OperationFailed` | 1007 | 操作失敗 |
+| | `SystemError` | 1008 | システムエラー |
+| **Asset** | `AssetNotFound` | 1100 | アセットが見つからない |
+| (1100-1199) | `AssetLoadFailed` | 1101 | アセット読み込み失敗 |
+| | `AssetAlreadyExists` | 1102 | アセットが既に存在 |
+| | `AssetCreationFailed` | 1103 | アセット作成失敗 |
+| | `AssetDeleteFailed` | 1104 | アセット削除失敗 |
+| | `InvalidAssetPath` | 1105 | 無効なアセットパス |
+| **Blueprint** | `BlueprintNotFound` | 1200 | Blueprintが見つからない |
+| (1200-1299) | `BlueprintCompileFailed` | 1201 | コンパイル失敗 |
+| | `BlueprintInvalidClass` | 1202 | 無効なクラス |
+| | `EventGraphNotFound` | 1203 | EventGraphが見つからない |
+| | `NodeCreationFailed` | 1204 | ノード作成失敗 |
+| | `NodeConnectionFailed` | 1205 | ノード接続失敗 |
+| | `PinNotFound` | 1206 | ピンが見つからない |
+| | `VariableNotFound` | 1207 | 変数が見つからない |
+| | `FunctionNotFound` | 1208 | 関数が見つからない |
+| | `GraphNotFound` | 1209 | グラフが見つからない |
+| | `NodeNotFound` | 1210 | ノードが見つからない |
+| | `ClassNotFound` | 1211 | クラスが見つからない |
+| | `InvalidOperation` | 1212 | 無効な操作 |
+| **Widget** | `WidgetNotFound` | 1300 | Widgetが見つからない |
+| (1300-1399) | `WidgetElementNotFound` | 1301 | 要素が見つからない |
+| | `WidgetCreationFailed` | 1302 | Widget作成失敗 |
+| | `WidgetTreeNotFound` | 1303 | Widget Treeが見つからない |
+| | `CanvasPanelNotFound` | 1304 | CanvasPanelが見つからない |
+| | `AnimationNotFound` | 1305 | アニメーションが見つからない |
+| **Actor** | `ActorNotFound` | 1400 | アクターが見つからない |
+| (1400-1499) | `ActorSpawnFailed` | 1401 | アクター生成失敗 |
+| | `ComponentNotFound` | 1402 | コンポーネントが見つからない |
+| | `PropertyNotFound` | 1403 | プロパティが見つからない |
+| | `PropertySetFailed` | 1404 | プロパティ設定失敗 |
+| | `ComponentCreationFailed` | 1405 | コンポーネント作成失敗 |
+| **GAS** | `GameplayTagInvalid` | 1500 | 無効なGameplayTag |
+| (1500-1599) | `GameplayEffectFailed` | 1501 | GameplayEffect失敗 |
+| | `GameplayAbilityFailed` | 1502 | GameplayAbility失敗 |
+| **Config** | `ConfigKeyNotFound` | 1600 | 設定キーが見つからない |
+| (1600-1699) | `FileWriteFailed` | 1601 | ファイル書き込み失敗 |
+| | `FileReadFailed` | 1602 | ファイル読み取り失敗 |
+
 #### アクターユーティリティ
 | 関数 | 説明 |
 |------|------|
@@ -505,6 +557,8 @@ else if (CommandType == "create_simple_material") {
 
 | 日付 | 内容 |
 |------|------|
+| 2026-01-03 | **Phase E**: 全18 Commandsファイルにエラーハンドリング統一適用 |
+| 2026-01-03 | SpirrowBridgeCommonUtils.hにエラーコード12個追加 |
 | 2026-01-03 | Phase D: ドキュメント整備完了 |
 | 2026-01-03 | Phase C: エラーハンドリング強化（CommonUtilsにバリデーション関数追加） |
 | 2026-01-03 | UMGWidgetCommands を3分割（Core/Basic/Interactive） |

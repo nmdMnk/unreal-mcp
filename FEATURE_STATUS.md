@@ -4,8 +4,9 @@
 
 このドキュメントは、MCPツールの動作確認状況と今後追加予定の機能をまとめたものです。
 
-> **バージョン**: 0.6.6 (Phase C/D 完了)  
-> **ステータス**: Beta
+> **バージョン**: Phase E (エラーハンドリング統一完了)  
+> **ステータス**: Beta  
+> **最終更新**: 2026-01-03
 
 ---
 
@@ -78,7 +79,43 @@
 
 ## 最新の更新履歴
 
-### 2026-01-03: UMGWidgetCommands 分割リファクタリング完了 (Phase 0.6.6) 🆕
+### 2026-01-03: Phase E - 全Commandsエラーハンドリング統一 🆕
+
+**完了内容**:
+- 全18 CommandsファイルにESpirrowErrorCode使用を統一
+- SpirrowBridgeCommonUtils.hに不足エラーコード12個追加
+
+**追加エラーコード**:
+| カテゴリ | コード | 説明 |
+|---------|------|------|
+| General (1000-1099) | `UnknownCommand` | 不明なコマンド |
+| General | `InvalidParameter` | 無効なパラメータ |
+| General | `OperationFailed` | 操作失敗 |
+| General | `SystemError` | システムエラー |
+| Blueprint (1200-1299) | `GraphNotFound` | グラフが見つからない |
+| Blueprint | `NodeNotFound` | ノードが見つからない |
+| Blueprint | `ClassNotFound` | クラスが見つからない |
+| Blueprint | `InvalidOperation` | 無効な操作 |
+| Actor (1400-1499) | `ComponentCreationFailed` | コンポーネント作成失敗 |
+| Config (1600-1699) | `ConfigKeyNotFound` | 設定キーが見つからない |
+| Config | `FileWriteFailed` | ファイル書き込み失敗 |
+| Config | `FileReadFailed` | ファイル読み取り失敗 |
+
+**対象ファイル (18ファイル)**:
+- ActorCommands, BlueprintCommands, BlueprintNodeCommands
+- BlueprintNodeFlowCommands, BlueprintNodeMathCommands, BlueprintNodeVariableCommands
+- InputCommands, GASCommands, GASTagCommands, ConfigCommands
+- UMGWidgetBasicCommands, UMGWidgetCoreCommands, UMGWidgetInteractiveCommands
+- UMGLayoutCommands, UMGAnimationCommands, UMGVariableCommands
+- MaterialCommands, ProjectCommands
+
+**テスト結果**:
+- TrapxTrapCppビルド成功 ✅
+- MCPツールテスト全11項目パス ✅
+
+---
+
+### 2026-01-03: UMGWidgetCommands 分割リファクタリング完了 (Phase 0.6.6)
 
 **完了内容**:
 - `SpirrowBridgeUMGWidgetCommands.cpp` (64 KB) を3ファイルに分割
