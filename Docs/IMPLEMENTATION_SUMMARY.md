@@ -4,7 +4,7 @@
 新しいチャットセッション開始時に、コードベースの全体像を把握するために参照してください。
 
 > **最終更新**: 2026-01-03  
-> **バージョン**: 0.6.5
+> **バージョン**: 0.6.6 (Phase C/D 完了)
 
 ---
 
@@ -30,11 +30,14 @@
 | `SpirrowBridgeBlueprintNodeControlFlowCommands.cpp` | 21 KB | Branch/Sequence/Delay/Loop/Math/Print |
 | `SpirrowBridgeBlueprintNodeCommands.cpp` | 1.7 KB | ルーター（上記3ファイルへ委譲） |
 
-#### UMG Widget 系（4分割）
+#### UMG Widget 系（3分割 + ルーター + 3独立）
 
 | ファイル | サイズ | 役割 |
 |----------|--------|------|
-| `SpirrowBridgeUMGWidgetCommands.cpp` | 64 KB | Widget 追加 |
+| `SpirrowBridgeUMGWidgetCoreCommands.cpp` | 7 KB | Widget Blueprint作成/Viewport追加/Anchorパース |
+| `SpirrowBridgeUMGWidgetBasicCommands.cpp` | 17 KB | Text/Image/ProgressBar 追加 |
+| `SpirrowBridgeUMGWidgetInteractiveCommands.cpp` | 30 KB | Button/Slider/CheckBox/ComboBox/EditableText/SpinBox/ScrollBox |
+| `SpirrowBridgeUMGWidgetCommands.cpp` | 1.5 KB | ルーター（上記3ファイルへ委譲） |
 | `SpirrowBridgeUMGVariableCommands.cpp` | 40 KB | 変数/バインディング |
 | `SpirrowBridgeUMGLayoutCommands.cpp` | 32 KB | レイアウト |
 | `SpirrowBridgeUMGAnimationCommands.cpp` | 23 KB | アニメーション |
@@ -50,7 +53,7 @@
 | `SpirrowBridgeMaterialCommands.cpp` | 8 KB | マテリアル作成 |
 | `SpirrowBridgeConfigCommands.cpp` | 8 KB | Config（INI）操作 |
 
-**合計**: 18 ファイル（Blueprint系6分割、UMG系4分割完了）
+**合計**: 21 ファイル（Blueprint系6分割、UMG系7分割完了）
 
 ---
 
@@ -312,20 +315,47 @@ Config（INI）ファイル操作を担当。
 
 ---
 
-### FSpirrowBridgeCommonUtils (35 KB)
+### FSpirrowBridgeCommonUtils (47 KB)
 
 共通ユーティリティ関数。
 
 #### JSON ユーティリティ
 | 関数 | 説明 |
 |------|------|
-| `CreateErrorResponse` | エラーレスポンス作成 |
+| `CreateErrorResponse(FString)` | エラーレスポンス作成（後方互換） |
+| `CreateErrorResponse(int32, FString)` | エラーコード付きレスポンス |
+| `CreateErrorResponse(int32, FString, TSharedPtr<FJsonObject>)` | 詳細付きエラーレスポンス |
 | `CreateSuccessResponse` | 成功レスポンス作成 |
 | `GetIntArrayFromJson` | JSON から int 配列取得 |
 | `GetFloatArrayFromJson` | JSON から float 配列取得 |
 | `GetVector2DFromJson` | JSON から Vector2D 取得 |
 | `GetVectorFromJson` | JSON から Vector 取得 |
 | `GetRotatorFromJson` | JSON から Rotator 取得 |
+| `GetLinearColorFromJson` | JSON から LinearColor 取得 |
+
+#### パラメータバリデーション (Phase C 追加)
+| 関数 | 説明 |
+|------|------|
+| `ValidateRequiredString` | 必須文字列パラメータ検証 |
+| `ValidateRequiredNumber` | 必須数値パラメータ検証 |
+| `ValidateRequiredBool` | 必須ブール値パラメータ検証 |
+| `GetOptionalString` | オプショナル文字列取得 |
+| `GetOptionalNumber` | オプショナル数値取得 |
+| `GetOptionalBool` | オプショナルブール値取得 |
+
+#### アセットバリデーション (Phase C 追加)
+| 関数 | 説明 |
+|------|------|
+| `ValidateBlueprint` | Blueprint 存在確認 |
+| `ValidateWidgetBlueprint` | Widget Blueprint 存在確認 |
+| `IsValidAssetPath` | アセットパス形式検証 |
+
+#### ロギング (Phase C 追加)
+| 関数 | 説明 |
+|------|------|
+| `LogCommandError` | エラーログ出力 |
+| `LogCommandWarning` | 警告ログ出力 |
+| `LogCommandInfo` | 情報ログ出力 |
 
 #### アクターユーティリティ
 | 関数 | 説明 |
@@ -465,8 +495,9 @@ else if (CommandType == "create_simple_material") {
 | `SpirrowBridgeUMGCommands.cpp` | ✅ 完了 | 2026-01-02 に4分割 |
 | `SpirrowBridgeBlueprintCommands.cpp` | ✅ 完了 | 2026-01-03 に3分割 |
 | `SpirrowBridgeBlueprintNodeCommands.cpp` | ✅ 完了 | 2026-01-03 に3分割 |
-| `SpirrowBridgeUMGWidgetCommands.cpp` | 📋 候補 | 64KB、将来的に分割検討 |
+| `SpirrowBridgeUMGWidgetCommands.cpp` | ✅ 完了 | 2026-01-03 に3分割 |
 | `SpirrowBridgeGASCommands.cpp` | 📋 候補 | 55KB、将来的に分割検討 |
+| `SpirrowBridgeCommonUtils.cpp` | 📋 候補 | 47KB、Phase Cで増加 |
 
 ---
 
@@ -474,6 +505,9 @@ else if (CommandType == "create_simple_material") {
 
 | 日付 | 内容 |
 |------|------|
+| 2026-01-03 | Phase D: ドキュメント整備完了 |
+| 2026-01-03 | Phase C: エラーハンドリング強化（CommonUtilsにバリデーション関数追加） |
+| 2026-01-03 | UMGWidgetCommands を3分割（Core/Basic/Interactive） |
 | 2026-01-03 | BlueprintCommands を3分割（Core/Component/Property） |
 | 2026-01-03 | BlueprintNodeCommands を3分割（Core/Variable/ControlFlow） |
 | 2026-01-02 | 新コマンド追加時のハンドラ選択ガイドを追加 |

@@ -16,10 +16,32 @@ dependencies = [
   "python-dotenv>=1.0.0"
 ]
 
+[project.optional-dependencies]
+test = [
+  "pytest>=7.0.0",
+  "pytest-html>=4.0.0",
+  "pytest-timeout>=2.0.0"
+]
+
 [build-system]
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 # The main server script is a single-file module
-py-modules = ["unreal_mcp_server"] 
+py-modules = ["unreal_mcp_server"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "umg: UMG Widget操作テスト",
+    "blueprint: Blueprint操作テスト",
+    "node: Blueprintノード操作テスト",
+    "gas: GAS操作テスト",
+    "integration: 統合テスト",
+    "slow: 遅いテスト"
+]
+addopts = "-v --tb=short"

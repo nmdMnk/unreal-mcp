@@ -1,6 +1,7 @@
 #include "Commands/SpirrowBridgeCommonUtils.h"
 #include "GameFramework/Actor.h"
 #include "Engine/Blueprint.h"
+#include "WidgetBlueprint.h"
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphNode.h"
 #include "EdGraph/EdGraphPin.h"
@@ -29,12 +30,31 @@
 #include "UObject/SoftObjectPath.h"
 #include "UObject/UObjectGlobals.h"
 
-// JSON Utilities
+// ============================================
+// JSON Response Utilities  
+// ============================================
+
 TSharedPtr<FJsonObject> FSpirrowBridgeCommonUtils::CreateErrorResponse(const FString& Message)
+{
+    return CreateErrorResponse(ESpirrowErrorCode::UnknownError, Message);
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeCommonUtils::CreateErrorResponse(int32 ErrorCode, const FString& Message)
 {
     TSharedPtr<FJsonObject> ResponseObject = MakeShared<FJsonObject>();
     ResponseObject->SetBoolField(TEXT("success"), false);
+    ResponseObject->SetNumberField(TEXT("error_code"), ErrorCode);
     ResponseObject->SetStringField(TEXT("error"), Message);
+    return ResponseObject;
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeCommonUtils::CreateErrorResponse(int32 ErrorCode, const FString& Message, const TSharedPtr<FJsonObject>& Details)
+{
+    TSharedPtr<FJsonObject> ResponseObject = CreateErrorResponse(ErrorCode, Message);
+    if (Details.IsValid())
+    {
+        ResponseObject->SetObjectField(TEXT("details"), Details);
+    }
     return ResponseObject;
 }
 
@@ -940,4 +960,278 @@ bool FSpirrowBridgeCommonUtils::SetObjectProperty(UObject* Object, const FString
     OutErrorMessage = FString::Printf(TEXT("Unsupported property type: %s for property %s"),
                                     *Property->GetClass()->GetName(), *PropertyName);
     return false;
+}
+
+// ============================================
+// Parameter Validation utilities
+// ============================================
+
+TSharedPtr<FJsonObject> FSpirrowBridgeCommonUtils::ValidateRequiredString(
+    const TSharedPtr<FJsonObject>& Params, 
+    const FString& ParamName, 
+    FString& OutValue)
+{
+    if (!Params.IsValid())
+    {
+        return CreateErrorResponse(ESpirrowErrorCode::InvalidParams, TEXT("Invalid params object"));
+    }
+    
+    if (!Params->HasField(ParamName))
+    {
+        return CreateErrorResponse(
+            ESpirrowErrorCode::MissingRequiredParam, 
+            FString::Printf(TEXT("Missing required parameter: %s"), *ParamName)
+        );
+    }
+    
+    if (!Params->TryGetStringField(ParamName, OutValue))
+    {
+        return CreateErrorResponse(
+            ESpirrowErrorCode::InvalidParamType, 
+            FString::Printf(TEXT("Parameter '%s' must be a string"), *ParamName)
+        );
+    }
+    
+    if (OutValue.IsEmpty())
+    {
+        return CreateErrorResponse(
+            ESpirrowErrorCode::InvalidParamValue, 
+            FString::Printf(TEXT("Parameter '%s' cannot be empty"), *ParamName)
+        );
+    }
+    
+    return nullptr; // Success - no error
+}
+
+void FSpirrowBridgeCommonUtils::GetOptionalString(
+    const TSharedPtr<FJsonObject>& Params, 
+    const FString& ParamName, 
+    FString& OutValue, 
+    const FString& DefaultValue)
+{
+    OutValue = DefaultValue;
+    
+    if (Params.IsValid() && Params->HasField(ParamName))
+    {
+        Params->TryGetStringField(ParamName, OutValue);
+    }
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeCommonUtils::ValidateRequiredNumber(
+    const TSharedPtr<FJsonObject>& Params, 
+    const FString& ParamName, 
+    double& OutValue)
+{
+    if (!Params.IsValid())
+    {
+        return CreateErrorResponse(ESpirrowErrorCode::InvalidParams, TEXT("Invalid params object"));
+    }
+    
+    if (!Params->HasField(ParamName))
+    {
+        return CreateErrorResponse(
+            ESpirrowErrorCode::MissingRequiredParam, 
+            FString::Printf(TEXT("Missing required parameter: %s"), *ParamName)
+        );
+    }
+    
+    if (!Params->TryGetNumberField(ParamName, OutValue))
+    {
+        return CreateErrorResponse(
+            ESpirrowErrorCode::InvalidParamType, 
+            FString::Printf(TEXT("Parameter '%s' must be a number"), *ParamName)
+        );
+    }
+    
+    return nullptr; // Success
+}
+
+void FSpirrowBridgeCommonUtils::GetOptionalNumber(
+    const TSharedPtr<FJsonObject>& Params, 
+    const FString& ParamName, 
+    double& OutValue, 
+    double DefaultValue)
+{
+    OutValue = DefaultValue;
+    
+    if (Params.IsValid() && Params->HasField(ParamName))
+    {
+        Params->TryGetNumberField(ParamName, OutValue);
+    }
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeCommonUtils::ValidateRequiredBool(
+    const TSharedPtr<FJsonObject>& Params, 
+    const FString& ParamName, 
+    bool& OutValue)
+{
+    if (!Params.IsValid())
+    {
+        return CreateErrorResponse(ESpirrowErrorCode::InvalidParams, TEXT("Invalid params object"));
+    }
+    
+    if (!Params->HasField(ParamName))
+    {
+        return CreateErrorResponse(
+            ESpirrowErrorCode::MissingRequiredParam, 
+            FString::Printf(TEXT("Missing required parameter: %s"), *ParamName)
+        );
+    }
+    
+    if (!Params->TryGetBoolField(ParamName, OutValue))
+    {
+        return CreateErrorResponse(
+            ESpirrowErrorCode::InvalidParamType, 
+            FString::Printf(TEXT("Parameter '%s' must be a boolean"), *ParamName)
+        );
+    }
+    
+    return nullptr; // Success
+}
+
+void FSpirrowBridgeCommonUtils::GetOptionalBool(
+    const TSharedPtr<FJsonObject>& Params, 
+    const FString& ParamName, 
+    bool& OutValue, 
+    bool DefaultValue)
+{
+    OutValue = DefaultValue;
+    
+    if (Params.IsValid() && Params->HasField(ParamName))
+    {
+        Params->TryGetBoolField(ParamName, OutValue);
+    }
+}
+
+// ============================================
+// Asset Validation utilities
+// ============================================
+
+TSharedPtr<FJsonObject> FSpirrowBridgeCommonUtils::ValidateBlueprint(
+    const FString& BlueprintName, 
+    const FString& Path, 
+    UBlueprint*& OutBlueprint)
+{
+    OutBlueprint = FindBlueprintByName(BlueprintName, Path);
+    
+    if (!OutBlueprint)
+    {
+        TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+        Details->SetStringField(TEXT("blueprint_name"), BlueprintName);
+        Details->SetStringField(TEXT("path"), Path);
+        Details->SetStringField(TEXT("full_path"), FString::Printf(TEXT("%s/%s.%s"), *Path, *BlueprintName, *BlueprintName));
+        
+        return CreateErrorResponse(
+            ESpirrowErrorCode::BlueprintNotFound, 
+            FString::Printf(TEXT("Blueprint not found: %s at %s"), *BlueprintName, *Path),
+            Details
+        );
+    }
+    
+    return nullptr; // Success
+}
+
+TSharedPtr<FJsonObject> FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(
+    const FString& WidgetName, 
+    const FString& Path, 
+    UWidgetBlueprint*& OutWidget)
+{
+    // Normalize path
+    FString NormalizedPath = Path;
+    if (!NormalizedPath.EndsWith(TEXT("/")))
+    {
+        NormalizedPath += TEXT("/");
+    }
+    
+    FString AssetPath = FString::Printf(TEXT("%s%s.%s"), *NormalizedPath, *WidgetName, *WidgetName);
+    OutWidget = LoadObject<UWidgetBlueprint>(nullptr, *AssetPath);
+    
+    if (!OutWidget)
+    {
+        TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+        Details->SetStringField(TEXT("widget_name"), WidgetName);
+        Details->SetStringField(TEXT("path"), Path);
+        Details->SetStringField(TEXT("full_path"), AssetPath);
+        
+        return CreateErrorResponse(
+            ESpirrowErrorCode::WidgetNotFound, 
+            FString::Printf(TEXT("Widget Blueprint not found: %s at %s"), *WidgetName, *Path),
+            Details
+        );
+    }
+    
+    return nullptr; // Success
+}
+
+bool FSpirrowBridgeCommonUtils::IsValidAssetPath(const FString& Path, FString& OutErrorMessage)
+{
+    if (Path.IsEmpty())
+    {
+        OutErrorMessage = TEXT("Asset path cannot be empty");
+        return false;
+    }
+    
+    if (!Path.StartsWith(TEXT("/Game/")) && !Path.StartsWith(TEXT("/Engine/")))
+    {
+        OutErrorMessage = FString::Printf(TEXT("Asset path must start with /Game/ or /Engine/: %s"), *Path);
+        return false;
+    }
+    
+    // Check for invalid characters
+    if (Path.Contains(TEXT("..")) || Path.Contains(TEXT("//")) || Path.Contains(TEXT(" ")))
+    {
+        OutErrorMessage = FString::Printf(TEXT("Asset path contains invalid characters: %s"), *Path);
+        return false;
+    }
+    
+    return true;
+}
+
+// ============================================
+// Additional JSON Array utilities
+// ============================================
+
+FLinearColor FSpirrowBridgeCommonUtils::GetLinearColorFromJson(
+    const TSharedPtr<FJsonObject>& JsonObject, 
+    const FString& FieldName, 
+    const FLinearColor& DefaultValue)
+{
+    if (!JsonObject->HasField(FieldName))
+    {
+        return DefaultValue;
+    }
+    
+    const TArray<TSharedPtr<FJsonValue>>* JsonArray;
+    if (JsonObject->TryGetArrayField(FieldName, JsonArray) && JsonArray->Num() >= 3)
+    {
+        float R = (float)(*JsonArray)[0]->AsNumber();
+        float G = (float)(*JsonArray)[1]->AsNumber();
+        float B = (float)(*JsonArray)[2]->AsNumber();
+        float A = JsonArray->Num() >= 4 ? (float)(*JsonArray)[3]->AsNumber() : 1.0f;
+        return FLinearColor(R, G, B, A);
+    }
+    
+    return DefaultValue;
+}
+
+// ============================================
+// Logging utilities
+// ============================================
+
+// Define log category at top of file or in module
+DEFINE_LOG_CATEGORY_STATIC(LogSpirrowBridge, Log, All);
+
+void FSpirrowBridgeCommonUtils::LogCommandError(const FString& CommandName, const FString& Message)
+{
+    UE_LOG(LogSpirrowBridge, Error, TEXT("[%s] %s"), *CommandName, *Message);
+}
+
+void FSpirrowBridgeCommonUtils::LogCommandWarning(const FString& CommandName, const FString& Message)
+{
+    UE_LOG(LogSpirrowBridge, Warning, TEXT("[%s] %s"), *CommandName, *Message);
+}
+
+void FSpirrowBridgeCommonUtils::LogCommandInfo(const FString& CommandName, const FString& Message)
+{
+    UE_LOG(LogSpirrowBridge, Display, TEXT("[%s] %s"), *CommandName, *Message);
 } 

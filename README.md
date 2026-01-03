@@ -6,20 +6,27 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Unreal Engine](https://img.shields.io/badge/Unreal%20Engine-5.5%2B-orange)](https://www.unrealengine.com)
 [![Python](https://img.shields.io/badge/Python-3.12%2B-yellow)](https://www.python.org)
-[![Status](https://img.shields.io/badge/Status-Experimental-red)](https://github.com/SpirrowGames/spirrow-unrealwise)
+[![Version](https://img.shields.io/badge/Version-0.6.6-green)](https://github.com/SpirrowGames/spirrow-unrealwise)
+[![Status](https://img.shields.io/badge/Status-Beta-brightgreen)](https://github.com/SpirrowGames/spirrow-unrealwise)
 
 </div>
 
 このプロジェクトは、Cursor、Windsurf、Claude DesktopなどのAIアシスタントクライアントが、Model Context Protocol (MCP)を通じて自然言語でUnreal Engineを制御できるようにします。
 
-## ⚠️ 実験的ステータス
+## ⚙️ 現在のステータス
 
-このプロジェクトは現在**実験段階**です。API、機能、実装の詳細は大きく変更される可能性があります。テストやフィードバックは歓迎しますが、以下の点にご注意ください：
+このプロジェクトは現在**ベータ版**です。主要な機能は安定して動作していますが、以下の点にご注意ください：
 
-- 予告なく破壊的変更が発生する可能性があります
-- 機能が不完全または不安定な場合があります
-- ドキュメントが古いまたは欠けている可能性があります
-- 現時点では本番環境での使用は推奨されません
+- APIや機能は変更される可能性があります
+- テストフレームワークが整備され、主要機能の動作確認済みです
+- エラーハンドリングが強化され、構造化されたエラーコードを返します
+- フィードバックや貢献を歓迎します
+
+### 最新の更新 (v0.6.6)
+
+- **Phase C完了**: テストフレームワーク作成、エラーハンドリング強化
+- **UMG Widgetツール**: Button, Slider, CheckBox, ComboBox, EditableText, SpinBox, ScrollBox対応
+- **Blueprintコマンド分割**: 95KBの巨大ファイルを管理しやすく分割
 
 ## 🎯 プロジェクトの目標
 

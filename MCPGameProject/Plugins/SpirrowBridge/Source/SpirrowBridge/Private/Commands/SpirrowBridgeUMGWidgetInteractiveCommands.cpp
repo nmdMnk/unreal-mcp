@@ -66,26 +66,26 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddBut
 
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddButtonToWidgetV2(const TSharedPtr<FJsonObject>& Params)
 {
-	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	// Validate required parameters
+	FString WidgetName, ButtonName;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+		return Error;
+	}
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("button_name"), ButtonName))
+	{
+		return Error;
 	}
 
-	FString ButtonName;
-	if (!Params->TryGetStringField(TEXT("button_name"), ButtonName))
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'button_name' parameter"));
-	}
+	// Get optional parameters
+	FString Path, Text, AnchorStr;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("text"), Text, TEXT(""));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("anchor"), AnchorStr, TEXT("Center"));
 
-	FString Path = TEXT("/Game/UI");
-	Params->TryGetStringField(TEXT("path"), Path);
-
-	FString Text;
-	Params->TryGetStringField(TEXT("text"), Text);
-
-	int32 FontSize = 14;
-	Params->TryGetNumberField(TEXT("font_size"), FontSize);
+	double FontSizeDouble;
+	FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("font_size"), FontSizeDouble, 14.0);
+	int32 FontSize = static_cast<int32>(FontSizeDouble);
 
 	FVector2D Size(200.0f, 50.0f);
 	const TArray<TSharedPtr<FJsonValue>>* SizeArray;
@@ -95,45 +95,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddBut
 		Size.Y = (*SizeArray)[1]->AsNumber();
 	}
 
-	FLinearColor TextColor(1.0f, 1.0f, 1.0f, 1.0f);
-	const TArray<TSharedPtr<FJsonValue>>* TextColorArray;
-	if (Params->TryGetArrayField(TEXT("text_color"), TextColorArray) && TextColorArray->Num() >= 4)
-	{
-		TextColor.R = (*TextColorArray)[0]->AsNumber();
-		TextColor.G = (*TextColorArray)[1]->AsNumber();
-		TextColor.B = (*TextColorArray)[2]->AsNumber();
-		TextColor.A = (*TextColorArray)[3]->AsNumber();
-	}
-
-	FLinearColor NormalColor(0.1f, 0.1f, 0.1f, 1.0f);
-	const TArray<TSharedPtr<FJsonValue>>* NormalArray;
-	if (Params->TryGetArrayField(TEXT("normal_color"), NormalArray) && NormalArray->Num() >= 4)
-	{
-		NormalColor.R = (*NormalArray)[0]->AsNumber();
-		NormalColor.G = (*NormalArray)[1]->AsNumber();
-		NormalColor.B = (*NormalArray)[2]->AsNumber();
-		NormalColor.A = (*NormalArray)[3]->AsNumber();
-	}
-
-	FLinearColor HoveredColor(0.2f, 0.2f, 0.2f, 1.0f);
-	const TArray<TSharedPtr<FJsonValue>>* HoveredArray;
-	if (Params->TryGetArrayField(TEXT("hovered_color"), HoveredArray) && HoveredArray->Num() >= 4)
-	{
-		HoveredColor.R = (*HoveredArray)[0]->AsNumber();
-		HoveredColor.G = (*HoveredArray)[1]->AsNumber();
-		HoveredColor.B = (*HoveredArray)[2]->AsNumber();
-		HoveredColor.A = (*HoveredArray)[3]->AsNumber();
-	}
-
-	FLinearColor PressedColor(0.05f, 0.05f, 0.05f, 1.0f);
-	const TArray<TSharedPtr<FJsonValue>>* PressedArray;
-	if (Params->TryGetArrayField(TEXT("pressed_color"), PressedArray) && PressedArray->Num() >= 4)
-	{
-		PressedColor.R = (*PressedArray)[0]->AsNumber();
-		PressedColor.G = (*PressedArray)[1]->AsNumber();
-		PressedColor.B = (*PressedArray)[2]->AsNumber();
-		PressedColor.A = (*PressedArray)[3]->AsNumber();
-	}
+	// Get colors
+	FLinearColor TextColor = FSpirrowBridgeCommonUtils::GetLinearColorFromJson(Params, TEXT("text_color"), FLinearColor::White);
+	FLinearColor NormalColor = FSpirrowBridgeCommonUtils::GetLinearColorFromJson(Params, TEXT("normal_color"), FLinearColor(0.1f, 0.1f, 0.1f, 1.0f));
+	FLinearColor HoveredColor = FSpirrowBridgeCommonUtils::GetLinearColorFromJson(Params, TEXT("hovered_color"), FLinearColor(0.2f, 0.2f, 0.2f, 1.0f));
+	FLinearColor PressedColor = FSpirrowBridgeCommonUtils::GetLinearColorFromJson(Params, TEXT("pressed_color"), FLinearColor(0.05f, 0.05f, 0.05f, 1.0f));
 
 	FVector2D Alignment(0.5f, 0.5f);
 	const TArray<TSharedPtr<FJsonValue>>* AlignArray;
@@ -143,21 +109,21 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddBut
 		Alignment.Y = (*AlignArray)[1]->AsNumber();
 	}
 
-	FString AnchorStr = TEXT("Center");
-	Params->TryGetStringField(TEXT("anchor"), AnchorStr);
 	FAnchors Anchors = FSpirrowBridgeUMGWidgetCoreCommands::ParseAnchorPreset(AnchorStr);
 
-	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
-	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
-	if (!WidgetBP)
+	// Validate and load Widget Blueprint
+	UWidgetBlueprint* WidgetBP = nullptr;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Widget '%s' not found"), *WidgetName));
+		return Error;
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
 	if (!WidgetTree)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetTreeNotFound,
+			TEXT("WidgetTree not found"));
 	}
 
 	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
@@ -170,7 +136,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddBut
 	UButton* ButtonWidget = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), FName(*ButtonName));
 	if (!ButtonWidget)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create Button"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetCreationFailed,
+			FString::Printf(TEXT("Failed to create Button '%s'"), *ButtonName));
 	}
 
 	FButtonStyle ButtonStyle = ButtonWidget->GetStyle();
@@ -217,35 +185,29 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddBut
 
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddSliderToWidget(const TSharedPtr<FJsonObject>& Params)
 {
-	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	// Validate required parameters
+	FString WidgetName, SliderName;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+		return Error;
+	}
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("slider_name"), SliderName))
+	{
+		return Error;
 	}
 
-	FString SliderName;
-	if (!Params->TryGetStringField(TEXT("slider_name"), SliderName))
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'slider_name' parameter"));
-	}
+	// Get optional parameters
+	FString Path, OrientationStr, AnchorStr;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("orientation"), OrientationStr, TEXT("Horizontal"));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("anchor"), AnchorStr, TEXT("Center"));
 
-	FString Path = TEXT("/Game/UI");
-	Params->TryGetStringField(TEXT("path"), Path);
+	double Value, MinValue, MaxValue, StepSize;
+	FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("value"), Value, 0.0);
+	FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("min_value"), MinValue, 0.0);
+	FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("max_value"), MaxValue, 1.0);
+	FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("step_size"), StepSize, 0.0);
 
-	float Value = 0.0f;
-	Params->TryGetNumberField(TEXT("value"), Value);
-
-	float MinValue = 0.0f;
-	Params->TryGetNumberField(TEXT("min_value"), MinValue);
-
-	float MaxValue = 1.0f;
-	Params->TryGetNumberField(TEXT("max_value"), MaxValue);
-
-	float StepSize = 0.0f;
-	Params->TryGetNumberField(TEXT("step_size"), StepSize);
-
-	FString OrientationStr = TEXT("Horizontal");
-	Params->TryGetStringField(TEXT("orientation"), OrientationStr);
 	EOrientation Orientation = (OrientationStr == TEXT("Vertical")) ? Orient_Vertical : Orient_Horizontal;
 
 	FVector2D Size(200.0f, 20.0f);
@@ -256,25 +218,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddSli
 		Size.Y = (*SizeArray)[1]->AsNumber();
 	}
 
-	FLinearColor BarColor(0.2f, 0.2f, 0.2f, 1.0f);
-	const TArray<TSharedPtr<FJsonValue>>* BarArray;
-	if (Params->TryGetArrayField(TEXT("bar_color"), BarArray) && BarArray->Num() >= 4)
-	{
-		BarColor.R = (*BarArray)[0]->AsNumber();
-		BarColor.G = (*BarArray)[1]->AsNumber();
-		BarColor.B = (*BarArray)[2]->AsNumber();
-		BarColor.A = (*BarArray)[3]->AsNumber();
-	}
-
-	FLinearColor HandleColor(1.0f, 1.0f, 1.0f, 1.0f);
-	const TArray<TSharedPtr<FJsonValue>>* HandleArray;
-	if (Params->TryGetArrayField(TEXT("handle_color"), HandleArray) && HandleArray->Num() >= 4)
-	{
-		HandleColor.R = (*HandleArray)[0]->AsNumber();
-		HandleColor.G = (*HandleArray)[1]->AsNumber();
-		HandleColor.B = (*HandleArray)[2]->AsNumber();
-		HandleColor.A = (*HandleArray)[3]->AsNumber();
-	}
+	FLinearColor BarColor = FSpirrowBridgeCommonUtils::GetLinearColorFromJson(Params, TEXT("bar_color"), FLinearColor(0.2f, 0.2f, 0.2f, 1.0f));
+	FLinearColor HandleColor = FSpirrowBridgeCommonUtils::GetLinearColorFromJson(Params, TEXT("handle_color"), FLinearColor::White);
 
 	FVector2D Alignment(0.5f, 0.5f);
 	const TArray<TSharedPtr<FJsonValue>>* AlignArray;
@@ -284,21 +229,21 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddSli
 		Alignment.Y = (*AlignArray)[1]->AsNumber();
 	}
 
-	FString AnchorStr = TEXT("Center");
-	Params->TryGetStringField(TEXT("anchor"), AnchorStr);
 	FAnchors Anchors = FSpirrowBridgeUMGWidgetCoreCommands::ParseAnchorPreset(AnchorStr);
 
-	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
-	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
-	if (!WidgetBP)
+	// Validate and load Widget Blueprint
+	UWidgetBlueprint* WidgetBP = nullptr;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Widget '%s' not found"), *WidgetName));
+		return Error;
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
 	if (!WidgetTree)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetTreeNotFound,
+			TEXT("WidgetTree not found"));
 	}
 
 	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
@@ -311,13 +256,15 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddSli
 	USlider* SliderWidget = WidgetTree->ConstructWidget<USlider>(USlider::StaticClass(), FName(*SliderName));
 	if (!SliderWidget)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create Slider"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetCreationFailed,
+			FString::Printf(TEXT("Failed to create Slider '%s'"), *SliderName));
 	}
 
-	SliderWidget->SetValue(Value);
-	SliderWidget->SetMinValue(MinValue);
-	SliderWidget->SetMaxValue(MaxValue);
-	SliderWidget->SetStepSize(StepSize);
+	SliderWidget->SetValue(static_cast<float>(Value));
+	SliderWidget->SetMinValue(static_cast<float>(MinValue));
+	SliderWidget->SetMaxValue(static_cast<float>(MaxValue));
+	SliderWidget->SetStepSize(static_cast<float>(StepSize));
 	SliderWidget->SetOrientation(Orientation);
 
 	FSliderStyle SliderStyle = SliderWidget->GetWidgetStyle();
@@ -350,26 +297,25 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddSli
 
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddCheckBoxToWidget(const TSharedPtr<FJsonObject>& Params)
 {
-	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	// Validate required parameters
+	FString WidgetName, CheckBoxName;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+		return Error;
+	}
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("checkbox_name"), CheckBoxName))
+	{
+		return Error;
 	}
 
-	FString CheckBoxName;
-	if (!Params->TryGetStringField(TEXT("checkbox_name"), CheckBoxName))
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'checkbox_name' parameter"));
-	}
+	// Get optional parameters
+	FString Path, LabelText, AnchorStr;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("label_text"), LabelText, TEXT(""));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("anchor"), AnchorStr, TEXT("Center"));
 
-	FString Path = TEXT("/Game/UI");
-	Params->TryGetStringField(TEXT("path"), Path);
-
-	bool bIsChecked = false;
-	Params->TryGetBoolField(TEXT("is_checked"), bIsChecked);
-
-	FString LabelText;
-	Params->TryGetStringField(TEXT("label_text"), LabelText);
+	bool bIsChecked;
+	FSpirrowBridgeCommonUtils::GetOptionalBool(Params, TEXT("is_checked"), bIsChecked, false);
 
 	FVector2D Alignment(0.5f, 0.5f);
 	const TArray<TSharedPtr<FJsonValue>>* AlignArray;
@@ -379,21 +325,21 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddChe
 		Alignment.Y = (*AlignArray)[1]->AsNumber();
 	}
 
-	FString AnchorStr = TEXT("Center");
-	Params->TryGetStringField(TEXT("anchor"), AnchorStr);
 	FAnchors Anchors = FSpirrowBridgeUMGWidgetCoreCommands::ParseAnchorPreset(AnchorStr);
 
-	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
-	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
-	if (!WidgetBP)
+	// Validate and load Widget Blueprint
+	UWidgetBlueprint* WidgetBP = nullptr;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Widget '%s' not found"), *WidgetName));
+		return Error;
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
 	if (!WidgetTree)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetTreeNotFound,
+			TEXT("WidgetTree not found"));
 	}
 
 	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
@@ -406,7 +352,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddChe
 	UCheckBox* CheckBoxWidget = WidgetTree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass(), FName(*CheckBoxName));
 	if (!CheckBoxWidget)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create CheckBox"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetCreationFailed,
+			FString::Printf(TEXT("Failed to create CheckBox '%s'"), *CheckBoxName));
 	}
 
 	CheckBoxWidget->SetIsChecked(bIsChecked);
@@ -457,20 +405,21 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddChe
 
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddComboBoxToWidget(const TSharedPtr<FJsonObject>& Params)
 {
-	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	// Validate required parameters
+	FString WidgetName, ComboBoxName;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+		return Error;
+	}
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("combobox_name"), ComboBoxName))
+	{
+		return Error;
 	}
 
-	FString ComboBoxName;
-	if (!Params->TryGetStringField(TEXT("combobox_name"), ComboBoxName))
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'combobox_name' parameter"));
-	}
-
-	FString Path = TEXT("/Game/UI");
-	Params->TryGetStringField(TEXT("path"), Path);
+	// Get optional parameters
+	FString Path, AnchorStr;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("anchor"), AnchorStr, TEXT("Center"));
 
 	TArray<FString> Options;
 	const TArray<TSharedPtr<FJsonValue>>* OptionsArray;
@@ -482,8 +431,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddCom
 		}
 	}
 
-	int32 SelectedIndex = 0;
-	Params->TryGetNumberField(TEXT("selected_index"), SelectedIndex);
+	double SelectedIndexDouble;
+	FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("selected_index"), SelectedIndexDouble, 0.0);
+	int32 SelectedIndex = static_cast<int32>(SelectedIndexDouble);
 
 	FVector2D Size(200.0f, 40.0f);
 	const TArray<TSharedPtr<FJsonValue>>* SizeArray;
@@ -501,33 +451,37 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddCom
 		Alignment.Y = (*AlignArray)[1]->AsNumber();
 	}
 
-	FString AnchorStr = TEXT("Center");
-	Params->TryGetStringField(TEXT("anchor"), AnchorStr);
 	FAnchors Anchors = FSpirrowBridgeUMGWidgetCoreCommands::ParseAnchorPreset(AnchorStr);
 
-	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
-	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
-	if (!WidgetBP)
+	// Validate and load Widget Blueprint
+	UWidgetBlueprint* WidgetBP = nullptr;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Widget '%s' not found"), *WidgetName));
+		return Error;
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
 	if (!WidgetTree)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetTreeNotFound,
+			TEXT("WidgetTree not found"));
 	}
 
 	UCanvasPanel* Canvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
 	if (!Canvas)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Root widget is not a Canvas Panel"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::CanvasPanelNotFound,
+			TEXT("Root widget is not a Canvas Panel"));
 	}
 
 	UComboBoxString* ComboBoxWidget = WidgetTree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass(), FName(*ComboBoxName));
 	if (!ComboBoxWidget)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create ComboBox"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetCreationFailed,
+			FString::Printf(TEXT("Failed to create ComboBox '%s'"), *ComboBoxName));
 	}
 
 	for (const FString& Option : Options)
@@ -562,29 +516,26 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddCom
 
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddEditableTextToWidget(const TSharedPtr<FJsonObject>& Params)
 {
-	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	// Validate required parameters
+	FString WidgetName, TextName;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+		return Error;
+	}
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("text_name"), TextName))
+	{
+		return Error;
 	}
 
-	FString TextName;
-	if (!Params->TryGetStringField(TEXT("text_name"), TextName))
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'text_name' parameter"));
-	}
+	// Get optional parameters
+	FString Path, HintText, AnchorStr;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("hint_text"), HintText, TEXT(""));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("anchor"), AnchorStr, TEXT("Center"));
 
-	FString Path = TEXT("/Game/UI");
-	Params->TryGetStringField(TEXT("path"), Path);
-
-	FString HintText;
-	Params->TryGetStringField(TEXT("hint_text"), HintText);
-
-	bool bIsPassword = false;
-	Params->TryGetBoolField(TEXT("is_password"), bIsPassword);
-
-	bool bIsMultiline = false;
-	Params->TryGetBoolField(TEXT("is_multiline"), bIsMultiline);
+	bool bIsPassword, bIsMultiline;
+	FSpirrowBridgeCommonUtils::GetOptionalBool(Params, TEXT("is_password"), bIsPassword, false);
+	FSpirrowBridgeCommonUtils::GetOptionalBool(Params, TEXT("is_multiline"), bIsMultiline, false);
 
 	FVector2D Size(200.0f, 40.0f);
 	const TArray<TSharedPtr<FJsonValue>>* SizeArray;
@@ -602,27 +553,29 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddEdi
 		Alignment.Y = (*AlignArray)[1]->AsNumber();
 	}
 
-	FString AnchorStr = TEXT("Center");
-	Params->TryGetStringField(TEXT("anchor"), AnchorStr);
 	FAnchors Anchors = FSpirrowBridgeUMGWidgetCoreCommands::ParseAnchorPreset(AnchorStr);
 
-	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
-	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
-	if (!WidgetBP)
+	// Validate and load Widget Blueprint
+	UWidgetBlueprint* WidgetBP = nullptr;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Widget '%s' not found"), *WidgetName));
+		return Error;
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
 	if (!WidgetTree)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetTreeNotFound,
+			TEXT("WidgetTree not found"));
 	}
 
 	UCanvasPanel* Canvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
 	if (!Canvas)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Root widget is not a Canvas Panel"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::CanvasPanelNotFound,
+			TEXT("Root widget is not a Canvas Panel"));
 	}
 
 	UWidget* TextWidget = nullptr;
@@ -633,7 +586,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddEdi
 			UMultiLineEditableTextBox::StaticClass(), FName(*TextName));
 		if (!MultiLineWidget)
 		{
-			return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create MultiLineEditableTextBox"));
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::WidgetCreationFailed,
+				FString::Printf(TEXT("Failed to create MultiLineEditableTextBox '%s'"), *TextName));
 		}
 		MultiLineWidget->SetHintText(FText::FromString(HintText));
 		TextWidget = MultiLineWidget;
@@ -644,7 +599,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddEdi
 			UEditableTextBox::StaticClass(), FName(*TextName));
 		if (!SingleLineWidget)
 		{
-			return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create EditableTextBox"));
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::WidgetCreationFailed,
+				FString::Printf(TEXT("Failed to create EditableTextBox '%s'"), *TextName));
 		}
 		SingleLineWidget->SetHintText(FText::FromString(HintText));
 		SingleLineWidget->SetIsPassword(bIsPassword);
@@ -673,32 +630,27 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddEdi
 
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddSpinBoxToWidget(const TSharedPtr<FJsonObject>& Params)
 {
-	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	// Validate required parameters
+	FString WidgetName, SpinBoxName;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+		return Error;
+	}
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("spinbox_name"), SpinBoxName))
+	{
+		return Error;
 	}
 
-	FString SpinBoxName;
-	if (!Params->TryGetStringField(TEXT("spinbox_name"), SpinBoxName))
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'spinbox_name' parameter"));
-	}
+	// Get optional parameters
+	FString Path, AnchorStr;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("anchor"), AnchorStr, TEXT("Center"));
 
-	FString Path = TEXT("/Game/UI");
-	Params->TryGetStringField(TEXT("path"), Path);
-
-	double Value = 0.0;
-	Params->TryGetNumberField(TEXT("value"), Value);
-
-	double MinValue = 0.0;
-	Params->TryGetNumberField(TEXT("min_value"), MinValue);
-
-	double MaxValue = 100.0;
-	Params->TryGetNumberField(TEXT("max_value"), MaxValue);
-
-	double Delta = 1.0;
-	Params->TryGetNumberField(TEXT("delta"), Delta);
+	double Value, MinValue, MaxValue, Delta;
+	FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("value"), Value, 0.0);
+	FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("min_value"), MinValue, 0.0);
+	FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("max_value"), MaxValue, 100.0);
+	FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("delta"), Delta, 1.0);
 
 	FVector2D Size(150.0f, 40.0f);
 	const TArray<TSharedPtr<FJsonValue>>* SizeArray;
@@ -716,33 +668,37 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddSpi
 		Alignment.Y = (*AlignArray)[1]->AsNumber();
 	}
 
-	FString AnchorStr = TEXT("Center");
-	Params->TryGetStringField(TEXT("anchor"), AnchorStr);
 	FAnchors Anchors = FSpirrowBridgeUMGWidgetCoreCommands::ParseAnchorPreset(AnchorStr);
 
-	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
-	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
-	if (!WidgetBP)
+	// Validate and load Widget Blueprint
+	UWidgetBlueprint* WidgetBP = nullptr;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Widget '%s' not found"), *WidgetName));
+		return Error;
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
 	if (!WidgetTree)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetTreeNotFound,
+			TEXT("WidgetTree not found"));
 	}
 
 	UCanvasPanel* Canvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
 	if (!Canvas)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Root widget is not a Canvas Panel"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::CanvasPanelNotFound,
+			TEXT("Root widget is not a Canvas Panel"));
 	}
 
 	USpinBox* SpinBoxWidget = WidgetTree->ConstructWidget<USpinBox>(USpinBox::StaticClass(), FName(*SpinBoxName));
 	if (!SpinBoxWidget)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create SpinBox"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetCreationFailed,
+			FString::Printf(TEXT("Failed to create SpinBox '%s'"), *SpinBoxName));
 	}
 
 	SpinBoxWidget->SetValue(Value);
@@ -772,26 +728,23 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddSpi
 
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddScrollBoxToWidget(const TSharedPtr<FJsonObject>& Params)
 {
-	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	// Validate required parameters
+	FString WidgetName, ScrollBoxName;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+		return Error;
+	}
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("scrollbox_name"), ScrollBoxName))
+	{
+		return Error;
 	}
 
-	FString ScrollBoxName;
-	if (!Params->TryGetStringField(TEXT("scrollbox_name"), ScrollBoxName))
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'scrollbox_name' parameter"));
-	}
-
-	FString Path = TEXT("/Game/UI");
-	Params->TryGetStringField(TEXT("path"), Path);
-
-	FString OrientationStr = TEXT("Vertical");
-	Params->TryGetStringField(TEXT("orientation"), OrientationStr);
-
-	FString ScrollBarVisibilityStr = TEXT("Visible");
-	Params->TryGetStringField(TEXT("scroll_bar_visibility"), ScrollBarVisibilityStr);
+	// Get optional parameters
+	FString Path, OrientationStr, ScrollBarVisibilityStr, AnchorStr;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("orientation"), OrientationStr, TEXT("Vertical"));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("scroll_bar_visibility"), ScrollBarVisibilityStr, TEXT("Visible"));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("anchor"), AnchorStr, TEXT("Center"));
 
 	FVector2D Size(300.0f, 200.0f);
 	const TArray<TSharedPtr<FJsonValue>>* SizeArray;
@@ -809,33 +762,37 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetInteractiveCommands::HandleAddScr
 		Alignment.Y = (*AlignArray)[1]->AsNumber();
 	}
 
-	FString AnchorStr = TEXT("Center");
-	Params->TryGetStringField(TEXT("anchor"), AnchorStr);
 	FAnchors Anchors = FSpirrowBridgeUMGWidgetCoreCommands::ParseAnchorPreset(AnchorStr);
 
-	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
-	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
-	if (!WidgetBP)
+	// Validate and load Widget Blueprint
+	UWidgetBlueprint* WidgetBP = nullptr;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Widget '%s' not found"), *WidgetName));
+		return Error;
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
 	if (!WidgetTree)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetTreeNotFound,
+			TEXT("WidgetTree not found"));
 	}
 
 	UCanvasPanel* Canvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
 	if (!Canvas)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Root widget is not a Canvas Panel"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::CanvasPanelNotFound,
+			TEXT("Root widget is not a Canvas Panel"));
 	}
 
 	UScrollBox* ScrollBoxWidget = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), FName(*ScrollBoxName));
 	if (!ScrollBoxWidget)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create ScrollBox"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetCreationFailed,
+			FString::Printf(TEXT("Failed to create ScrollBox '%s'"), *ScrollBoxName));
 	}
 
 	EOrientation Orientation = (OrientationStr == TEXT("Horizontal")) ? Orient_Horizontal : Orient_Vertical;

@@ -20,4 +20,7 @@ private:
     TSharedPtr<FJsonObject> HandleGetConfigValue(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleSetConfigValue(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleListConfigSections(const TSharedPtr<FJsonObject>& Params);
+
+    // Helper to resolve config file path
+    FString ResolveConfigFilePath(const FString& ConfigFile, FString& OutGConfigPath, FString& OutFileName);
 };

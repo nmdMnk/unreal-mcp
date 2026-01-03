@@ -23,44 +23,37 @@ TSharedPtr<FJsonObject> FSpirrowBridgeMaterialCommands::HandleCommand(
         return HandleCreateSimpleMaterial(Params);
     }
 
-    return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown material command: %s"), *CommandType));
+    return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+        ESpirrowErrorCode::UnknownCommand,
+        FString::Printf(TEXT("Unknown material command: %s"), *CommandType));
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeMaterialCommands::HandleCreateSimpleMaterial(
     const TSharedPtr<FJsonObject>& Params)
 {
-    // Get parameters
+    // Validate required parameters
     FString Name;
-    if (!Params->TryGetStringField(TEXT("name"), Name))
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("name"), Name))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+        return Error;
     }
 
-    FString Path;
-    if (!Params->TryGetStringField(TEXT("path"), Path))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'path' parameter"));
-    }
+    // Get optional parameters
+    FString Path, ShadingModelStr, BlendModeStr;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Materials"));
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("shading_model"), ShadingModelStr, TEXT("DefaultLit"));
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("blend_mode"), BlendModeStr, TEXT("Opaque"));
 
-    FString ShadingModelStr;
-    if (!Params->TryGetStringField(TEXT("shading_model"), ShadingModelStr))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'shading_model' parameter"));
-    }
+    bool bTwoSided;
+    FSpirrowBridgeCommonUtils::GetOptionalBool(Params, TEXT("two_sided"), bTwoSided, false);
 
-    FString BlendModeStr;
-    if (!Params->TryGetStringField(TEXT("blend_mode"), BlendModeStr))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blend_mode' parameter"));
-    }
-
-    bool bTwoSided = Params->GetBoolField(TEXT("two_sided"));
-    float Opacity = Params->HasField(TEXT("opacity")) ? Params->GetNumberField(TEXT("opacity")) : 1.0f;
+    double Opacity, EmissiveStrength;
+    FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("opacity"), Opacity, 1.0);
+    FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("emissive_strength"), EmissiveStrength, 1.0);
 
     // Parse colors
     FLinearColor BaseColor = FLinearColor::White;
     FLinearColor EmissiveColor = FLinearColor::Black;
-    float EmissiveStrength = 1.0f;
 
     const TArray<TSharedPtr<FJsonValue>>* BaseColorArray;
     if (Params->TryGetArrayField(TEXT("base_color"), BaseColorArray) && BaseColorArray->Num() >= 3)
@@ -80,10 +73,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeMaterialCommands::HandleCreateSimpleMateri
             (*EmissiveColorArray)[1]->AsNumber(),
             (*EmissiveColorArray)[2]->AsNumber()
         );
-        if (Params->HasField(TEXT("emissive_strength")))
-        {
-            EmissiveStrength = Params->GetNumberField(TEXT("emissive_strength"));
-        }
     }
 
     // Create package
@@ -92,13 +81,17 @@ TSharedPtr<FJsonObject> FSpirrowBridgeMaterialCommands::HandleCreateSimpleMateri
     // Check if material already exists
     if (UEditorAssetLibrary::DoesAssetExist(PackagePath))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Material already exists at: %s"), *PackagePath));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetAlreadyExists,
+            FString::Printf(TEXT("Material already exists at: %s"), *PackagePath));
     }
 
     UPackage* Package = CreatePackage(*PackagePath);
     if (!Package)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create package"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetCreationFailed,
+            TEXT("Failed to create package"));
     }
 
     // Create material
@@ -114,7 +107,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeMaterialCommands::HandleCreateSimpleMateri
 
     if (!Material)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create material"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetCreationFailed,
+            TEXT("Failed to create material"));
     }
 
     // Set blend mode

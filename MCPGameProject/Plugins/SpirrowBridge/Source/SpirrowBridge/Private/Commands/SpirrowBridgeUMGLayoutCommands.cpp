@@ -54,31 +54,31 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleCommand(const FSt
 
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleGetWidgetElements(const TSharedPtr<FJsonObject>& Params)
 {
-	// Get required parameters
+	// Validate required parameters
 	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+		return Error;
 	}
 
-	// Get optional path parameter
-	FString Path = TEXT("/Game/UI");
-	Params->TryGetStringField(TEXT("path"), Path);
+	// Get optional parameters
+	FString Path;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
 
-	// Load Widget Blueprint
-	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
-	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
-	if (!WidgetBP)
+	// Validate and load Widget Blueprint
+	UWidgetBlueprint* WidgetBP = nullptr;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			FString::Printf(TEXT("Widget Blueprint '%s' not found at path '%s'"), *WidgetName, *AssetPath));
+		return Error;
 	}
 
 	// Get WidgetTree
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
 	if (!WidgetTree)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetTreeNotFound,
+			TEXT("WidgetTree not found"));
 	}
 
 	// Collect all widgets
@@ -171,30 +171,26 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleGetWidgetElements
 
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetSlotProperty(const TSharedPtr<FJsonObject>& Params)
 {
-	// Get required parameters
-	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	// Validate required parameters
+	FString WidgetName, ElementName;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+		return Error;
+	}
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("element_name"), ElementName))
+	{
+		return Error;
 	}
 
-	FString ElementName;
-	if (!Params->TryGetStringField(TEXT("element_name"), ElementName))
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'element_name' parameter"));
-	}
+	// Get optional parameters
+	FString Path;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
 
-	// Get optional path parameter
-	FString Path = TEXT("/Game/UI");
-	Params->TryGetStringField(TEXT("path"), Path);
-
-	// Load Widget Blueprint
-	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
-	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
-	if (!WidgetBP)
+	// Validate and load Widget Blueprint
+	UWidgetBlueprint* WidgetBP = nullptr;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			FString::Printf(TEXT("Widget Blueprint '%s' not found at path '%s'"), *WidgetName, *AssetPath));
+		return Error;
 	}
 
 	// Find the widget element
@@ -202,6 +198,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetSlotProp
 	if (!Widget)
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetElementNotFound,
 			FString::Printf(TEXT("Widget element '%s' not found"), *ElementName));
 	}
 
@@ -210,6 +207,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetSlotProp
 	if (!CanvasSlot)
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::CanvasPanelNotFound,
 			FString::Printf(TEXT("Widget element '%s' is not in a Canvas Panel"), *ElementName));
 	}
 
@@ -324,42 +322,34 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetSlotProp
 
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetElementProperty(const TSharedPtr<FJsonObject>& Params)
 {
-	// Get required parameters
-	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	// Validate required parameters
+	FString WidgetName, ElementName, PropertyName, PropertyValue;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+		return Error;
+	}
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("element_name"), ElementName))
+	{
+		return Error;
+	}
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("property_name"), PropertyName))
+	{
+		return Error;
+	}
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("property_value"), PropertyValue))
+	{
+		return Error;
 	}
 
-	FString ElementName;
-	if (!Params->TryGetStringField(TEXT("element_name"), ElementName))
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'element_name' parameter"));
-	}
+	// Get optional parameters
+	FString Path;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
 
-	FString PropertyName;
-	if (!Params->TryGetStringField(TEXT("property_name"), PropertyName))
+	// Validate and load Widget Blueprint
+	UWidgetBlueprint* WidgetBP = nullptr;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'property_name' parameter"));
-	}
-
-	FString PropertyValue;
-	if (!Params->TryGetStringField(TEXT("property_value"), PropertyValue))
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'property_value' parameter"));
-	}
-
-	// Get optional path parameter
-	FString Path = TEXT("/Game/UI");
-	Params->TryGetStringField(TEXT("path"), Path);
-
-	// Load Widget Blueprint
-	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
-	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
-	if (!WidgetBP)
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			FString::Printf(TEXT("Widget Blueprint '%s' not found at path '%s'"), *WidgetName, *AssetPath));
+		return Error;
 	}
 
 	// Find the widget element
@@ -367,6 +357,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetElementP
 	if (!Widget)
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetElementNotFound,
 			FString::Printf(TEXT("Widget element '%s' not found"), *ElementName));
 	}
 
@@ -475,6 +466,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetElementP
 	if (!bSuccess)
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::PropertySetFailed,
 			FString::Printf(TEXT("Failed to set property '%s' on element '%s'"), *PropertyName, *ElementName));
 	}
 
@@ -494,46 +486,45 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleSetWidgetElementP
 
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleAddVerticalBoxToWidget(const TSharedPtr<FJsonObject>& Params)
 {
-	// Get required parameters
-	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	// Validate required parameters
+	FString WidgetName, BoxName;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+		return Error;
 	}
-
-	FString BoxName;
-	if (!Params->TryGetStringField(TEXT("box_name"), BoxName))
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("box_name"), BoxName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'box_name' parameter"));
+		return Error;
 	}
 
 	// Get optional parameters
-	FString Path = TEXT("/Game/UI");
-	Params->TryGetStringField(TEXT("path"), Path);
-
-	FString ParentName;
+	FString Path, ParentName, AnchorStr;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("anchor"), AnchorStr, TEXT("Center"));
 	bool bHasParent = Params->TryGetStringField(TEXT("parent_name"), ParentName);
 
-	// Load Widget Blueprint
-	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
-	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
-	if (!WidgetBP)
+	// Validate and load Widget Blueprint
+	UWidgetBlueprint* WidgetBP = nullptr;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			FString::Printf(TEXT("Widget Blueprint '%s' not found at path '%s'"), *WidgetName, *AssetPath));
+		return Error;
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
 	if (!WidgetTree)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetTreeNotFound,
+			TEXT("WidgetTree not found"));
 	}
 
 	// Create VerticalBox
 	UVerticalBox* VerticalBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), FName(*BoxName));
 	if (!VerticalBox)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create VerticalBox"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetCreationFailed,
+			FString::Printf(TEXT("Failed to create VerticalBox '%s'"), *BoxName));
 	}
 
 	// Determine parent
@@ -544,6 +535,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleAddVerticalBoxToW
 		if (!Parent)
 		{
 			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::WidgetElementNotFound,
 				FString::Printf(TEXT("Parent widget '%s' not found or not a panel"), *ParentName));
 		}
 	}
@@ -552,7 +544,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleAddVerticalBoxToW
 		Parent = Cast<UCanvasPanel>(WidgetTree->RootWidget);
 		if (!Parent)
 		{
-			return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Root Canvas Panel not found"));
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::CanvasPanelNotFound,
+				TEXT("Root Canvas Panel not found"));
 		}
 	}
 
@@ -562,10 +556,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleAddVerticalBoxToW
 	// If added to CanvasPanel, set slot properties
 	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Slot))
 	{
-		// Set anchor
-		FString AnchorStr = TEXT("Center");
-		Params->TryGetStringField(TEXT("anchor"), AnchorStr);
-
 		FAnchors Anchors(0.5f, 0.5f, 0.5f, 0.5f);
 		if (AnchorStr == TEXT("TopLeft")) Anchors = FAnchors(0.0f, 0.0f, 0.0f, 0.0f);
 		else if (AnchorStr == TEXT("TopCenter")) Anchors = FAnchors(0.5f, 0.0f, 0.5f, 0.0f);
@@ -628,46 +618,45 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleAddVerticalBoxToW
 
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleAddHorizontalBoxToWidget(const TSharedPtr<FJsonObject>& Params)
 {
-	// Get required parameters
-	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	// Validate required parameters
+	FString WidgetName, BoxName;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+		return Error;
 	}
-
-	FString BoxName;
-	if (!Params->TryGetStringField(TEXT("box_name"), BoxName))
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("box_name"), BoxName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'box_name' parameter"));
+		return Error;
 	}
 
 	// Get optional parameters
-	FString Path = TEXT("/Game/UI");
-	Params->TryGetStringField(TEXT("path"), Path);
-
-	FString ParentName;
+	FString Path, ParentName, AnchorStr;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("anchor"), AnchorStr, TEXT("Center"));
 	bool bHasParent = Params->TryGetStringField(TEXT("parent_name"), ParentName);
 
-	// Load Widget Blueprint
-	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
-	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
-	if (!WidgetBP)
+	// Validate and load Widget Blueprint
+	UWidgetBlueprint* WidgetBP = nullptr;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			FString::Printf(TEXT("Widget Blueprint '%s' not found at path '%s'"), *WidgetName, *AssetPath));
+		return Error;
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
 	if (!WidgetTree)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetTreeNotFound,
+			TEXT("WidgetTree not found"));
 	}
 
 	// Create HorizontalBox
 	UHorizontalBox* HorizontalBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), FName(*BoxName));
 	if (!HorizontalBox)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create HorizontalBox"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetCreationFailed,
+			FString::Printf(TEXT("Failed to create HorizontalBox '%s'"), *BoxName));
 	}
 
 	// Determine parent
@@ -678,6 +667,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleAddHorizontalBoxT
 		if (!Parent)
 		{
 			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::WidgetElementNotFound,
 				FString::Printf(TEXT("Parent widget '%s' not found or not a panel"), *ParentName));
 		}
 	}
@@ -686,7 +676,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleAddHorizontalBoxT
 		Parent = Cast<UCanvasPanel>(WidgetTree->RootWidget);
 		if (!Parent)
 		{
-			return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Root Canvas Panel not found"));
+			return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+				ESpirrowErrorCode::CanvasPanelNotFound,
+				TEXT("Root Canvas Panel not found"));
 		}
 	}
 
@@ -696,10 +688,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleAddHorizontalBoxT
 	// If added to CanvasPanel, set slot properties
 	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Slot))
 	{
-		// Set anchor
-		FString AnchorStr = TEXT("Center");
-		Params->TryGetStringField(TEXT("anchor"), AnchorStr);
-
 		FAnchors Anchors(0.5f, 0.5f, 0.5f, 0.5f);
 		if (AnchorStr == TEXT("TopLeft")) Anchors = FAnchors(0.0f, 0.0f, 0.0f, 0.0f);
 		else if (AnchorStr == TEXT("TopCenter")) Anchors = FAnchors(0.5f, 0.0f, 0.5f, 0.0f);
@@ -762,45 +750,42 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleAddHorizontalBoxT
 
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleReparentWidgetElement(const TSharedPtr<FJsonObject>& Params)
 {
-	// Get required parameters
-	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	// Validate required parameters
+	FString WidgetName, ElementName, NewParentName;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+		return Error;
 	}
-
-	FString ElementName;
-	if (!Params->TryGetStringField(TEXT("element_name"), ElementName))
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("element_name"), ElementName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'element_name' parameter"));
+		return Error;
 	}
-
-	FString NewParentName;
-	if (!Params->TryGetStringField(TEXT("new_parent_name"), NewParentName))
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("new_parent_name"), NewParentName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'new_parent_name' parameter"));
+		return Error;
 	}
 
 	// Get optional parameters
-	FString Path = TEXT("/Game/UI");
-	Params->TryGetStringField(TEXT("path"), Path);
+	FString Path;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
 
-	int32 SlotIndex = -1;
-	Params->TryGetNumberField(TEXT("slot_index"), SlotIndex);
+	double SlotIndexDouble;
+	FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("slot_index"), SlotIndexDouble, -1.0);
+	int32 SlotIndex = static_cast<int32>(SlotIndexDouble);
 
-	// Load Widget Blueprint
-	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
-	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
-	if (!WidgetBP)
+	// Validate and load Widget Blueprint
+	UWidgetBlueprint* WidgetBP = nullptr;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			FString::Printf(TEXT("Widget Blueprint '%s' not found at path '%s'"), *WidgetName, *AssetPath));
+		return Error;
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
 	if (!WidgetTree)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetTreeNotFound,
+			TEXT("WidgetTree not found"));
 	}
 
 	// Find the element to move
@@ -808,6 +793,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleReparentWidgetEle
 	if (!Element)
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetElementNotFound,
 			FString::Printf(TEXT("Widget element '%s' not found"), *ElementName));
 	}
 
@@ -816,6 +802,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleReparentWidgetEle
 	if (!NewParent)
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetElementNotFound,
 			FString::Printf(TEXT("New parent '%s' not found or not a panel widget"), *NewParentName));
 	}
 
@@ -835,9 +822,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleReparentWidgetEle
 	{
 		// Insert at specific index - need to add at end then reorder
 		NewSlot = NewParent->AddChild(Element);
-		// Note: UMG doesn't have a direct InsertChildAt, so we add at end
-		// For proper index support, would need to remove all children after index,
-		// add the new one, then re-add the removed ones. Simplified here.
 	}
 	else
 	{
@@ -846,7 +830,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleReparentWidgetEle
 
 	if (!NewSlot)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to add element to new parent"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetCreationFailed,
+			TEXT("Failed to add element to new parent"));
 	}
 
 	// Mark as modified and compile
@@ -866,36 +852,34 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleReparentWidgetEle
 
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleRemoveWidgetElement(const TSharedPtr<FJsonObject>& Params)
 {
-	// Get required parameters
-	FString WidgetName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+	// Validate required parameters
+	FString WidgetName, ElementName;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), WidgetName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+		return Error;
+	}
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("element_name"), ElementName))
+	{
+		return Error;
 	}
 
-	FString ElementName;
-	if (!Params->TryGetStringField(TEXT("element_name"), ElementName))
-	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'element_name' parameter"));
-	}
+	// Get optional parameters
+	FString Path;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/UI"));
 
-	// Get optional path parameter
-	FString Path = TEXT("/Game/UI");
-	Params->TryGetStringField(TEXT("path"), Path);
-
-	// Load Widget Blueprint
-	FString AssetPath = Path + TEXT("/") + WidgetName + TEXT(".") + WidgetName;
-	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(AssetPath));
-	if (!WidgetBP)
+	// Validate and load Widget Blueprint
+	UWidgetBlueprint* WidgetBP = nullptr;
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateWidgetBlueprint(WidgetName, Path, WidgetBP))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-			FString::Printf(TEXT("Widget Blueprint '%s' not found at path '%s'"), *WidgetName, *AssetPath));
+		return Error;
 	}
 
 	UWidgetTree* WidgetTree = WidgetBP->WidgetTree;
 	if (!WidgetTree)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("WidgetTree not found"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetTreeNotFound,
+			TEXT("WidgetTree not found"));
 	}
 
 	// Find the element to remove
@@ -903,13 +887,16 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleRemoveWidgetEleme
 	if (!Element)
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetElementNotFound,
 			FString::Printf(TEXT("Widget element '%s' not found"), *ElementName));
 	}
 
 	// Cannot remove root widget
 	if (Element == WidgetTree->RootWidget)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Cannot remove root widget"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::InvalidOperation,
+			TEXT("Cannot remove root widget"));
 	}
 
 	// Mark blueprint as modified BEFORE making changes
@@ -946,6 +933,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGLayoutCommands::HandleRemoveWidgetEleme
 	if (VerifyWidget)
 	{
 		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::OperationFailed,
 			FString::Printf(TEXT("Failed to completely remove widget '%s' from WidgetTree"), *ElementName));
 	}
 

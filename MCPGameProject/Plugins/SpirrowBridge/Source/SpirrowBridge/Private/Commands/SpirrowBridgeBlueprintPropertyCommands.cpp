@@ -33,40 +33,23 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleCommand(c
         return HandleSetStructArrayProperty(Params);
     }
 
-    return nullptr; // Not handled by this class
+    return nullptr;
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleScanProjectClasses(const TSharedPtr<FJsonObject>& Params)
 {
-    // Get parameters
-    FString ClassType = TEXT("all");
-    Params->TryGetStringField(TEXT("class_type"), ClassType);
-
-    FString ParentClassFilter;
+    // Get optional parameters
+    FString ClassType, ParentClassFilter, ModuleFilter, PathFilter, BlueprintTypeFilter;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("class_type"), ClassType, TEXT("all"));
     Params->TryGetStringField(TEXT("parent_class"), ParentClassFilter);
-
-    FString ModuleFilter;
     Params->TryGetStringField(TEXT("module_filter"), ModuleFilter);
-
-    FString PathFilter;
     Params->TryGetStringField(TEXT("path_filter"), PathFilter);
-
-    bool bIncludeEngine = false;
-    if (Params->HasField(TEXT("include_engine")))
-    {
-        bIncludeEngine = Params->GetBoolField(TEXT("include_engine"));
-    }
-
-    bool bExcludeReinst = true;
-    if (Params->HasField(TEXT("exclude_reinst")))
-    {
-        bExcludeReinst = Params->GetBoolField(TEXT("exclude_reinst"));
-    }
-
-    FString BlueprintTypeFilter;
     Params->TryGetStringField(TEXT("blueprint_type"), BlueprintTypeFilter);
 
-    // Result arrays
+    bool bIncludeEngine, bExcludeReinst;
+    FSpirrowBridgeCommonUtils::GetOptionalBool(Params, TEXT("include_engine"), bIncludeEngine, false);
+    FSpirrowBridgeCommonUtils::GetOptionalBool(Params, TEXT("exclude_reinst"), bExcludeReinst, true);
+
     TArray<TSharedPtr<FJsonValue>> CppClassesArray;
     TArray<TSharedPtr<FJsonValue>> BlueprintsArray;
 
@@ -84,7 +67,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleScanProje
             FString ClassPath = TestClass->GetPathName();
             FString ClassName = TestClass->GetName();
 
-            // Filter Engine classes
             if (!bIncludeEngine)
             {
                 if (ClassPath.Contains(TEXT("/Script/Engine.")) ||
@@ -100,23 +82,19 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleScanProje
                 }
             }
 
-            // Skip Blueprint-generated classes
             if (ClassName.EndsWith(TEXT("_C")))
             {
                 continue;
             }
 
-            // Filter REINST_* classes
             if (bExcludeReinst)
             {
-                if (ClassName.StartsWith(TEXT("REINST_")) ||
-                    ClassPath.Contains(TEXT("/Engine/Transient.")))
+                if (ClassName.StartsWith(TEXT("REINST_")) || ClassPath.Contains(TEXT("/Engine/Transient.")))
                 {
                     continue;
                 }
             }
 
-            // Module filter
             if (!ModuleFilter.IsEmpty())
             {
                 if (!ClassPath.Contains(FString::Printf(TEXT("/Script/%s."), *ModuleFilter)))
@@ -125,7 +103,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleScanProje
                 }
             }
 
-            // Parent class filter
             if (!ParentClassFilter.IsEmpty())
             {
                 UClass* ParentClass = TestClass->GetSuperClass();
@@ -141,13 +118,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleScanProje
                     }
                     ParentClass = ParentClass->GetSuperClass();
                 }
-                if (!bMatchesParent)
-                {
-                    continue;
-                }
+                if (!bMatchesParent) continue;
             }
 
-            // Extract module name
             FString ModuleName;
             if (ClassPath.Contains(TEXT("/Script/")))
             {
@@ -159,14 +132,12 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleScanProje
                 }
             }
 
-            // Get parent class name
             FString ParentClassName;
             if (TestClass->GetSuperClass())
             {
                 ParentClassName = TestClass->GetSuperClass()->GetName();
             }
 
-            // Create JSON object
             TSharedPtr<FJsonObject> ClassObj = MakeShared<FJsonObject>();
             ClassObj->SetStringField(TEXT("name"), ClassName);
             ClassObj->SetStringField(TEXT("path"), ClassPath);
@@ -203,12 +174,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleScanProje
         for (const FAssetData& Asset : AssetList)
         {
             UBlueprint* Blueprint = Cast<UBlueprint>(Asset.GetAsset());
-            if (!Blueprint)
-            {
-                continue;
-            }
+            if (!Blueprint) continue;
 
-            // Parent class filter
             if (!ParentClassFilter.IsEmpty() && Blueprint->ParentClass)
             {
                 UClass* ParentClass = Blueprint->ParentClass;
@@ -224,13 +191,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleScanProje
                     }
                     ParentClass = ParentClass->GetSuperClass();
                 }
-                if (!bMatchesParent)
-                {
-                    continue;
-                }
+                if (!bMatchesParent) continue;
             }
 
-            // Blueprint type filter
             if (!BlueprintTypeFilter.IsEmpty() && Blueprint->ParentClass)
             {
                 bool bMatchesType = false;
@@ -279,20 +242,15 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleScanProje
                     bMatchesType = ParentClass->IsChildOf(APawn::StaticClass());
                 }
 
-                if (!bMatchesType)
-                {
-                    continue;
-                }
+                if (!bMatchesType) continue;
             }
 
-            // Parent class name
             FString ParentClassName;
             if (Blueprint->ParentClass)
             {
                 ParentClassName = Blueprint->ParentClass->GetName();
             }
 
-            // Create JSON object
             TSharedPtr<FJsonObject> BPObj = MakeShared<FJsonObject>();
             BPObj->SetStringField(TEXT("name"), Asset.AssetName.ToString());
             BPObj->SetStringField(TEXT("path"), Asset.GetObjectPathString());
@@ -302,8 +260,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleScanProje
         }
     }
 
-    // Build result
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
     ResultObj->SetArrayField(TEXT("cpp_classes"), CppClassesArray);
     ResultObj->SetArrayField(TEXT("blueprints"), BlueprintsArray);
     ResultObj->SetNumberField(TEXT("total_cpp"), CppClassesArray.Num());
@@ -314,70 +272,81 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleScanProje
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetBlueprintClassArray(const TSharedPtr<FJsonObject>& Params)
 {
-    // Get parameters
-    FString BlueprintName = Params->GetStringField(TEXT("blueprint_name"));
-    FString PropertyName = Params->GetStringField(TEXT("property_name"));
+    // Validate required parameters
+    FString BlueprintName, PropertyName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
+    {
+        return Error;
+    }
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("property_name"), PropertyName))
+    {
+        return Error;
+    }
+
     const TArray<TSharedPtr<FJsonValue>>* ClassPathsArray = nullptr;
     if (!Params->TryGetArrayField(TEXT("class_paths"), ClassPathsArray))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing required parameter: class_paths"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::MissingRequiredParam,
+            TEXT("Missing required parameter: class_paths"));
     }
 
-    FString Path = Params->HasField(TEXT("path")) ? Params->GetStringField(TEXT("path")) : TEXT("/Game/Blueprints");
+    // Get optional parameters
+    FString Path;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
 
     // Load Blueprint
-    FString BlueprintPath = Path + TEXT("/") + BlueprintName + TEXT(".") + BlueprintName;
-    UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *BlueprintPath);
-    if (!Blueprint)
+    UBlueprint* Blueprint = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Failed to load blueprint: %s"), *BlueprintPath));
+        return Error;
     }
 
     // Get CDO
     UClass* BPClass = Blueprint->GeneratedClass;
     if (!BPClass)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Blueprint has no generated class"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidOperation,
+            TEXT("Blueprint has no generated class"));
     }
 
     UObject* CDO = BPClass->GetDefaultObject();
     if (!CDO)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get CDO"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidOperation,
+            TEXT("Failed to get CDO"));
     }
 
     // Find property
     FArrayProperty* ArrayProp = FindFProperty<FArrayProperty>(BPClass, *PropertyName);
     if (!ArrayProp)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Property not found: %s"), *PropertyName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::PropertyNotFound,
+            FString::Printf(TEXT("Property not found: %s"), *PropertyName));
     }
 
-    // Check if inner property is a class property
     FClassProperty* ClassProp = CastField<FClassProperty>(ArrayProp->Inner);
     if (!ClassProp)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Property %s is not a TSubclassOf array"), *PropertyName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidParameter,
+            FString::Printf(TEXT("Property %s is not a TSubclassOf array"), *PropertyName));
     }
 
-    // Get array helper
     void* ArrayPtr = ArrayProp->ContainerPtrToValuePtr<void>(CDO);
     FScriptArrayHelper ArrayHelper(ArrayProp, ArrayPtr);
 
-    // Clear existing array
     ArrayHelper.EmptyValues();
 
-    // Add new classes
     int32 AddedCount = 0;
     for (const TSharedPtr<FJsonValue>& ClassPathValue : *ClassPathsArray)
     {
         FString ClassPath = ClassPathValue->AsString();
-
         UClass* LoadedClass = LoadObject<UClass>(nullptr, *ClassPath);
-        if (!LoadedClass)
-        {
-            continue;
-        }
+        if (!LoadedClass) continue;
 
         int32 NewIndex = ArrayHelper.AddValue();
         UClass** ElementPtr = reinterpret_cast<UClass**>(ArrayHelper.GetRawPtr(NewIndex));
@@ -385,12 +354,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetBluepr
         AddedCount++;
     }
 
-    // Mark modified and compile
     Blueprint->Modify();
     Blueprint->MarkPackageDirty();
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
 
-    // Create success response
     TSharedPtr<FJsonObject> ResultJson = MakeShareable(new FJsonObject());
     ResultJson->SetBoolField(TEXT("success"), true);
     ResultJson->SetStringField(TEXT("property_name"), PropertyName);
@@ -401,67 +368,79 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetBluepr
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetStructArrayProperty(const TSharedPtr<FJsonObject>& Params)
 {
-    // Get parameters
-    FString BlueprintName = Params->GetStringField(TEXT("blueprint_name"));
-    FString PropertyName = Params->GetStringField(TEXT("property_name"));
+    // Validate required parameters
+    FString BlueprintName, PropertyName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
+    {
+        return Error;
+    }
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("property_name"), PropertyName))
+    {
+        return Error;
+    }
 
     const TArray<TSharedPtr<FJsonValue>>* ValuesArray = nullptr;
     if (!Params->TryGetArrayField(TEXT("values"), ValuesArray))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing required parameter: values"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::MissingRequiredParam,
+            TEXT("Missing required parameter: values"));
     }
 
-    FString Path = Params->HasField(TEXT("path")) ? Params->GetStringField(TEXT("path")) : TEXT("/Game/Blueprints");
+    // Get optional parameters
+    FString Path;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
 
     // Load Blueprint
-    FString BlueprintPath = Path + TEXT("/") + BlueprintName + TEXT(".") + BlueprintName;
-    UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *BlueprintPath);
-    if (!Blueprint)
+    UBlueprint* Blueprint = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Failed to load blueprint: %s"), *BlueprintPath));
+        return Error;
     }
 
-    // Get CDO
     UClass* BPClass = Blueprint->GeneratedClass;
     if (!BPClass)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Blueprint has no generated class"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidOperation,
+            TEXT("Blueprint has no generated class"));
     }
 
     UObject* CDO = BPClass->GetDefaultObject();
     if (!CDO)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get CDO"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidOperation,
+            TEXT("Failed to get CDO"));
     }
 
-    // Find array property
     FArrayProperty* ArrayProp = FindFProperty<FArrayProperty>(BPClass, *PropertyName);
     if (!ArrayProp)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Property not found: %s"), *PropertyName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::PropertyNotFound,
+            FString::Printf(TEXT("Property not found: %s"), *PropertyName));
     }
 
-    // Verify inner property is a struct
     FStructProperty* StructProp = CastField<FStructProperty>(ArrayProp->Inner);
     if (!StructProp)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Property %s is not a struct array"), *PropertyName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidParameter,
+            FString::Printf(TEXT("Property %s is not a struct array"), *PropertyName));
     }
 
     UScriptStruct* StructType = StructProp->Struct;
 
-    // Get array helper
     void* ArrayPtr = ArrayProp->ContainerPtrToValuePtr<void>(CDO);
     FScriptArrayHelper ArrayHelper(ArrayProp, ArrayPtr);
 
-    // Clear existing array and resize
     ArrayHelper.EmptyValues();
     ArrayHelper.Resize(ValuesArray->Num());
 
     int32 SetCount = 0;
     TArray<FString> Errors;
 
-    // Set each element
     for (int32 i = 0; i < ValuesArray->Num(); ++i)
     {
         const TSharedPtr<FJsonValue>& ElementValue = (*ValuesArray)[i];
@@ -474,26 +453,18 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetStruct
         const TSharedPtr<FJsonObject>& ElementObj = ElementValue->AsObject();
         void* ElementPtr = ArrayHelper.GetRawPtr(i);
 
-        // Set each field of the struct
         for (TFieldIterator<FProperty> PropIt(StructType); PropIt; ++PropIt)
         {
             FProperty* FieldProp = *PropIt;
             FString FieldName = FieldProp->GetName();
 
-            if (!ElementObj->HasField(FieldName))
-            {
-                continue;
-            }
+            if (!ElementObj->HasField(FieldName)) continue;
 
             TSharedPtr<FJsonValue> FieldValue = ElementObj->TryGetField(FieldName);
-            if (!FieldValue.IsValid())
-            {
-                continue;
-            }
+            if (!FieldValue.IsValid()) continue;
 
             void* FieldPtr = FieldProp->ContainerPtrToValuePtr<void>(ElementPtr);
 
-            // Handle different field types
             if (FClassProperty* ClassFieldProp = CastField<FClassProperty>(FieldProp))
             {
                 FString ClassPath = FieldValue->AsString();
@@ -509,45 +480,37 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetStruct
             }
             else if (FIntProperty* IntFieldProp = CastField<FIntProperty>(FieldProp))
             {
-                int32 IntValue = static_cast<int32>(FieldValue->AsNumber());
-                IntFieldProp->SetPropertyValue(FieldPtr, IntValue);
+                IntFieldProp->SetPropertyValue(FieldPtr, static_cast<int32>(FieldValue->AsNumber()));
             }
             else if (FFloatProperty* FloatFieldProp = CastField<FFloatProperty>(FieldProp))
             {
-                float FloatValue = static_cast<float>(FieldValue->AsNumber());
-                FloatFieldProp->SetPropertyValue(FieldPtr, FloatValue);
+                FloatFieldProp->SetPropertyValue(FieldPtr, static_cast<float>(FieldValue->AsNumber()));
             }
             else if (FDoubleProperty* DoubleFieldProp = CastField<FDoubleProperty>(FieldProp))
             {
-                double DoubleValue = FieldValue->AsNumber();
-                DoubleFieldProp->SetPropertyValue(FieldPtr, DoubleValue);
+                DoubleFieldProp->SetPropertyValue(FieldPtr, FieldValue->AsNumber());
             }
             else if (FBoolProperty* BoolFieldProp = CastField<FBoolProperty>(FieldProp))
             {
-                bool BoolValue = FieldValue->AsBool();
-                BoolFieldProp->SetPropertyValue(FieldPtr, BoolValue);
+                BoolFieldProp->SetPropertyValue(FieldPtr, FieldValue->AsBool());
             }
             else if (FStrProperty* StrFieldProp = CastField<FStrProperty>(FieldProp))
             {
-                FString StrValue = FieldValue->AsString();
-                StrFieldProp->SetPropertyValue(FieldPtr, StrValue);
+                StrFieldProp->SetPropertyValue(FieldPtr, FieldValue->AsString());
             }
             else if (FNameProperty* NameFieldProp = CastField<FNameProperty>(FieldProp))
             {
-                FName NameValue = FName(*FieldValue->AsString());
-                NameFieldProp->SetPropertyValue(FieldPtr, NameValue);
+                NameFieldProp->SetPropertyValue(FieldPtr, FName(*FieldValue->AsString()));
             }
         }
 
         SetCount++;
     }
 
-    // Mark modified and compile
     Blueprint->Modify();
     Blueprint->MarkPackageDirty();
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
 
-    // Create response
     TSharedPtr<FJsonObject> ResultJson = MakeShareable(new FJsonObject());
     ResultJson->SetBoolField(TEXT("success"), Errors.Num() == 0);
     ResultJson->SetStringField(TEXT("property_name"), PropertyName);

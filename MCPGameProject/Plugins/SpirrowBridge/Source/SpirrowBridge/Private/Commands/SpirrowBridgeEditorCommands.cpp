@@ -115,10 +115,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleGetActorsInLevel(con
 
 TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleFindActorsByName(const TSharedPtr<FJsonObject>& Params)
 {
+    // Validate required parameters
     FString Pattern;
-    if (!Params->TryGetStringField(TEXT("pattern"), Pattern))
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("pattern"), Pattern))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'pattern' parameter"));
+        return Error;
     }
     
     TArray<AActor*> AllActors;
@@ -144,18 +145,15 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleFindActorsByName(con
 
 TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSpawnActor(const TSharedPtr<FJsonObject>& Params)
 {
-    // Get required parameters
-    FString ActorType;
-    if (!Params->TryGetStringField(TEXT("type"), ActorType))
+    // Validate required parameters
+    FString ActorType, ActorName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("type"), ActorType))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'type' parameter"));
+        return Error;
     }
-
-    // Get actor name (required parameter)
-    FString ActorName;
-    if (!Params->TryGetStringField(TEXT("name"), ActorName))
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("name"), ActorName))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+        return Error;
     }
 
     // Get optional transform parameters
@@ -192,7 +190,12 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSpawnActor(const TSh
     {
         if (Actor && Actor->GetName() == ActorName)
         {
-            return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor with name '%s' already exists"), *ActorName));
+            TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+            Details->SetStringField(TEXT("name"), ActorName);
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::AssetAlreadyExists,
+                FString::Printf(TEXT("Actor with name '%s' already exists"), *ActorName),
+                Details);
         }
     }
 
@@ -240,10 +243,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSpawnActor(const TSh
 
 TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleDeleteActor(const TSharedPtr<FJsonObject>& Params)
 {
+    // Validate required parameters
     FString ActorName;
-    if (!Params->TryGetStringField(TEXT("name"), ActorName))
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("name"), ActorName))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+        return Error;
     }
 
     TArray<AActor*> AllActors;
@@ -265,16 +269,18 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleDeleteActor(const TS
         }
     }
     
-    return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+    return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+        ESpirrowErrorCode::ActorNotFound,
+        FString::Printf(TEXT("Actor not found: %s"), *ActorName));
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSetActorTransform(const TSharedPtr<FJsonObject>& Params)
 {
-    // Get actor name
+    // Validate required parameters
     FString ActorName;
-    if (!Params->TryGetStringField(TEXT("name"), ActorName))
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("name"), ActorName))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+        return Error;
     }
 
     // Find the actor
@@ -293,7 +299,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSetActorTransform(co
 
     if (!TargetActor)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::ActorNotFound,
+            FString::Printf(TEXT("Actor not found: %s"), *ActorName));
     }
 
     // Get transform parameters
@@ -321,11 +329,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSetActorTransform(co
 
 TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleGetActorProperties(const TSharedPtr<FJsonObject>& Params)
 {
-    // Get actor name
+    // Validate required parameters
     FString ActorName;
-    if (!Params->TryGetStringField(TEXT("name"), ActorName))
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("name"), ActorName))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+        return Error;
     }
 
     // Find the actor
@@ -344,7 +352,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleGetActorProperties(c
 
     if (!TargetActor)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::ActorNotFound,
+            FString::Printf(TEXT("Actor not found: %s"), *ActorName));
     }
 
     // Always return detailed properties for this command
@@ -353,11 +363,23 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleGetActorProperties(c
 
 TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSetActorProperty(const TSharedPtr<FJsonObject>& Params)
 {
-    // Get actor name
-    FString ActorName;
-    if (!Params->TryGetStringField(TEXT("name"), ActorName))
+    // Validate required parameters
+    FString ActorName, PropertyName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("name"), ActorName))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+        return Error;
+    }
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("property_name"), PropertyName))
+    {
+        return Error;
+    }
+
+    // Validate property_value exists
+    if (!Params->HasField(TEXT("property_value")))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::MissingRequiredParam,
+            TEXT("Missing 'property_value' parameter"));
     }
 
     // Find the actor
@@ -376,20 +398,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSetActorProperty(con
 
     if (!TargetActor)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
-    }
-
-    // Get property name
-    FString PropertyName;
-    if (!Params->TryGetStringField(TEXT("property_name"), PropertyName))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'property_name' parameter"));
-    }
-
-    // Get property value
-    if (!Params->HasField(TEXT("property_value")))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'property_value' parameter"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::ActorNotFound,
+            FString::Printf(TEXT("Actor not found: %s"), *ActorName));
     }
 
     TSharedPtr<FJsonValue> PropertyValue = Params->Values.FindRef(TEXT("property_value"));
@@ -418,22 +429,24 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSetActorProperty(con
         if (!FoundComponent)
         {
             // Log available components for debugging
-            FString AvailableComponents;
+            TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+            Details->SetStringField(TEXT("component_name"), ComponentName);
+            Details->SetStringField(TEXT("actor_name"), ActorName);
+            
+            TArray<TSharedPtr<FJsonValue>> ComponentList;
             for (UActorComponent* Component : Components)
             {
                 if (Component)
                 {
-                    if (!AvailableComponents.IsEmpty())
-                    {
-                        AvailableComponents += TEXT(", ");
-                    }
-                    AvailableComponents += Component->GetName();
+                    ComponentList.Add(MakeShared<FJsonValueString>(Component->GetName()));
                 }
             }
+            Details->SetArrayField(TEXT("available_components"), ComponentList);
 
             return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-                FString::Printf(TEXT("Component '%s' not found on actor '%s'. Available components: %s"),
-                    *ComponentName, *ActorName, *AvailableComponents));
+                ESpirrowErrorCode::ComponentNotFound,
+                FString::Printf(TEXT("Component '%s' not found on actor '%s'"), *ComponentName, *ActorName),
+                Details);
         }
 
         TargetObject = FoundComponent;
@@ -459,31 +472,28 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSetActorProperty(con
     }
     else
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(ErrorMessage);
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::PropertySetFailed,
+            ErrorMessage);
     }
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSpawnBlueprintActor(const TSharedPtr<FJsonObject>& Params)
 {
-    // Get required parameters
-    FString BlueprintName;
-    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    // Validate required parameters
+    FString BlueprintName, ActorName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+        return Error;
+    }
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("actor_name"), ActorName))
+    {
+        return Error;
     }
 
-    FString ActorName;
-    if (!Params->TryGetStringField(TEXT("actor_name"), ActorName))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'actor_name' parameter"));
-    }
-
-    // Get path parameter (default: /Game/Blueprints)
+    // Get optional parameters
     FString Path;
-    if (!Params->TryGetStringField(TEXT("path"), Path))
-    {
-        Path = TEXT("/Game/Blueprints");
-    }
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
 
     // Ensure path ends with /
     if (!Path.EndsWith(TEXT("/")))
@@ -501,13 +511,21 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSpawnBlueprintActor(
 
     if (!FPackageName::DoesPackageExist(AssetPath))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint '%s' not found at path: %s"), *BlueprintName, *AssetPath));
+        TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+        Details->SetStringField(TEXT("blueprint_name"), BlueprintName);
+        Details->SetStringField(TEXT("path"), AssetPath);
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::BlueprintNotFound,
+            FString::Printf(TEXT("Blueprint '%s' not found at path: %s"), *BlueprintName, *AssetPath),
+            Details);
     }
 
     UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *AssetPath);
     if (!Blueprint)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetLoadFailed,
+            FString::Printf(TEXT("Failed to load Blueprint: %s"), *BlueprintName));
     }
 
     // Get transform parameters
@@ -549,7 +567,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSpawnBlueprintActor(
         return FSpirrowBridgeCommonUtils::ActorToJsonObject(NewActor, true);
     }
 
-    return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to spawn blueprint actor"));
+    return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+        ESpirrowErrorCode::ActorSpawnFailed,
+        FString::Printf(TEXT("Failed to spawn blueprint actor '%s'"), *BlueprintName));
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleFocusViewport(const TSharedPtr<FJsonObject>& Params)

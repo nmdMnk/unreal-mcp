@@ -4,6 +4,9 @@
 
 このドキュメントは、MCPツールの動作確認状況と今後追加予定の機能をまとめたものです。
 
+> **バージョン**: 0.6.6 (Phase C/D 完了)  
+> **ステータス**: Beta
+
 ---
 
 ## 確認済み機能
@@ -147,3 +150,76 @@
 | ✅ | 動作確認済み |
 | 🔲 | 未確認 |
 | 🆕 | 新規追加 |
+
+---
+
+## Phase C: テスト自動化・エラーハンドリング強化 (進行中) 🆕
+
+### Part 1: テストフレームワーク作成 ✅
+
+**新規作成ファイル (Python/tests/)**:
+| ファイル | 説明 |
+|----------|------|
+| `test_framework.py` | MCPクライアント & TestSuite基盤 |
+| `conftest.py` | pytest fixtures |
+| `test_umg_widgets.py` | UMG Widgetテスト (13テスト) |
+| `test_blueprints.py` | Blueprintテスト (11テスト) |
+| `run_tests.py` | CLIテストランナー |
+| `smoke_test.py` | スタンドアロン スモークテスト |
+| `README.md` | テストドキュメント |
+
+**テスト実行方法**:
+```bash
+cd Python
+pip install -e ".[test]"
+python tests/smoke_test.py  # クイックテスト
+python tests/run_tests.py   # 全テスト
+python tests/run_tests.py -m umg  # UMGのみ
+```
+
+### Part 2: エラーハンドリング強化 ✅
+
+**C++側 (SpirrowBridgeCommonUtils)**:
+
+新規追加エラーコード体系:
+```cpp
+namespace ESpirrowErrorCode {
+    // General (1000-1099): InvalidParams, MissingRequiredParam, etc.
+    // Asset (1100-1199): AssetNotFound, AssetLoadFailed, etc.
+    // Blueprint (1200-1299): BlueprintNotFound, NodeCreationFailed, etc.
+    // Widget (1300-1399): WidgetNotFound, WidgetElementNotFound, etc.
+    // Actor (1400-1499): ActorNotFound, ComponentNotFound, etc.
+    // GAS (1500-1599): GameplayTagInvalid, etc.
+}
+```
+
+新規バリデーション関数:
+- `ValidateRequiredString()` - 必須文字列パラメータ検証
+- `ValidateRequiredNumber()` - 必須数値パラメータ検証
+- `ValidateRequiredBool()` - 必須ブール値パラメータ検証
+- `GetOptionalString/Number/Bool()` - オプショナルパラメータ取得
+- `ValidateBlueprint()` - Blueprint存在確認
+- `ValidateWidgetBlueprint()` - Widget Blueprint存在確認
+- `IsValidAssetPath()` - アセットパス形式検証
+- `GetLinearColorFromJson()` - RGBA色値取得
+- `LogCommandError/Warning/Info()` - ロギングユーティリティ
+
+エラーレスポンス形式:
+```json
+{
+    "success": false,
+    "error_code": 1200,
+    "error": "Blueprint not found: BP_Test at /Game/Test",
+    "details": {
+        "blueprint_name": "BP_Test",
+        "path": "/Game/Test",
+        "full_path": "/Game/Test/BP_Test.BP_Test"
+    }
+}
+```
+
+**Python側 (tools/error_codes.py)**:
+- `ErrorCode` enum - C++と同期したエラーコード
+- `SpirrowError` dataclass - 構造化エラー
+- `parse_error_response()` - レスポンスからエラー解析
+- `get_friendly_message()` - ユーザーフレンドリーメッセージ

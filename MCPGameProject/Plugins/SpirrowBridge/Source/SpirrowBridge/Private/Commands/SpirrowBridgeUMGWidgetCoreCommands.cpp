@@ -75,29 +75,27 @@ FAnchors FSpirrowBridgeUMGWidgetCoreCommands::ParseAnchorPreset(const FString& A
 
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetCoreCommands::HandleCreateUMGWidgetBlueprint(const TSharedPtr<FJsonObject>& Params)
 {
-	// Get required parameters - support both "widget_name" and "name" for compatibility
+	// Validate required parameters - support both "widget_name" and "name" for compatibility
 	FString BlueprintName;
-	if (!Params->TryGetStringField(TEXT("widget_name"), BlueprintName))
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("widget_name"), BlueprintName))
 	{
-		if (!Params->TryGetStringField(TEXT("name"), BlueprintName))
+		// Try alternative parameter name
+		if (auto Error2 = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("name"), BlueprintName))
 		{
-			return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'widget_name' parameter"));
+			return Error; // Return original error
 		}
 	}
 
-	// Get optional path parameter (default: /Game/UI)
-	FString PackagePath = TEXT("/Game/UI");
-	Params->TryGetStringField(TEXT("path"), PackagePath);
+	// Get optional parameters
+	FString PackagePath, ParentClassName;
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), PackagePath, TEXT("/Game/UI"));
+	FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("parent_class"), ParentClassName, TEXT("UserWidget"));
 
 	// Ensure path ends without trailing slash
 	if (PackagePath.EndsWith(TEXT("/")))
 	{
 		PackagePath = PackagePath.LeftChop(1);
 	}
-
-	// Get optional parent class (default: UserWidget)
-	FString ParentClassName = TEXT("UserWidget");
-	Params->TryGetStringField(TEXT("parent_class"), ParentClassName);
 
 	// Find the parent class
 	UClass* ParentClass = nullptr;
@@ -115,7 +113,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetCoreCommands::HandleCreateUMGWidg
 		}
 		if (!ParentClass)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Parent class '%s' not found, using UserWidget"), *ParentClassName);
+			FSpirrowBridgeCommonUtils::LogCommandWarning(TEXT("create_umg_widget_blueprint"),
+				FString::Printf(TEXT("Parent class '%s' not found, using UserWidget"), *ParentClassName));
 			ParentClass = UUserWidget::StaticClass();
 		}
 	}
@@ -127,14 +126,22 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetCoreCommands::HandleCreateUMGWidg
 	// Check if asset already exists
 	if (UEditorAssetLibrary::DoesAssetExist(FullPath))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Widget Blueprint '%s' already exists at '%s'"), *BlueprintName, *FullPath));
+		TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+		Details->SetStringField(TEXT("widget_name"), BlueprintName);
+		Details->SetStringField(TEXT("path"), FullPath);
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::AssetAlreadyExists,
+			FString::Printf(TEXT("Widget Blueprint '%s' already exists at '%s'"), *BlueprintName, *FullPath),
+			Details);
 	}
 
 	// Create package
 	UPackage* Package = CreatePackage(*FullPath);
 	if (!Package)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create package"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::AssetCreationFailed,
+			TEXT("Failed to create package"));
 	}
 
 	// Create Widget Blueprint
@@ -151,7 +158,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetCoreCommands::HandleCreateUMGWidg
 	UWidgetBlueprint* WidgetBlueprint = Cast<UWidgetBlueprint>(NewBlueprint);
 	if (!WidgetBlueprint)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create Widget Blueprint"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetCreationFailed,
+			FString::Printf(TEXT("Failed to create Widget Blueprint '%s'"), *BlueprintName));
 	}
 
 	// Add default Canvas Panel
@@ -184,36 +193,46 @@ TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetCoreCommands::HandleCreateUMGWidg
 
 TSharedPtr<FJsonObject> FSpirrowBridgeUMGWidgetCoreCommands::HandleAddWidgetToViewport(const TSharedPtr<FJsonObject>& Params)
 {
-	// Get required parameters
+	// Validate required parameters
 	FString BlueprintName;
-	if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+	if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+		return Error;
 	}
 
-	// Find the Widget Blueprint
+	// Find the Widget Blueprint (legacy path)
 	FString FullPath = TEXT("/Game/Widgets/") + BlueprintName;
 	UWidgetBlueprint* WidgetBlueprint = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(FullPath));
 	if (!WidgetBlueprint)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Widget Blueprint '%s' not found"), *BlueprintName));
+		TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+		Details->SetStringField(TEXT("blueprint_name"), BlueprintName);
+		Details->SetStringField(TEXT("path"), TEXT("/Game/Widgets"));
+		Details->SetStringField(TEXT("full_path"), FullPath);
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetNotFound,
+			FString::Printf(TEXT("Widget Blueprint '%s' not found"), *BlueprintName),
+			Details);
 	}
 
 	// Get optional Z-order parameter
-	int32 ZOrder = 0;
-	Params->TryGetNumberField(TEXT("z_order"), ZOrder);
+	double ZOrder;
+	FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("z_order"), ZOrder, 0.0);
 
 	UClass* WidgetClass = WidgetBlueprint->GeneratedClass;
 	if (!WidgetClass)
 	{
-		return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get widget class"));
+		return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+			ESpirrowErrorCode::WidgetCreationFailed,
+			TEXT("Failed to get widget class"));
 	}
 
 	// Create success response
 	TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+	ResultObj->SetBoolField(TEXT("success"), true);
 	ResultObj->SetStringField(TEXT("blueprint_name"), BlueprintName);
 	ResultObj->SetStringField(TEXT("class_path"), WidgetClass->GetPathName());
-	ResultObj->SetNumberField(TEXT("z_order"), ZOrder);
+	ResultObj->SetNumberField(TEXT("z_order"), static_cast<int32>(ZOrder));
 	ResultObj->SetStringField(TEXT("note"), TEXT("Widget class ready. Use CreateWidget and AddToViewport nodes in Blueprint to display in game."));
 	return ResultObj;
 }

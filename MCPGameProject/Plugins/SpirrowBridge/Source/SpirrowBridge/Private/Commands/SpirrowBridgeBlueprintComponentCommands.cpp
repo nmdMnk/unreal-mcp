@@ -46,47 +46,30 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleCommand(
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleAddComponentToBlueprint(const TSharedPtr<FJsonObject>& Params)
 {
-    // Get required parameters
-    FString BlueprintName;
-    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    // Validate required parameters
+    FString BlueprintName, ComponentType, ComponentName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+        return Error;
+    }
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("component_type"), ComponentType))
+    {
+        return Error;
+    }
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("component_name"), ComponentName))
+    {
+        return Error;
     }
 
-    FString ComponentType;
-    if (!Params->TryGetStringField(TEXT("component_type"), ComponentType))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'type' parameter"));
-    }
-
-    FString ComponentName;
-    if (!Params->TryGetStringField(TEXT("component_name"), ComponentName))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
-    }
-
-    // Get path parameter (default: /Game/Blueprints)
+    // Get optional parameters
     FString Path;
-    if (!Params->TryGetStringField(TEXT("path"), Path))
-    {
-        Path = TEXT("/Game/Blueprints");
-    }
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
 
-    // Ensure path ends with /
-    if (!Path.EndsWith(TEXT("/")))
+    // Validate and load Blueprint
+    UBlueprint* Blueprint = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
     {
-        Path += TEXT("/");
-    }
-
-    // Construct the full asset path
-    FString BlueprintPath = FString::Printf(TEXT("%s%s.%s"), *Path, *BlueprintName, *BlueprintName);
-
-    // Load the blueprint
-    UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *BlueprintPath);
-    if (!Blueprint)
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintPath));
+        return Error;
     }
 
     // Create the component - dynamically find the component class by name
@@ -178,6 +161,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleAddCompo
     if (!ComponentClass || !ComponentClass->IsChildOf(UActorComponent::StaticClass()))
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::ClassNotFound,
             FString::Printf(TEXT("Unknown component type: %s"), *ComponentType));
     }
 
@@ -207,54 +191,52 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleAddCompo
         FKismetEditorUtilities::CompileBlueprint(Blueprint);
 
         TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+        ResultObj->SetBoolField(TEXT("success"), true);
         ResultObj->SetStringField(TEXT("component_name"), ComponentName);
         ResultObj->SetStringField(TEXT("component_type"), ComponentType);
         return ResultObj;
     }
 
-    return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to add component to blueprint"));
+    return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+        ESpirrowErrorCode::ComponentCreationFailed,
+        FString::Printf(TEXT("Failed to add component '%s' to blueprint"), *ComponentName));
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleSetComponentProperty(const TSharedPtr<FJsonObject>& Params)
 {
-    // Get required parameters
-    FString BlueprintName;
-    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    // Validate required parameters
+    FString BlueprintName, ComponentName, PropertyName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+        return Error;
+    }
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("component_name"), ComponentName))
+    {
+        return Error;
+    }
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("property_name"), PropertyName))
+    {
+        return Error;
     }
 
-    FString ComponentName;
-    if (!Params->TryGetStringField(TEXT("component_name"), ComponentName))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'component_name' parameter"));
-    }
-
-    FString PropertyName;
-    if (!Params->TryGetStringField(TEXT("property_name"), PropertyName))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'property_name' parameter"));
-    }
-
-    // Get path parameter (default: /Game/Blueprints)
+    // Get optional parameters
     FString Path;
-    if (!Params->TryGetStringField(TEXT("path"), Path))
-    {
-        Path = TEXT("/Game/Blueprints");
-    }
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
 
-    // Find the blueprint
-    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
-    if (!Blueprint)
+    // Validate and load Blueprint
+    UBlueprint* Blueprint = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+        return Error;
     }
 
     // Find the component
     USCS_Node* ComponentNode = nullptr;
     if (!Blueprint->SimpleConstructionScript)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Invalid blueprint construction script"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidBlueprint,
+            TEXT("Invalid blueprint construction script"));
     }
     
     for (USCS_Node* Node : Blueprint->SimpleConstructionScript->GetAllNodes())
@@ -268,14 +250,18 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleSetCompo
 
     if (!ComponentNode)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Component not found: %s"), *ComponentName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::ComponentNotFound,
+            FString::Printf(TEXT("Component not found: %s"), *ComponentName));
     }
 
     // Get the component template
     UObject* ComponentTemplate = ComponentNode->ComponentTemplate;
     if (!ComponentTemplate)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Invalid component template"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidComponent,
+            TEXT("Invalid component template"));
     }
 
     // Set the property value
@@ -288,6 +274,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleSetCompo
         if (!Property)
         {
             return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::PropertyNotFound,
                 FString::Printf(TEXT("Property %s not found on component %s"), *PropertyName, *ComponentName));
         }
 
@@ -404,47 +391,46 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleSetCompo
             FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
 
             TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+            ResultObj->SetBoolField(TEXT("success"), true);
             ResultObj->SetStringField(TEXT("component"), ComponentName);
             ResultObj->SetStringField(TEXT("property"), PropertyName);
-            ResultObj->SetBoolField(TEXT("success"), true);
             return ResultObj;
         }
         else
         {
-            return FSpirrowBridgeCommonUtils::CreateErrorResponse(ErrorMessage.IsEmpty() ? TEXT("Failed to set property") : ErrorMessage);
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::PropertySetFailed,
+                ErrorMessage.IsEmpty() ? TEXT("Failed to set property") : ErrorMessage);
         }
     }
 
-    return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'property_value' parameter"));
+    return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+        ESpirrowErrorCode::MissingRequiredParam,
+        TEXT("Missing 'property_value' parameter"));
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleSetPhysicsProperties(const TSharedPtr<FJsonObject>& Params)
 {
-    // Get required parameters
-    FString BlueprintName;
-    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    // Validate required parameters
+    FString BlueprintName, ComponentName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+        return Error;
+    }
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("component_name"), ComponentName))
+    {
+        return Error;
     }
 
-    FString ComponentName;
-    if (!Params->TryGetStringField(TEXT("component_name"), ComponentName))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'component_name' parameter"));
-    }
-
-    // Get path parameter (default: /Game/Blueprints)
+    // Get optional parameters
     FString Path;
-    if (!Params->TryGetStringField(TEXT("path"), Path))
-    {
-        Path = TEXT("/Game/Blueprints");
-    }
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
 
-    // Find the blueprint
-    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
-    if (!Blueprint)
+    // Validate and load Blueprint
+    UBlueprint* Blueprint = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+        return Error;
     }
 
     // Find the component
@@ -460,13 +446,17 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleSetPhysi
 
     if (!ComponentNode)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Component not found: %s"), *ComponentName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::ComponentNotFound,
+            FString::Printf(TEXT("Component not found: %s"), *ComponentName));
     }
 
     UPrimitiveComponent* PrimComponent = Cast<UPrimitiveComponent>(ComponentNode->ComponentTemplate);
     if (!PrimComponent)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Component is not a primitive component"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidComponent,
+            TEXT("Component is not a primitive component"));
     }
 
     // Set physics properties
@@ -494,37 +484,33 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleSetPhysi
     FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
 
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
     ResultObj->SetStringField(TEXT("component"), ComponentName);
     return ResultObj;
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleSetStaticMeshProperties(const TSharedPtr<FJsonObject>& Params)
 {
-    // Get required parameters
-    FString BlueprintName;
-    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    // Validate required parameters
+    FString BlueprintName, ComponentName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+        return Error;
+    }
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("component_name"), ComponentName))
+    {
+        return Error;
     }
 
-    FString ComponentName;
-    if (!Params->TryGetStringField(TEXT("component_name"), ComponentName))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'component_name' parameter"));
-    }
-
-    // Get path parameter (default: /Game/Blueprints)
+    // Get optional parameters
     FString Path;
-    if (!Params->TryGetStringField(TEXT("path"), Path))
-    {
-        Path = TEXT("/Game/Blueprints");
-    }
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
 
-    // Find the blueprint
-    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
-    if (!Blueprint)
+    // Validate and load Blueprint
+    UBlueprint* Blueprint = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+        return Error;
     }
 
     // Find the component
@@ -540,13 +526,17 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleSetStati
 
     if (!ComponentNode)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Component not found: %s"), *ComponentName));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::ComponentNotFound,
+            FString::Printf(TEXT("Component not found: %s"), *ComponentName));
     }
 
     UStaticMeshComponent* MeshComponent = Cast<UStaticMeshComponent>(ComponentNode->ComponentTemplate);
     if (!MeshComponent)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Component is not a static mesh component"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidComponent,
+            TEXT("Component is not a static mesh component"));
     }
 
     // Set static mesh properties
@@ -573,38 +563,38 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleSetStati
     FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
 
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
     ResultObj->SetStringField(TEXT("component"), ComponentName);
     return ResultObj;
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleSetPawnProperties(const TSharedPtr<FJsonObject>& Params)
 {
-    // Get required parameters
+    // Validate required parameters
     FString BlueprintName;
-    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName))
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'blueprint_name' parameter"));
+        return Error;
     }
 
-    // Get path parameter (default: /Game/Blueprints)
+    // Get optional parameters
     FString Path;
-    if (!Params->TryGetStringField(TEXT("path"), Path))
-    {
-        Path = TEXT("/Game/Blueprints");
-    }
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Blueprints"));
 
-    // Find the blueprint
-    UBlueprint* Blueprint = FSpirrowBridgeCommonUtils::FindBlueprint(BlueprintName, Path);
-    if (!Blueprint)
+    // Validate and load Blueprint
+    UBlueprint* Blueprint = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, Path, Blueprint))
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Blueprint not found: %s"), *BlueprintName));
+        return Error;
     }
 
     // Get the default object
     UObject* DefaultObject = Blueprint->GeneratedClass->GetDefaultObject();
     if (!DefaultObject)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to get default object"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidBlueprint,
+            TEXT("Failed to get default object"));
     }
 
     // Track if any properties were set successfully
@@ -698,12 +688,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintComponentCommands::HandleSetPawnP
     }
     else if (ResultsObj->Values.Num() == 0)
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("No properties specified to set"));
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::MissingRequiredParam,
+            TEXT("No properties specified to set"));
     }
 
     TSharedPtr<FJsonObject> ResponseObj = MakeShared<FJsonObject>();
-    ResponseObj->SetStringField(TEXT("blueprint"), BlueprintName);
     ResponseObj->SetBoolField(TEXT("success"), bAnyPropertiesSet);
+    ResponseObj->SetStringField(TEXT("blueprint"), BlueprintName);
     ResponseObj->SetObjectField(TEXT("results"), ResultsObj);
     return ResponseObj;
 }

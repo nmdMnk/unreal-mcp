@@ -24,57 +24,71 @@ TSharedPtr<FJsonObject> FSpirrowBridgeConfigCommands::HandleCommand(const FStrin
     }
 
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+        ESpirrowErrorCode::UnknownCommand,
         FString::Printf(TEXT("Unknown config command: %s"), *CommandType));
+}
+
+FString FSpirrowBridgeConfigCommands::ResolveConfigFilePath(const FString& ConfigFile, FString& OutGConfigPath, FString& OutFileName)
+{
+    if (ConfigFile == TEXT("DefaultEngine") || ConfigFile == TEXT("Engine"))
+    {
+        OutGConfigPath = GEngineIni;
+        OutFileName = TEXT("DefaultEngine.ini");
+    }
+    else if (ConfigFile == TEXT("DefaultGame") || ConfigFile == TEXT("Game"))
+    {
+        OutGConfigPath = GGameIni;
+        OutFileName = TEXT("DefaultGame.ini");
+    }
+    else if (ConfigFile == TEXT("DefaultEditor") || ConfigFile == TEXT("Editor"))
+    {
+        OutGConfigPath = GEditorIni;
+        OutFileName = TEXT("DefaultEditor.ini");
+    }
+    else if (ConfigFile == TEXT("DefaultInput") || ConfigFile == TEXT("Input"))
+    {
+        OutGConfigPath = GInputIni;
+        OutFileName = TEXT("DefaultInput.ini");
+    }
+    else
+    {
+        return FString::Printf(TEXT("Unknown config file: %s. Use DefaultEngine, DefaultGame, DefaultEditor, or DefaultInput"), *ConfigFile);
+    }
+    return FString();
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeConfigCommands::HandleGetConfigValue(const TSharedPtr<FJsonObject>& Params)
 {
+    // Validate required parameters
+    FString Section, Key;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("section"), Section))
+    {
+        return Error;
+    }
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("key"), Key))
+    {
+        return Error;
+    }
+
+    // Get optional parameters
     FString ConfigFile;
-    if (!Params->TryGetStringField(TEXT("config_file"), ConfigFile))
-    {
-        ConfigFile = TEXT("DefaultEngine");
-    }
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("config_file"), ConfigFile, TEXT("DefaultEngine"));
 
-    FString Section;
-    if (!Params->TryGetStringField(TEXT("section"), Section))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'section' parameter"));
-    }
-
-    FString Key;
-    if (!Params->TryGetStringField(TEXT("key"), Key))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'key' parameter"));
-    }
-
-    // Determine which config file to use
-    FString ConfigFilePath;
-    if (ConfigFile == TEXT("DefaultEngine") || ConfigFile == TEXT("Engine"))
-    {
-        ConfigFilePath = GEngineIni;
-    }
-    else if (ConfigFile == TEXT("DefaultGame") || ConfigFile == TEXT("Game"))
-    {
-        ConfigFilePath = GGameIni;
-    }
-    else if (ConfigFile == TEXT("DefaultEditor") || ConfigFile == TEXT("Editor"))
-    {
-        ConfigFilePath = GEditorIni;
-    }
-    else if (ConfigFile == TEXT("DefaultInput") || ConfigFile == TEXT("Input"))
-    {
-        ConfigFilePath = GInputIni;
-    }
-    else
+    // Resolve config file path
+    FString GConfigPath, FileName;
+    FString ErrorMsg = ResolveConfigFilePath(ConfigFile, GConfigPath, FileName);
+    if (!ErrorMsg.IsEmpty())
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            FString::Printf(TEXT("Unknown config file: %s. Use DefaultEngine, DefaultGame, DefaultEditor, or DefaultInput"), *ConfigFile));
+            ESpirrowErrorCode::InvalidParameter,
+            ErrorMsg);
     }
 
     FString Value;
-    if (GConfig->GetString(*Section, *Key, Value, ConfigFilePath))
+    if (GConfig->GetString(*Section, *Key, Value, GConfigPath))
     {
         TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+        ResultObj->SetBoolField(TEXT("success"), true);
         ResultObj->SetStringField(TEXT("config_file"), ConfigFile);
         ResultObj->SetStringField(TEXT("section"), Section);
         ResultObj->SetStringField(TEXT("key"), Key);
@@ -84,58 +98,40 @@ TSharedPtr<FJsonObject> FSpirrowBridgeConfigCommands::HandleGetConfigValue(const
     else
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::ConfigKeyNotFound,
             FString::Printf(TEXT("Key not found: [%s] %s"), *Section, *Key));
     }
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeConfigCommands::HandleSetConfigValue(const TSharedPtr<FJsonObject>& Params)
 {
+    // Validate required parameters
+    FString Section, Key, Value;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("section"), Section))
+    {
+        return Error;
+    }
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("key"), Key))
+    {
+        return Error;
+    }
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("value"), Value))
+    {
+        return Error;
+    }
+
+    // Get optional parameters
     FString ConfigFile;
-    if (!Params->TryGetStringField(TEXT("config_file"), ConfigFile))
-    {
-        ConfigFile = TEXT("DefaultEngine");
-    }
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("config_file"), ConfigFile, TEXT("DefaultEngine"));
 
-    FString Section;
-    if (!Params->TryGetStringField(TEXT("section"), Section))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'section' parameter"));
-    }
-
-    FString Key;
-    if (!Params->TryGetStringField(TEXT("key"), Key))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'key' parameter"));
-    }
-
-    FString Value;
-    if (!Params->TryGetStringField(TEXT("value"), Value))
-    {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Missing 'value' parameter"));
-    }
-
-    // Build the actual file path in project Config folder
-    FString FileName;
-    if (ConfigFile == TEXT("DefaultEngine") || ConfigFile == TEXT("Engine"))
-    {
-        FileName = TEXT("DefaultEngine.ini");
-    }
-    else if (ConfigFile == TEXT("DefaultGame") || ConfigFile == TEXT("Game"))
-    {
-        FileName = TEXT("DefaultGame.ini");
-    }
-    else if (ConfigFile == TEXT("DefaultEditor") || ConfigFile == TEXT("Editor"))
-    {
-        FileName = TEXT("DefaultEditor.ini");
-    }
-    else if (ConfigFile == TEXT("DefaultInput") || ConfigFile == TEXT("Input"))
-    {
-        FileName = TEXT("DefaultInput.ini");
-    }
-    else
+    // Resolve config file path
+    FString GConfigPath, FileName;
+    FString ErrorMsg = ResolveConfigFilePath(ConfigFile, GConfigPath, FileName);
+    if (!ErrorMsg.IsEmpty())
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            FString::Printf(TEXT("Unknown config file: %s"), *ConfigFile));
+            ESpirrowErrorCode::InvalidParameter,
+            ErrorMsg);
     }
 
     FString FilePath = FPaths::ProjectConfigDir() / FileName;
@@ -144,30 +140,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeConfigCommands::HandleSetConfigValue(const
     FConfigFile ConfigFileObj;
     ConfigFileObj.Read(FilePath);
 
-    // Set the value
     ConfigFileObj.SetString(*Section, *Key, *Value);
-
-    // Write back to disk
     ConfigFileObj.Write(FilePath);
 
     // Also update in-memory GConfig cache
-    FString GConfigPath;
-    if (ConfigFile == TEXT("DefaultEngine") || ConfigFile == TEXT("Engine"))
-    {
-        GConfigPath = GEngineIni;
-    }
-    else if (ConfigFile == TEXT("DefaultGame") || ConfigFile == TEXT("Game"))
-    {
-        GConfigPath = GGameIni;
-    }
-    else if (ConfigFile == TEXT("DefaultEditor") || ConfigFile == TEXT("Editor"))
-    {
-        GConfigPath = GEditorIni;
-    }
-    else if (ConfigFile == TEXT("DefaultInput") || ConfigFile == TEXT("Input"))
-    {
-        GConfigPath = GInputIni;
-    }
     GConfig->SetString(*Section, *Key, *Value, GConfigPath);
 
     UE_LOG(LogTemp, Display, TEXT("Set config value: [%s] %s = %s in %s"),
@@ -185,38 +161,22 @@ TSharedPtr<FJsonObject> FSpirrowBridgeConfigCommands::HandleSetConfigValue(const
 
 TSharedPtr<FJsonObject> FSpirrowBridgeConfigCommands::HandleListConfigSections(const TSharedPtr<FJsonObject>& Params)
 {
+    // Get optional parameters
     FString ConfigFile;
-    if (!Params->TryGetStringField(TEXT("config_file"), ConfigFile))
-    {
-        ConfigFile = TEXT("DefaultEngine");
-    }
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("config_file"), ConfigFile, TEXT("DefaultEngine"));
 
-    // Determine which config file to use
-    FString ConfigFilePath;
-    if (ConfigFile == TEXT("DefaultEngine") || ConfigFile == TEXT("Engine"))
-    {
-        ConfigFilePath = GEngineIni;
-    }
-    else if (ConfigFile == TEXT("DefaultGame") || ConfigFile == TEXT("Game"))
-    {
-        ConfigFilePath = GGameIni;
-    }
-    else if (ConfigFile == TEXT("DefaultEditor") || ConfigFile == TEXT("Editor"))
-    {
-        ConfigFilePath = GEditorIni;
-    }
-    else if (ConfigFile == TEXT("DefaultInput") || ConfigFile == TEXT("Input"))
-    {
-        ConfigFilePath = GInputIni;
-    }
-    else
+    // Resolve config file path
+    FString GConfigPath, FileName;
+    FString ErrorMsg = ResolveConfigFilePath(ConfigFile, GConfigPath, FileName);
+    if (!ErrorMsg.IsEmpty())
     {
         return FSpirrowBridgeCommonUtils::CreateErrorResponse(
-            FString::Printf(TEXT("Unknown config file: %s"), *ConfigFile));
+            ESpirrowErrorCode::InvalidParameter,
+            ErrorMsg);
     }
 
     TArray<FString> SectionNames;
-    GConfig->GetSectionNames(ConfigFilePath, SectionNames);
+    GConfig->GetSectionNames(GConfigPath, SectionNames);
 
     TArray<TSharedPtr<FJsonValue>> SectionsArray;
     for (const FString& SectionName : SectionNames)
@@ -225,6 +185,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeConfigCommands::HandleListConfigSections(c
     }
 
     TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
     ResultObj->SetStringField(TEXT("config_file"), ConfigFile);
     ResultObj->SetArrayField(TEXT("sections"), SectionsArray);
     ResultObj->SetNumberField(TEXT("count"), SectionNames.Num());

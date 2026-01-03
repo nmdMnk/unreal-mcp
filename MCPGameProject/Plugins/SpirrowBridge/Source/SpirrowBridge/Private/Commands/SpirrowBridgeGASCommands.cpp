@@ -1,4 +1,5 @@
 #include "Commands/SpirrowBridgeGASCommands.h"
+#include "Commands/SpirrowBridgeCommonUtils.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "HAL/PlatformFileManager.h"
@@ -66,10 +67,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCommand(const FString& 
         return HandleCreateGameplayAbility(Params);
     }
 
-    TSharedPtr<FJsonObject> ErrorResponse = MakeShareable(new FJsonObject);
-    ErrorResponse->SetBoolField(TEXT("success"), false);
-    ErrorResponse->SetStringField(TEXT("error"), FString::Printf(TEXT("Unknown GAS command: %s"), *CommandType));
-    return ErrorResponse;
+    return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+        ESpirrowErrorCode::UnknownCommand,
+        FString::Printf(TEXT("Unknown GAS command: %s"), *CommandType));
 }
 
 FString FSpirrowBridgeGASCommands::GetGameplayTagsConfigPath() const
@@ -87,8 +87,6 @@ TArray<TPair<FString, FString>> FSpirrowBridgeGASCommands::ParseExistingTags(con
         return ExistingTags;
     }
 
-    // Parse lines looking for GameplayTagList entries
-    // Format: +GameplayTagList=(Tag="TagName",DevComment="Comment")
     TArray<FString> Lines;
     FileContent.ParseIntoArrayLines(Lines);
 
@@ -96,15 +94,13 @@ TArray<TPair<FString, FString>> FSpirrowBridgeGASCommands::ParseExistingTags(con
     {
         if (Line.Contains(TEXT("GameplayTagList=")))
         {
-            // Extract Tag value
             FString TagValue;
             FString CommentValue;
 
-            // Find Tag="..."
             int32 TagStart = Line.Find(TEXT("Tag=\""));
             if (TagStart != INDEX_NONE)
             {
-                TagStart += 5; // Length of 'Tag="'
+                TagStart += 5;
                 int32 TagEnd = Line.Find(TEXT("\""), ESearchCase::IgnoreCase, ESearchDir::FromStart, TagStart);
                 if (TagEnd != INDEX_NONE)
                 {
@@ -112,11 +108,10 @@ TArray<TPair<FString, FString>> FSpirrowBridgeGASCommands::ParseExistingTags(con
                 }
             }
 
-            // Find DevComment="..."
             int32 CommentStart = Line.Find(TEXT("DevComment=\""));
             if (CommentStart != INDEX_NONE)
             {
-                CommentStart += 12; // Length of 'DevComment="'
+                CommentStart += 12;
                 int32 CommentEnd = Line.Find(TEXT("\""), ESearchCase::IgnoreCase, ESearchDir::FromStart, CommentStart);
                 if (CommentEnd != INDEX_NONE)
                 {
@@ -139,10 +134,8 @@ bool FSpirrowBridgeGASCommands::WriteTagsToConfig(const FString& ConfigPath, con
     FString FileContent;
     FFileHelper::LoadFileToString(FileContent, *ConfigPath);
 
-    // Find or create the GameplayTags section
     const FString SectionName = TEXT("[/Script/GameplayTags.GameplayTagsSettings]");
 
-    // Remove existing GameplayTagList entries
     TArray<FString> Lines;
     FileContent.ParseIntoArrayLines(Lines);
 
@@ -161,7 +154,6 @@ bool FSpirrowBridgeGASCommands::WriteTagsToConfig(const FString& ConfigPath, con
             }
         }
 
-        // Skip existing GameplayTagList entries in our section
         if (bInSection && Line.Contains(TEXT("GameplayTagList=")))
         {
             continue;
@@ -170,23 +162,20 @@ bool FSpirrowBridgeGASCommands::WriteTagsToConfig(const FString& ConfigPath, con
         NewLines.Add(Line);
     }
 
-    // If section doesn't exist, add it
     if (!bSectionFound)
     {
         NewLines.Add(TEXT(""));
         NewLines.Add(SectionName);
     }
 
-    // Find where to insert new tags (after section header)
     int32 InsertIndex = NewLines.IndexOfByPredicate([&SectionName](const FString& Line) {
         return Line.Equals(SectionName);
     });
 
     if (InsertIndex != INDEX_NONE)
     {
-        InsertIndex++; // Insert after section header
+        InsertIndex++;
 
-        // Add all tags
         for (const auto& TagPair : Tags)
         {
             FString TagLine;
@@ -202,31 +191,25 @@ bool FSpirrowBridgeGASCommands::WriteTagsToConfig(const FString& ConfigPath, con
         }
     }
 
-    // Write back to file
     FString NewContent = FString::Join(NewLines, TEXT("\n"));
     return FFileHelper::SaveStringToFile(NewContent, *ConfigPath);
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleAddGameplayTags(const TSharedPtr<FJsonObject>& Params)
 {
-    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
-
-    // Get tags array from params
     const TArray<TSharedPtr<FJsonValue>>* TagsArray;
     if (!Params->TryGetArrayField(TEXT("tags"), TagsArray))
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Missing 'tags' parameter"));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::MissingRequiredParam,
+            TEXT("Missing 'tags' parameter"));
     }
 
-    // Get optional comments
     const TSharedPtr<FJsonObject>* CommentsObj = nullptr;
     Params->TryGetObjectField(TEXT("comments"), CommentsObj);
 
     FString ConfigPath = GetGameplayTagsConfigPath();
 
-    // Parse existing tags
     TArray<TPair<FString, FString>> ExistingTags = ParseExistingTags(ConfigPath);
     TSet<FString> ExistingTagSet;
     for (const auto& TagPair : ExistingTags)
@@ -234,7 +217,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleAddGameplayTags(const T
         ExistingTagSet.Add(TagPair.Key);
     }
 
-    // Process new tags
     TArray<FString> AddedTags;
     TArray<FString> SkippedTags;
 
@@ -248,7 +230,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleAddGameplayTags(const T
             continue;
         }
 
-        // Get comment if provided
         FString Comment;
         if (CommentsObj && (*CommentsObj)->HasField(Tag))
         {
@@ -260,18 +241,17 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleAddGameplayTags(const T
         AddedTags.Add(Tag);
     }
 
-    // Write back to config
     if (AddedTags.Num() > 0)
     {
         if (!WriteTagsToConfig(ConfigPath, ExistingTags))
         {
-            Response->SetBoolField(TEXT("success"), false);
-            Response->SetStringField(TEXT("error"), TEXT("Failed to write config file"));
-            return Response;
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::FileWriteFailed,
+                TEXT("Failed to write config file"));
         }
     }
 
-    // Build response
+    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
     Response->SetBoolField(TEXT("success"), true);
     Response->SetStringField(TEXT("file_path"), ConfigPath);
 
@@ -289,16 +269,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleAddGameplayTags(const T
     }
     Response->SetArrayField(TEXT("skipped_tags"), SkippedArray);
 
-    UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Added %d gameplay tags, skipped %d existing"), AddedTags.Num(), SkippedTags.Num());
-
     return Response;
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleListGameplayTags(const TSharedPtr<FJsonObject>& Params)
 {
-    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
-
-    FString FilterPrefix = Params->GetStringField(TEXT("filter_prefix"));
+    FString FilterPrefix;
+    Params->TryGetStringField(TEXT("filter_prefix"), FilterPrefix);
     FString ConfigPath = GetGameplayTagsConfigPath();
 
     TArray<TPair<FString, FString>> AllTags = ParseExistingTags(ConfigPath);
@@ -306,7 +283,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleListGameplayTags(const 
     TArray<TSharedPtr<FJsonValue>> TagsArray;
     for (const auto& TagPair : AllTags)
     {
-        // Apply filter if specified
         if (!FilterPrefix.IsEmpty() && !TagPair.Key.StartsWith(FilterPrefix))
         {
             continue;
@@ -318,6 +294,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleListGameplayTags(const 
         TagsArray.Add(MakeShareable(new FJsonValueObject(TagObj)));
     }
 
+    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
     Response->SetBoolField(TEXT("success"), true);
     Response->SetArrayField(TEXT("tags"), TagsArray);
     Response->SetNumberField(TEXT("count"), TagsArray.Num());
@@ -328,14 +305,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleListGameplayTags(const 
 
 TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleRemoveGameplayTag(const TSharedPtr<FJsonObject>& Params)
 {
-    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
-
-    FString TagToRemove = Params->GetStringField(TEXT("tag"));
-    if (TagToRemove.IsEmpty())
+    FString TagToRemove;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("tag"), TagToRemove))
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Missing 'tag' parameter"));
-        return Response;
+        return Error;
     }
 
     FString ConfigPath = GetGameplayTagsConfigPath();
@@ -357,12 +330,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleRemoveGameplayTag(const
     {
         if (!WriteTagsToConfig(ConfigPath, NewTags))
         {
-            Response->SetBoolField(TEXT("success"), false);
-            Response->SetStringField(TEXT("error"), TEXT("Failed to write config file"));
-            return Response;
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::FileWriteFailed,
+                TEXT("Failed to write config file"));
         }
     }
 
+    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
     Response->SetBoolField(TEXT("success"), true);
     Response->SetBoolField(TEXT("removed"), bFound);
     Response->SetStringField(TEXT("message"), bFound ? FString::Printf(TEXT("Removed tag: %s"), *TagToRemove) : FString::Printf(TEXT("Tag not found: %s"), *TagToRemove));
@@ -373,22 +347,18 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleRemoveGameplayTag(const
 
 TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleListGASAssets(const TSharedPtr<FJsonObject>& Params)
 {
-    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
+    FString AssetType, PathFilter;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("asset_type"), AssetType, TEXT("all"));
+    Params->TryGetStringField(TEXT("path_filter"), PathFilter);
 
-    FString AssetType = Params->GetStringField(TEXT("asset_type"));
-    FString PathFilter = Params->GetStringField(TEXT("path_filter"));
-
-    // Get Asset Registry
     FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
     IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
 
-    // Results arrays
     TArray<TSharedPtr<FJsonValue>> EffectsArray;
     TArray<TSharedPtr<FJsonValue>> AbilitiesArray;
     TArray<TSharedPtr<FJsonValue>> CuesArray;
     TArray<TSharedPtr<FJsonValue>> AttributeSetsArray;
 
-    // Helper lambda to create asset info JSON
     auto CreateAssetInfo = [](const FAssetData& Asset) -> TSharedPtr<FJsonObject> {
         TSharedPtr<FJsonObject> AssetObj = MakeShareable(new FJsonObject);
         AssetObj->SetStringField(TEXT("name"), Asset.AssetName.ToString());
@@ -397,7 +367,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleListGASAssets(const TSh
         return AssetObj;
     };
 
-    // Search for Blueprint assets
     FARFilter Filter;
     Filter.ClassPaths.Add(FTopLevelAssetPath(TEXT("/Script/Engine"), TEXT("Blueprint")));
     Filter.bRecursiveClasses = true;
@@ -406,7 +375,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleListGASAssets(const TSh
     if (!PathFilter.IsEmpty())
     {
         Filter.PackagePaths.Add(FName(*PathFilter));
-        Filter.bRecursivePaths = true;
     }
 
     TArray<FAssetData> BlueprintAssets;
@@ -414,7 +382,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleListGASAssets(const TSh
 
     for (const FAssetData& Asset : BlueprintAssets)
     {
-        // Load the blueprint to check its parent class
         UBlueprint* Blueprint = Cast<UBlueprint>(Asset.GetAsset());
         if (!Blueprint || !Blueprint->GeneratedClass)
         {
@@ -429,13 +396,11 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleListGASAssets(const TSh
 
         FString ParentClassName = ParentClass->GetName();
 
-        // Check if it's a GameplayEffect
         bool bIsEffect = false;
         bool bIsAbility = false;
         bool bIsCue = false;
         bool bIsAttributeSet = false;
 
-        // Walk up the class hierarchy to find GAS base classes
         UClass* CurrentClass = ParentClass;
         while (CurrentClass)
         {
@@ -465,7 +430,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleListGASAssets(const TSh
             CurrentClass = CurrentClass->GetSuperClass();
         }
 
-        // Add to appropriate array based on type filter
         if (bIsEffect && (AssetType == TEXT("all") || AssetType == TEXT("effect")))
         {
             TSharedPtr<FJsonObject> AssetObj = CreateAssetInfo(Asset);
@@ -496,7 +460,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleListGASAssets(const TSh
         }
     }
 
-    // Build response
+    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
     Response->SetBoolField(TEXT("success"), true);
     Response->SetArrayField(TEXT("effects"), EffectsArray);
     Response->SetArrayField(TEXT("abilities"), AbilitiesArray);
@@ -506,22 +470,24 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleListGASAssets(const TSh
     int32 TotalCount = EffectsArray.Num() + AbilitiesArray.Num() + CuesArray.Num() + AttributeSetsArray.Num();
     Response->SetNumberField(TEXT("total_count"), TotalCount);
 
-    UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Found %d GAS assets (Effects: %d, Abilities: %d, Cues: %d, AttributeSets: %d)"),
-        TotalCount, EffectsArray.Num(), AbilitiesArray.Num(), CuesArray.Num(), AttributeSetsArray.Num());
-
     return Response;
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(const TSharedPtr<FJsonObject>& Params)
 {
-    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
+    FString Name;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("name"), Name))
+    {
+        return Error;
+    }
 
-    // Get parameters
-    FString Name = Params->GetStringField(TEXT("name"));
-    FString DurationPolicyStr = Params->GetStringField(TEXT("duration_policy"));
-    double DurationMagnitude = Params->GetNumberField(TEXT("duration_magnitude"));
-    double Period = Params->GetNumberField(TEXT("period"));
-    FString Path = Params->GetStringField(TEXT("path"));
+    FString DurationPolicyStr, Path;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("duration_policy"), DurationPolicyStr, TEXT("Instant"));
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/GAS/Effects"));
+
+    double DurationMagnitude = 0.0, Period = 0.0;
+    FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("duration_magnitude"), DurationMagnitude, 0.0);
+    FSpirrowBridgeCommonUtils::GetOptionalNumber(Params, TEXT("period"), Period, 0.0);
 
     const TArray<TSharedPtr<FJsonValue>>* ModifiersArray = nullptr;
     Params->TryGetArrayField(TEXT("modifiers"), ModifiersArray);
@@ -532,64 +498,35 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(co
     const TArray<TSharedPtr<FJsonValue>>* RemovalTagsArray = nullptr;
     Params->TryGetArrayField(TEXT("removal_tags"), RemovalTagsArray);
 
-    // Validate name
-    if (Name.IsEmpty())
-    {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Missing 'name' parameter"));
-        return Response;
-    }
-
-    // Construct full asset path
     FString PackagePath = Path / Name;
     FString AssetPath = PackagePath + TEXT(".") + Name;
 
-    // Check if asset already exists - multiple checks for safety
-    // 1. Check via EditorAssetLibrary
     if (UEditorAssetLibrary::DoesAssetExist(AssetPath))
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Asset already exists: %s"), *AssetPath));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetAlreadyExists,
+            FString::Printf(TEXT("Asset already exists: %s"), *AssetPath));
     }
 
-    // 2. Check if package already exists
     UPackage* ExistingPackage = FindPackage(nullptr, *PackagePath);
     if (ExistingPackage)
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Package already exists: %s"), *PackagePath));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetAlreadyExists,
+            FString::Printf(TEXT("Package already exists: %s"), *PackagePath));
     }
 
-    // 3. Check if Blueprint object exists in memory
-    UBlueprint* ExistingBlueprint = FindObject<UBlueprint>(nullptr, *Name);
-    if (ExistingBlueprint)
-    {
-        // Check if it's in the same path
-        FString ExistingPath = ExistingBlueprint->GetPathName();
-        if (ExistingPath.Contains(Path))
-        {
-            Response->SetBoolField(TEXT("success"), false);
-            Response->SetStringField(TEXT("error"), FString::Printf(TEXT("GameplayEffect Blueprint already exists in memory: %s"), *ExistingPath));
-            return Response;
-        }
-    }
-
-    // Create the package
     UPackage* Package = CreatePackage(*PackagePath);
     if (!Package)
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Failed to create package"));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetCreationFailed,
+            TEXT("Failed to create package"));
     }
 
-    // Create Blueprint factory
     UBlueprintFactory* Factory = NewObject<UBlueprintFactory>();
     Factory->ParentClass = UGameplayEffect::StaticClass();
 
-    // Create the Blueprint asset
     UBlueprint* Blueprint = Cast<UBlueprint>(Factory->FactoryCreateNew(
         UBlueprint::StaticClass(),
         Package,
@@ -601,24 +538,21 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(co
 
     if (!Blueprint)
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Failed to create GameplayEffect Blueprint"));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetCreationFailed,
+            TEXT("Failed to create GameplayEffect Blueprint"));
     }
 
-    // Compile the blueprint to generate the class
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
 
-    // Get the CDO (Class Default Object) to set properties
     UGameplayEffect* EffectCDO = Cast<UGameplayEffect>(Blueprint->GeneratedClass->GetDefaultObject());
     if (!EffectCDO)
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Failed to get GameplayEffect CDO"));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::OperationFailed,
+            TEXT("Failed to get GameplayEffect CDO"));
     }
 
-    // Set Duration Policy
     if (DurationPolicyStr == TEXT("Instant"))
     {
         EffectCDO->DurationPolicy = EGameplayEffectDurationType::Instant;
@@ -626,7 +560,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(co
     else if (DurationPolicyStr == TEXT("HasDuration"))
     {
         EffectCDO->DurationPolicy = EGameplayEffectDurationType::HasDuration;
-        // Set duration magnitude
         EffectCDO->DurationMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(DurationMagnitude));
     }
     else if (DurationPolicyStr == TEXT("Infinite"))
@@ -634,74 +567,43 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(co
         EffectCDO->DurationPolicy = EGameplayEffectDurationType::Infinite;
     }
 
-    // Set Period if specified
     if (Period > 0.0)
     {
         EffectCDO->Period = FScalableFloat(Period);
     }
 
-    // Set Modifiers
     if (ModifiersArray && ModifiersArray->Num() > 0)
     {
         for (const TSharedPtr<FJsonValue>& ModValue : *ModifiersArray)
         {
             const TSharedPtr<FJsonObject>* ModObj = nullptr;
-            if (!ModValue->TryGetObject(ModObj) || !ModObj)
-            {
-                continue;
-            }
+            if (!ModValue->TryGetObject(ModObj) || !ModObj) continue;
 
             FString AttributeName = (*ModObj)->GetStringField(TEXT("attribute"));
             FString OperationStr = (*ModObj)->GetStringField(TEXT("operation"));
             double Magnitude = (*ModObj)->GetNumberField(TEXT("magnitude"));
 
-            // Create modifier info
             FGameplayModifierInfo ModInfo;
 
-            // Set operation
             if (OperationStr == TEXT("Add"))
-            {
                 ModInfo.ModifierOp = EGameplayModOp::Additive;
-            }
             else if (OperationStr == TEXT("Multiply"))
-            {
                 ModInfo.ModifierOp = EGameplayModOp::Multiplicitive;
-            }
             else if (OperationStr == TEXT("Divide"))
-            {
                 ModInfo.ModifierOp = EGameplayModOp::Division;
-            }
             else if (OperationStr == TEXT("Override"))
-            {
                 ModInfo.ModifierOp = EGameplayModOp::Override;
-            }
             else
-            {
                 ModInfo.ModifierOp = EGameplayModOp::Additive;
-            }
 
-            // Set magnitude
             ModInfo.ModifierMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(Magnitude));
-
-            // Note: Setting the Attribute requires finding the actual FGameplayAttribute
-            // For now, we store the attribute name in the modifier info
-            // The actual attribute binding would need the AttributeSet class reference
-            // This is a simplified implementation - full implementation would need AttributeSet lookup
-
             EffectCDO->Modifiers.Add(ModInfo);
-
-            UE_LOG(LogTemp, Display, TEXT("Added modifier: %s %s %.2f"),
-                *AttributeName, *OperationStr, Magnitude);
         }
     }
 
-    // Set Application Tags using TargetTagsGameplayEffectComponent (UE5 way)
     if (ApplicationTagsArray && ApplicationTagsArray->Num() > 0)
     {
-        // Use FindOrAddComponent which is the UE5 recommended way
         UTargetTagsGameplayEffectComponent& TargetTagsComponent = EffectCDO->FindOrAddComponent<UTargetTagsGameplayEffectComponent>();
-
-        // Build the tag container - must add to both Added AND CombinedTags
         FInheritedTagContainer TagContainer;
 
         for (const TSharedPtr<FJsonValue>& TagValue : *ApplicationTagsArray)
@@ -710,23 +612,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(co
             FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*TagString), false);
             if (Tag.IsValid())
             {
-                // Must add to both Added and CombinedTags for the tags to actually appear
                 TagContainer.Added.AddTag(Tag);
                 TagContainer.CombinedTags.AddTag(Tag);
-                UE_LOG(LogTemp, Display, TEXT("Adding granted tag: %s"), *TagString);
-            }
-            else
-            {
-                UE_LOG(LogTemp, Warning, TEXT("Invalid gameplay tag: %s"), *TagString);
             }
         }
 
-        // Set the tags on the component
         TargetTagsComponent.SetAndApplyTargetTagChanges(TagContainer);
-        UE_LOG(LogTemp, Display, TEXT("Added TargetTagsGameplayEffectComponent with %d tags"), TagContainer.Added.Num());
     }
 
-    // Set Removal Tags (with deprecation warning suppressed)
     if (RemovalTagsArray && RemovalTagsArray->Num() > 0)
     {
         PRAGMA_DISABLE_DEPRECATION_WARNINGS
@@ -738,97 +631,51 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayEffect(co
             {
                 EffectCDO->RemoveGameplayEffectsWithTags.Added.AddTag(Tag);
             }
-            else
-            {
-                UE_LOG(LogTemp, Warning, TEXT("Invalid gameplay tag: %s"), *TagString);
-            }
         }
         PRAGMA_ENABLE_DEPRECATION_WARNINGS
-        UE_LOG(LogTemp, Display, TEXT("Added %d removal tags"), RemovalTagsArray->Num());
     }
 
-    // Mark package dirty and save
     Package->MarkPackageDirty();
     Blueprint->MarkPackageDirty();
-
-    // Compile again after setting properties
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
 
-    // Save the asset
     FString PackageFileName = FPackageName::LongPackageNameToFilename(PackagePath, FPackageName::GetAssetPackageExtension());
     FSavePackageArgs SaveArgs;
     SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
-    bool bSaved = UPackage::SavePackage(Package, Blueprint, *PackageFileName, SaveArgs);
+    UPackage::SavePackage(Package, Blueprint, *PackageFileName, SaveArgs);
 
-    if (!bSaved)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Failed to save GameplayEffect asset to disk, but asset was created in memory"));
-    }
-
-    // Notify asset registry
     FAssetRegistryModule::AssetCreated(Blueprint);
 
-    // Build response
+    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
     Response->SetBoolField(TEXT("success"), true);
     Response->SetStringField(TEXT("name"), Name);
     Response->SetStringField(TEXT("asset_path"), AssetPath);
     Response->SetStringField(TEXT("duration_policy"), DurationPolicyStr);
     Response->SetNumberField(TEXT("modifier_count"), ModifiersArray ? ModifiersArray->Num() : 0);
 
-    UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Created GameplayEffect '%s' at %s"), *Name, *AssetPath);
-
     return Response;
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGASCharacter(const TSharedPtr<FJsonObject>& Params)
 {
-    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
-
-    // Extract parameters
     FString Name;
-    if (!Params->TryGetStringField(TEXT("name"), Name) || Name.IsEmpty())
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("name"), Name))
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Missing or empty 'name' parameter"));
-        return Response;
+        return Error;
     }
 
-    FString ParentClassStr;
-    Params->TryGetStringField(TEXT("parent_class"), ParentClassStr);
-    if (ParentClassStr.IsEmpty())
-    {
-        ParentClassStr = TEXT("Character");
-    }
+    FString ParentClassStr, ASCComponentName, ReplicationMode, PathStr;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("parent_class"), ParentClassStr, TEXT("Character"));
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("asc_component_name"), ASCComponentName, TEXT("AbilitySystemComponent"));
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("replication_mode"), ReplicationMode, TEXT("Mixed"));
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), PathStr, TEXT("/Game/GAS/Characters"));
 
-    FString ASCComponentName;
-    Params->TryGetStringField(TEXT("asc_component_name"), ASCComponentName);
-    if (ASCComponentName.IsEmpty())
-    {
-        ASCComponentName = TEXT("AbilitySystemComponent");
-    }
-
-    FString ReplicationMode;
-    Params->TryGetStringField(TEXT("replication_mode"), ReplicationMode);
-    if (ReplicationMode.IsEmpty())
-    {
-        ReplicationMode = TEXT("Mixed");
-    }
-
-    FString PathStr;
-    Params->TryGetStringField(TEXT("path"), PathStr);
-    if (PathStr.IsEmpty())
-    {
-        PathStr = TEXT("/Game/GAS/Characters");
-    }
-
-    // Get default abilities and effects arrays
     const TArray<TSharedPtr<FJsonValue>>* DefaultAbilitiesArray = nullptr;
     Params->TryGetArrayField(TEXT("default_abilities"), DefaultAbilitiesArray);
 
     const TArray<TSharedPtr<FJsonValue>>* DefaultEffectsArray = nullptr;
     Params->TryGetArrayField(TEXT("default_effects"), DefaultEffectsArray);
 
-    // Find parent class
     UClass* ParentClass = nullptr;
     if (ParentClassStr == TEXT("Character"))
     {
@@ -839,57 +686,38 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGASCharacter(cons
         ParentClass = FindObject<UClass>(nullptr, *ParentClassStr);
         if (!ParentClass)
         {
-            Response->SetBoolField(TEXT("success"), false);
-            Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Parent class not found: %s"), *ParentClassStr));
-            return Response;
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::ClassNotFound,
+                FString::Printf(TEXT("Parent class not found: %s"), *ParentClassStr));
         }
     }
 
-    // Check if asset already exists - multiple checks for safety
     FString PackageName = PathStr / Name;
     FString AssetPath = PackageName + TEXT(".") + Name;
 
-    // 1. Check via EditorAssetLibrary
     if (UEditorAssetLibrary::DoesAssetExist(AssetPath))
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Asset already exists: %s"), *AssetPath));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetAlreadyExists,
+            FString::Printf(TEXT("Asset already exists: %s"), *AssetPath));
     }
 
-    // 2. Check if package already exists
     UPackage* ExistingPackage = FindPackage(nullptr, *PackageName);
     if (ExistingPackage)
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Package already exists: %s"), *PackageName));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetAlreadyExists,
+            FString::Printf(TEXT("Package already exists: %s"), *PackageName));
     }
 
-    // 3. Check if Blueprint object exists in memory
-    UBlueprint* ExistingBlueprint = FindObject<UBlueprint>(nullptr, *Name);
-    if (ExistingBlueprint)
-    {
-        // Check if it's in the same path
-        FString ExistingPath = ExistingBlueprint->GetPathName();
-        if (ExistingPath.Contains(PathStr))
-        {
-            Response->SetBoolField(TEXT("success"), false);
-            Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Blueprint already exists in memory: %s"), *ExistingPath));
-            return Response;
-        }
-    }
-
-    // Create package and asset
     UPackage* Package = CreatePackage(*PackageName);
     if (!Package)
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Failed to create package"));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetCreationFailed,
+            TEXT("Failed to create package"));
     }
 
-    // Create Blueprint
     UBlueprint* NewBlueprint = FKismetEditorUtilities::CreateBlueprint(
         ParentClass,
         Package,
@@ -902,87 +730,45 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGASCharacter(cons
 
     if (!NewBlueprint)
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Failed to create Blueprint"));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetCreationFailed,
+            TEXT("Failed to create Blueprint"));
     }
 
-    // Add AbilitySystemComponent to the Blueprint
     USimpleConstructionScript* SCS = NewBlueprint->SimpleConstructionScript;
     if (!SCS)
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Blueprint has no SimpleConstructionScript"));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidOperation,
+            TEXT("Blueprint has no SimpleConstructionScript"));
     }
 
     USCS_Node* NewNode = SCS->CreateNode(UAbilitySystemComponent::StaticClass(), FName(*ASCComponentName));
     if (!NewNode)
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Failed to create AbilitySystemComponent node"));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::ComponentCreationFailed,
+            TEXT("Failed to create AbilitySystemComponent node"));
     }
 
     SCS->AddNode(NewNode);
-    UE_LOG(LogTemp, Log, TEXT("Added AbilitySystemComponent '%s' to Blueprint"), *ASCComponentName);
 
-    // Configure ASC replication mode
     UAbilitySystemComponent* ASCTemplate = Cast<UAbilitySystemComponent>(NewNode->ComponentTemplate);
     if (ASCTemplate)
     {
         if (ReplicationMode == TEXT("Full"))
-        {
             ASCTemplate->SetReplicationMode(EGameplayEffectReplicationMode::Full);
-            UE_LOG(LogTemp, Log, TEXT("Set ASC replication mode to Full"));
-        }
         else if (ReplicationMode == TEXT("Mixed"))
-        {
             ASCTemplate->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
-            UE_LOG(LogTemp, Log, TEXT("Set ASC replication mode to Mixed"));
-        }
         else if (ReplicationMode == TEXT("Minimal"))
-        {
             ASCTemplate->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
-            UE_LOG(LogTemp, Log, TEXT("Set ASC replication mode to Minimal"));
-        }
-        else
-        {
-            UE_LOG(LogTemp, Warning, TEXT("Unknown replication mode '%s', using default"), *ReplicationMode);
-        }
-
-        // Note: UAbilitySystemComponent doesn't have DefaultAbilities/DefaultEffects properties by default
-        // These would typically be set in a custom ASC subclass or in BeginPlay
-        // For now, we'll log them for reference
-        if (DefaultAbilitiesArray && DefaultAbilitiesArray->Num() > 0)
-        {
-            UE_LOG(LogTemp, Log, TEXT("Default abilities specified (%d abilities) - note these need to be granted in BeginPlay or custom ASC class"), DefaultAbilitiesArray->Num());
-            for (const TSharedPtr<FJsonValue>& AbilityValue : *DefaultAbilitiesArray)
-            {
-                FString AbilityPath = AbilityValue->AsString();
-                UE_LOG(LogTemp, Log, TEXT("  - %s"), *AbilityPath);
-            }
-        }
-
-        if (DefaultEffectsArray && DefaultEffectsArray->Num() > 0)
-        {
-            UE_LOG(LogTemp, Log, TEXT("Default effects specified (%d effects) - note these need to be applied in BeginPlay or custom ASC class"), DefaultEffectsArray->Num());
-            for (const TSharedPtr<FJsonValue>& EffectValue : *DefaultEffectsArray)
-            {
-                FString EffectPath = EffectValue->AsString();
-                UE_LOG(LogTemp, Log, TEXT("  - %s"), *EffectPath);
-            }
-        }
     }
 
-    // Compile and save
     FKismetEditorUtilities::CompileBlueprint(NewBlueprint);
-
-    // AssetPath already defined at the beginning of function for duplicate checks
     FAssetRegistryModule::AssetCreated(NewBlueprint);
     Package->MarkPackageDirty();
 
-    // Build response
+    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
     Response->SetBoolField(TEXT("success"), true);
     Response->SetStringField(TEXT("name"), Name);
     Response->SetStringField(TEXT("asset_path"), AssetPath);
@@ -990,62 +776,39 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGASCharacter(cons
     Response->SetStringField(TEXT("asc_component_name"), ASCComponentName);
     Response->SetStringField(TEXT("replication_mode"), ReplicationMode);
 
-    UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Created GAS Character Blueprint '%s' at %s with ASC"), *Name, *AssetPath);
-
     return Response;
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleSetAbilitySystemDefaults(const TSharedPtr<FJsonObject>& Params)
 {
-    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
-
-    // Extract parameters
     FString BlueprintName;
-    if (!Params->TryGetStringField(TEXT("blueprint_name"), BlueprintName) || BlueprintName.IsEmpty())
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("blueprint_name"), BlueprintName))
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Missing or empty 'blueprint_name' parameter"));
-        return Response;
+        return Error;
     }
 
-    FString ASCComponentName;
-    Params->TryGetStringField(TEXT("asc_component_name"), ASCComponentName);
-    if (ASCComponentName.IsEmpty())
-    {
-        ASCComponentName = TEXT("AbilitySystemComponent");
-    }
+    FString ASCComponentName, PathStr;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("asc_component_name"), ASCComponentName, TEXT("AbilitySystemComponent"));
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), PathStr, TEXT("/Game/Blueprints"));
 
-    FString PathStr;
-    Params->TryGetStringField(TEXT("path"), PathStr);
-    if (PathStr.IsEmpty())
-    {
-        PathStr = TEXT("/Game/Blueprints");
-    }
-
-    // Get default abilities and effects arrays
     const TArray<TSharedPtr<FJsonValue>>* DefaultAbilitiesArray = nullptr;
     Params->TryGetArrayField(TEXT("default_abilities"), DefaultAbilitiesArray);
 
     const TArray<TSharedPtr<FJsonValue>>* DefaultEffectsArray = nullptr;
     Params->TryGetArrayField(TEXT("default_effects"), DefaultEffectsArray);
 
-    // Load Blueprint
-    FString AssetPath = PathStr / BlueprintName + TEXT(".") + BlueprintName;
-    UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *AssetPath);
-    if (!Blueprint)
+    UBlueprint* Blueprint = nullptr;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateBlueprint(BlueprintName, PathStr, Blueprint))
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Blueprint not found: %s"), *AssetPath));
-        return Response;
+        return Error;
     }
 
-    // Find ASC component
     USimpleConstructionScript* SCS = Blueprint->SimpleConstructionScript;
     if (!SCS)
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Blueprint has no SimpleConstructionScript"));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidOperation,
+            TEXT("Blueprint has no SimpleConstructionScript"));
     }
 
     USCS_Node* ASCNode = nullptr;
@@ -1061,64 +824,35 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleSetAbilitySystemDefault
 
     if (!ASCNode)
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), FString::Printf(TEXT("AbilitySystemComponent '%s' not found in Blueprint"), *ASCComponentName));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::ComponentNotFound,
+            FString::Printf(TEXT("AbilitySystemComponent '%s' not found in Blueprint"), *ASCComponentName));
     }
 
     UAbilitySystemComponent* ASCTemplate = Cast<UAbilitySystemComponent>(ASCNode->ComponentTemplate);
     if (!ASCTemplate)
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Component is not an AbilitySystemComponent"));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidOperation,
+            TEXT("Component is not an AbilitySystemComponent"));
     }
 
-    // Note: UAbilitySystemComponent doesn't have DefaultAbilities/DefaultEffects properties by default
-    // These would typically be set in a custom ASC subclass or in BeginPlay
-    // For now, we'll log them for reference
-    if (DefaultAbilitiesArray && DefaultAbilitiesArray->Num() > 0)
-    {
-        UE_LOG(LogTemp, Log, TEXT("Default abilities specified (%d abilities) - note these need to be granted in BeginPlay or custom ASC class"), DefaultAbilitiesArray->Num());
-        for (const TSharedPtr<FJsonValue>& AbilityValue : *DefaultAbilitiesArray)
-        {
-            FString AbilityPath = AbilityValue->AsString();
-            UE_LOG(LogTemp, Log, TEXT("  - %s"), *AbilityPath);
-        }
-    }
-
-    if (DefaultEffectsArray && DefaultEffectsArray->Num() > 0)
-    {
-        UE_LOG(LogTemp, Log, TEXT("Default effects specified (%d effects) - note these need to be applied in BeginPlay or custom ASC class"), DefaultEffectsArray->Num());
-        for (const TSharedPtr<FJsonValue>& EffectValue : *DefaultEffectsArray)
-        {
-            FString EffectPath = EffectValue->AsString();
-            UE_LOG(LogTemp, Log, TEXT("  - %s"), *EffectPath);
-        }
-    }
-
-    // Compile and save
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
     Blueprint->MarkPackageDirty();
 
-    // Build response
+    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
     Response->SetBoolField(TEXT("success"), true);
     Response->SetStringField(TEXT("blueprint_name"), BlueprintName);
     Response->SetStringField(TEXT("asc_component_name"), ASCComponentName);
     Response->SetNumberField(TEXT("default_abilities_count"), DefaultAbilitiesArray ? DefaultAbilitiesArray->Num() : 0);
     Response->SetNumberField(TEXT("default_effects_count"), DefaultEffectsArray ? DefaultEffectsArray->Num() : 0);
 
-    UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Configured ASC defaults for Blueprint '%s'"), *BlueprintName);
-
     return Response;
 }
 
 void FSpirrowBridgeGASCommands::SetGameplayTagContainerFromArray(FGameplayTagContainer& Container, const TArray<TSharedPtr<FJsonValue>>* TagsArray)
 {
-    if (!TagsArray)
-    {
-        return;
-    }
+    if (!TagsArray) return;
 
     for (const TSharedPtr<FJsonValue>& TagValue : *TagsArray)
     {
@@ -1128,38 +862,19 @@ void FSpirrowBridgeGASCommands::SetGameplayTagContainerFromArray(FGameplayTagCon
         {
             Container.AddTag(Tag);
         }
-        else
-        {
-            UE_LOG(LogTemp, Warning, TEXT("Invalid gameplay tag: %s"), *TagString);
-        }
     }
 }
 
-// Helper function to set a GameplayTagContainer property using reflection
 static void SetGameplayTagContainerPropertyByName(UObject* Object, const FName& PropertyName, const TArray<TSharedPtr<FJsonValue>>* TagsArray)
 {
-    if (!Object || !TagsArray)
-    {
-        return;
-    }
+    if (!Object || !TagsArray) return;
 
-    // Find the property using reflection
     FProperty* Property = Object->GetClass()->FindPropertyByName(PropertyName);
-    if (!Property)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Property not found: %s"), *PropertyName.ToString());
-        return;
-    }
+    if (!Property) return;
 
-    // Get pointer to the property value
     void* PropertyValuePtr = Property->ContainerPtrToValuePtr<void>(Object);
-    if (!PropertyValuePtr)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Failed to get property value pointer: %s"), *PropertyName.ToString());
-        return;
-    }
+    if (!PropertyValuePtr) return;
 
-    // Cast to FGameplayTagContainer and populate it
     FGameplayTagContainer* Container = static_cast<FGameplayTagContainer*>(PropertyValuePtr);
     for (const TSharedPtr<FJsonValue>& TagValue : *TagsArray)
     {
@@ -1169,27 +884,25 @@ static void SetGameplayTagContainerPropertyByName(UObject* Object, const FName& 
         {
             Container->AddTag(Tag);
         }
-        else
-        {
-            UE_LOG(LogTemp, Warning, TEXT("Invalid gameplay tag: %s"), *TagString);
-        }
     }
 }
 
 TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayAbility(const TSharedPtr<FJsonObject>& Params)
 {
-    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
+    FString Name;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("name"), Name))
+    {
+        return Error;
+    }
 
-    // Get parameters
-    FString Name = Params->GetStringField(TEXT("name"));
-    FString ParentClassName = Params->GetStringField(TEXT("parent_class"));
-    FString CostEffectPath = Params->GetStringField(TEXT("cost_effect"));
-    FString CooldownEffectPath = Params->GetStringField(TEXT("cooldown_effect"));
-    FString InstancingPolicyStr = Params->GetStringField(TEXT("instancing_policy"));
-    FString NetExecutionPolicyStr = Params->GetStringField(TEXT("net_execution_policy"));
-    FString Path = Params->GetStringField(TEXT("path"));
+    FString ParentClassName, CostEffectPath, CooldownEffectPath, InstancingPolicyStr, NetExecutionPolicyStr, Path;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("parent_class"), ParentClassName, TEXT("GameplayAbility"));
+    Params->TryGetStringField(TEXT("cost_effect"), CostEffectPath);
+    Params->TryGetStringField(TEXT("cooldown_effect"), CooldownEffectPath);
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("instancing_policy"), InstancingPolicyStr, TEXT("InstancedPerActor"));
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("net_execution_policy"), NetExecutionPolicyStr, TEXT("LocalPredicted"));
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/GAS/Abilities"));
 
-    // Get tag arrays
     const TArray<TSharedPtr<FJsonValue>>* AbilityTagsArray = nullptr;
     Params->TryGetArrayField(TEXT("ability_tags"), AbilityTagsArray);
 
@@ -1208,35 +921,24 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayAbility(c
     const TArray<TSharedPtr<FJsonValue>>* ActivationBlockedTagsArray = nullptr;
     Params->TryGetArrayField(TEXT("activation_blocked_tags"), ActivationBlockedTagsArray);
 
-    // Validate name
-    if (Name.IsEmpty())
-    {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Missing 'name' parameter"));
-        return Response;
-    }
-
-    // Construct full asset path
     FString PackagePath = Path / Name;
     FString AssetPath = PackagePath + TEXT(".") + Name;
 
-    // Check if asset already exists - multiple checks for safety
     if (UEditorAssetLibrary::DoesAssetExist(AssetPath))
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Asset already exists: %s"), *AssetPath));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetAlreadyExists,
+            FString::Printf(TEXT("Asset already exists: %s"), *AssetPath));
     }
 
     UPackage* ExistingPackage = FindPackage(nullptr, *PackagePath);
     if (ExistingPackage)
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), FString::Printf(TEXT("Package already exists: %s"), *PackagePath));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetAlreadyExists,
+            FString::Printf(TEXT("Package already exists: %s"), *PackagePath));
     }
 
-    // Find parent class
     UClass* ParentClass = nullptr;
     if (ParentClassName == TEXT("GameplayAbility") || ParentClassName.IsEmpty())
     {
@@ -1252,24 +954,20 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayAbility(c
         if (!ParentClass)
         {
             ParentClass = UGameplayAbility::StaticClass();
-            UE_LOG(LogTemp, Warning, TEXT("Parent class '%s' not found, using UGameplayAbility"), *ParentClassName);
         }
     }
 
-    // Create the package
     UPackage* Package = CreatePackage(*PackagePath);
     if (!Package)
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Failed to create package"));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetCreationFailed,
+            TEXT("Failed to create package"));
     }
 
-    // Create Blueprint factory
     UBlueprintFactory* Factory = NewObject<UBlueprintFactory>();
     Factory->ParentClass = ParentClass;
 
-    // Create the Blueprint asset
     UBlueprint* Blueprint = Cast<UBlueprint>(Factory->FactoryCreateNew(
         UBlueprint::StaticClass(),
         Package,
@@ -1281,42 +979,28 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayAbility(c
 
     if (!Blueprint)
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Failed to create GameplayAbility Blueprint"));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetCreationFailed,
+            TEXT("Failed to create GameplayAbility Blueprint"));
     }
 
-    // Compile the blueprint to generate the class
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
 
-    // Get the CDO (Class Default Object) to set properties
     UGameplayAbility* AbilityCDO = Cast<UGameplayAbility>(Blueprint->GeneratedClass->GetDefaultObject());
     if (!AbilityCDO)
     {
-        Response->SetBoolField(TEXT("success"), false);
-        Response->SetStringField(TEXT("error"), TEXT("Failed to get GameplayAbility CDO"));
-        return Response;
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::OperationFailed,
+            TEXT("Failed to get GameplayAbility CDO"));
     }
 
-    // Set Ability Tags using reflection
     SetGameplayTagContainerPropertyByName(AbilityCDO, FName("AbilityTags"), AbilityTagsArray);
-
-    // Set Cancel Abilities With Tags using reflection
     SetGameplayTagContainerPropertyByName(AbilityCDO, FName("CancelAbilitiesWithTag"), CancelTagsArray);
-
-    // Set Block Abilities With Tags using reflection
     SetGameplayTagContainerPropertyByName(AbilityCDO, FName("BlockAbilitiesWithTag"), BlockTagsArray);
-
-    // Set Activation Owned Tags using reflection
     SetGameplayTagContainerPropertyByName(AbilityCDO, FName("ActivationOwnedTags"), ActivationOwnedTagsArray);
-
-    // Set Activation Required Tags using reflection
     SetGameplayTagContainerPropertyByName(AbilityCDO, FName("ActivationRequiredTags"), ActivationRequiredTagsArray);
-
-    // Set Activation Blocked Tags using reflection
     SetGameplayTagContainerPropertyByName(AbilityCDO, FName("ActivationBlockedTags"), ActivationBlockedTagsArray);
 
-    // Set Cost Effect using reflection
     if (!CostEffectPath.IsEmpty())
     {
         UClass* CostEffectClass = LoadClass<UGameplayEffect>(nullptr, *CostEffectPath);
@@ -1333,13 +1017,8 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayAbility(c
                 }
             }
         }
-        else
-        {
-            UE_LOG(LogTemp, Warning, TEXT("Cost effect class not found: %s"), *CostEffectPath);
-        }
     }
 
-    // Set Cooldown Effect using reflection
     if (!CooldownEffectPath.IsEmpty())
     {
         UClass* CooldownEffectClass = LoadClass<UGameplayEffect>(nullptr, *CooldownEffectPath);
@@ -1356,76 +1035,45 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayAbility(c
                 }
             }
         }
-        else
-        {
-            UE_LOG(LogTemp, Warning, TEXT("Cooldown effect class not found: %s"), *CooldownEffectPath);
-        }
     }
 
-    // Set Instancing Policy using reflection
     FProperty* InstancingProp = AbilityCDO->GetClass()->FindPropertyByName(FName("InstancingPolicy"));
     if (InstancingProp)
     {
         void* InstancingPropPtr = InstancingProp->ContainerPtrToValuePtr<void>(AbilityCDO);
         if (InstancingPolicyStr == TEXT("NonInstanced"))
-        {
             *static_cast<TEnumAsByte<EGameplayAbilityInstancingPolicy::Type>*>(InstancingPropPtr) = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-        }
         else if (InstancingPolicyStr == TEXT("InstancedPerActor"))
-        {
             *static_cast<TEnumAsByte<EGameplayAbilityInstancingPolicy::Type>*>(InstancingPropPtr) = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-        }
         else if (InstancingPolicyStr == TEXT("InstancedPerExecution"))
-        {
             *static_cast<TEnumAsByte<EGameplayAbilityInstancingPolicy::Type>*>(InstancingPropPtr) = EGameplayAbilityInstancingPolicy::InstancedPerExecution;
-        }
     }
 
-    // Set Net Execution Policy using reflection
     FProperty* NetExecProp = AbilityCDO->GetClass()->FindPropertyByName(FName("NetExecutionPolicy"));
     if (NetExecProp)
     {
         void* NetExecPropPtr = NetExecProp->ContainerPtrToValuePtr<void>(AbilityCDO);
         if (NetExecutionPolicyStr == TEXT("LocalPredicted"))
-        {
             *static_cast<TEnumAsByte<EGameplayAbilityNetExecutionPolicy::Type>*>(NetExecPropPtr) = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
-        }
         else if (NetExecutionPolicyStr == TEXT("LocalOnly"))
-        {
             *static_cast<TEnumAsByte<EGameplayAbilityNetExecutionPolicy::Type>*>(NetExecPropPtr) = EGameplayAbilityNetExecutionPolicy::LocalOnly;
-        }
         else if (NetExecutionPolicyStr == TEXT("ServerInitiated"))
-        {
             *static_cast<TEnumAsByte<EGameplayAbilityNetExecutionPolicy::Type>*>(NetExecPropPtr) = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
-        }
         else if (NetExecutionPolicyStr == TEXT("ServerOnly"))
-        {
             *static_cast<TEnumAsByte<EGameplayAbilityNetExecutionPolicy::Type>*>(NetExecPropPtr) = EGameplayAbilityNetExecutionPolicy::ServerOnly;
-        }
     }
 
-    // Mark package dirty and save
     Package->MarkPackageDirty();
     Blueprint->MarkPackageDirty();
-
-    // Compile again after setting properties
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
 
-    // Save the asset
     FString PackageFileName = FPackageName::LongPackageNameToFilename(PackagePath, FPackageName::GetAssetPackageExtension());
     FSavePackageArgs SaveArgs;
     SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
-    bool bSaved = UPackage::SavePackage(Package, Blueprint, *PackageFileName, SaveArgs);
+    UPackage::SavePackage(Package, Blueprint, *PackageFileName, SaveArgs);
 
-    if (!bSaved)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Failed to save GameplayAbility asset to disk, but asset was created in memory"));
-    }
-
-    // Notify asset registry
     FAssetRegistryModule::AssetCreated(Blueprint);
 
-    // Count tags set for response
     int32 TotalTagsSet = 0;
     if (AbilityTagsArray) TotalTagsSet += AbilityTagsArray->Num();
     if (CancelTagsArray) TotalTagsSet += CancelTagsArray->Num();
@@ -1434,7 +1082,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayAbility(c
     if (ActivationRequiredTagsArray) TotalTagsSet += ActivationRequiredTagsArray->Num();
     if (ActivationBlockedTagsArray) TotalTagsSet += ActivationBlockedTagsArray->Num();
 
-    // Build response
+    TSharedPtr<FJsonObject> Response = MakeShareable(new FJsonObject);
     Response->SetBoolField(TEXT("success"), true);
     Response->SetStringField(TEXT("name"), Name);
     Response->SetStringField(TEXT("asset_path"), AssetPath);
@@ -1444,8 +1092,6 @@ TSharedPtr<FJsonObject> FSpirrowBridgeGASCommands::HandleCreateGameplayAbility(c
     Response->SetNumberField(TEXT("tags_configured"), TotalTagsSet);
     Response->SetBoolField(TEXT("has_cost"), !CostEffectPath.IsEmpty());
     Response->SetBoolField(TEXT("has_cooldown"), !CooldownEffectPath.IsEmpty());
-
-    UE_LOG(LogTemp, Display, TEXT("SpirrowBridge: Created GameplayAbility '%s' at %s"), *Name, *AssetPath);
 
     return Response;
 }

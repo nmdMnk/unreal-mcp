@@ -12,7 +12,45 @@ spirrow-unrealwiseは、Unreal Engine 5とMCP（Model Context Protocol）を接�
 - Blueprint作成・編集
 - アクター操作
 - ノードグラフ構築
-- UMG Widget作成
+- UMG Widget作成・編集
+- GAS（Gameplay Ability System）セットアップ
+- マテリアル作成
+
+**バージョン**: 0.6.6+ (Phase C完了)
+
+---
+
+## プロジェクト構造
+
+```
+spirrow-unrealwise/
+├── MCPGameProject/           # サンプルUnrealプロジェクト
+│   └── Plugins/SpirrowBridge/  # C++プラグイン
+│       └── Source/SpirrowBridge/
+│           ├── Public/Commands/   # ヘッダファイル
+│           └── Private/Commands/  # 実装ファイル (18ファイル)
+├── Python/
+│   ├── tools/               # MCPツール定義
+│   │   ├── actor_tools.py
+│   │   ├── blueprint_tools.py
+│   │   ├── umg_tools.py     # UMG Widget操作
+│   │   ├── gas_tools.py     # GAS機能
+│   │   ├── material_tools.py
+│   │   ├── rag_tools.py     # RAGナレッジ
+│   │   ├── config_tools.py
+│   │   ├── node_tools.py
+│   │   ├── input_tools.py
+│   │   └── error_codes.py   # エラーコード定義 🆕
+│   ├── tests/               # テストスイート 🆕
+│   │   ├── test_framework.py
+│   │   ├── test_umg_widgets.py
+│   │   ├── test_blueprints.py
+│   │   └── smoke_test.py
+│   └── unreal_mcp_server.py
+├── FEATURE_STATUS.md         # 全ツール動作確認状況
+├── AGENTS.md                 # このファイル
+└── README.md                 # セットアップガイド
+```
 
 ---
 
@@ -67,14 +105,6 @@ y = branch_index * 150
 
 合流ノードは最も下の入力ノードのY座標 + 75（中央揃え）に配置。
 
-#### 4. 複雑なグラフ
-
-複数の分岐・合流がある場合:
-1. 左から右へ処理順に配置
-2. 分岐は下方向に展開
-3. 合流点は分岐の中央Y座標に配置
-4. 重なりそうな場合は垂直間隔を広げる（150 → 200）
-
 ---
 
 ## Blueprint作成のベストプラクティス
@@ -86,415 +116,251 @@ y = branch_index * 150
 | Actor Blueprint | `BP_` | `BP_Enemy`, `BP_Projectile` |
 | Widget Blueprint | `WBP_` | `WBP_MainMenu`, `WBP_HUD` |
 | Component | なし（説明的な名前） | `CubeMesh`, `RootCollision` |
+| GameplayEffect | `GE_` | `GE_Damage`, `GE_HealOverTime` |
+| GameplayAbility | `GA_` | `GA_Attack`, `GA_Dash` |
 
 ### 作成フロー
 
 #### Actor Blueprint の場合
-1. **Blueprint作成**: `create_blueprint`
-2. **コンポーネント追加**: `add_component_to_blueprint`
-3. **メッシュ/プロパティ設定**: `set_static_mesh_properties`, `set_component_property`
-4. **イベントノード追加**: `add_blueprint_event_node`
-5. **関数ノード追加**: `add_blueprint_function_node`
-6. **ノード接続**: `connect_blueprint_nodes`
-7. **コンパイル**: `compile_blueprint`
+```python
+# 1. Blueprint作成
+create_blueprint(name="BP_Example", parent_class="Actor", path="/Game/Blueprints")
+
+# 2. コンポーネント追加
+add_component_to_blueprint(blueprint_name="BP_Example", component_type="StaticMeshComponent", 
+                          component_name="Mesh", path="/Game/Blueprints")
+
+# 3. メッシュ設定
+set_static_mesh_properties(blueprint_name="BP_Example", component_name="Mesh",
+                          static_mesh="/Engine/BasicShapes/Cube.Cube", path="/Game/Blueprints")
+
+# 4. イベントノード追加
+add_blueprint_event_node(blueprint_name="BP_Example", event_name="ReceiveBeginPlay", path="/Game/Blueprints")
+
+# 5. 関数ノード追加
+add_print_string_node(blueprint_name="BP_Example", message="Hello!", path="/Game/Blueprints")
+
+# 6. コンパイル
+compile_blueprint(blueprint_name="BP_Example", path="/Game/Blueprints")
+```
 
 #### Widget Blueprint の場合
-1. **Widget Blueprint作成**: `create_blueprint` (parent_class に UserWidget 系を指定)
-2. **Widget要素追加**: UMG Editor で手動追加（現在MCPツールは未対応）
-3. **イベントノード追加**: `add_blueprint_event_node`
-4. **関数ノード追加**: `add_blueprint_function_node`
-5. **ノード接続**: `connect_blueprint_nodes`
-6. **コンパイル**: `compile_blueprint`
+```python
+# 1. Widget Blueprint作成
+create_umg_widget_blueprint(widget_name="WBP_HUD", path="/Game/UI")
 
-### 関数ノードのtarget指定
+# 2. Text追加
+add_text_to_widget(widget_name="WBP_HUD", text_name="TitleText", text="Score: 0",
+                  font_size=24, anchor="TopCenter", path="/Game/UI")
 
-| 関数の種類 | target | 例 |
-|-----------|--------|-----|
-| アクター自身のメソッド | `self` | `SetActorLocation` |
-| Kismetライブラリ | `KismetSystemLibrary` | `PrintString`, `Delay` |
-| Math系 | `KismetMathLibrary` | `Sin`, `Lerp` |
-| コンポーネントのメソッド | コンポーネント名 | `MeshComponent` |
+# 3. Button追加
+add_button_to_widget(widget_name="WBP_HUD", button_name="StartBtn", text="Start",
+                    size=[200, 50], anchor="Center", path="/Game/UI")
+
+# 4. ProgressBar追加
+add_progressbar_to_widget(widget_name="WBP_HUD", progressbar_name="HealthBar",
+                         percent=1.0, fill_color=[0, 1, 0, 1], path="/Game/UI")
+```
 
 ---
 
-## ピン名リファレンス
+## エラーハンドリング 🆕
 
-### 実行ピン
+### エラーコード体系
 
-| ノード種類 | 出力ピン | 入力ピン |
-|-----------|---------|---------|
-| Event | `then` | - |
-| Function | `then` | `execute` |
-| Branch | `True`, `False` | `execute` |
+Phase Cで構造化エラーコードが追加されました:
 
-### 一般的なデータピン
+| 範囲 | カテゴリ | 例 |
+|------|----------|-----|
+| 1000-1099 | General | InvalidParams, MissingRequiredParam |
+| 1100-1199 | Asset | AssetNotFound, AssetLoadFailed |
+| 1200-1299 | Blueprint | BlueprintNotFound, NodeCreationFailed |
+| 1300-1399 | Widget | WidgetNotFound, WidgetElementNotFound |
+| 1400-1499 | Actor | ActorNotFound, ComponentNotFound |
+| 1500-1599 | GAS | GameplayTagInvalid |
 
-| 型 | ピン名例 |
-|----|---------|
-| Boolean | `Condition`, `ReturnValue` |
-| Float | `Value`, `DeltaTime` |
-| Vector | `Location`, `Direction` |
-| Actor | `Target`, `OtherActor` |
+### エラーレスポンス形式
 
-### Math/Comparisonノードのピン
-
-| ノード種別 | 入力ピン | 出力ピン |
-|-----------|---------|----------|
-| Math (Add, Subtract, Multiply, Divide) | `A`, `B` | `ReturnValue` |
-| Comparison (Greater, Less, Equal等) | `A`, `B` | `ReturnValue` (Boolean) |
-
----
-
-## エラーハンドリング
-
-### よくあるエラーと対処
-
-| エラー | 原因 | 対処 |
-|--------|------|------|
-| `Function not found in target self` | グローバル関数をselfで呼んだ | 適切なライブラリ名を指定 |
-| `Timeout receiving Unreal response` | UE側の処理遅延/通信エラー | 再試行、またはUEエディタ確認 |
-| `Property not found` | プロパティ名が間違っている | UEでプロパティ名を確認 |
-
-### タイムアウト時の対応
-
-1. UEエディタがフリーズしていないか確認
-2. 操作自体は成功している可能性があるので、エディタで結果確認
-3. 必要に応じて再試行
-
----
-
-## 制限事項
-
-### 現在対応していない操作
-
-- 既存アクターへのStaticMesh直接設定（Blueprint経由で対応）
-- `spawn_blueprint_actor` は不安定（タイムアウトの可能性）
-- ノードのパラメータ設定（一部のみ対応）
-
-### 推奨ワークフロー
-
-複雑なBlueprintは:
-1. MCPで骨格（ノード構成）を作成
-2. UEエディタで詳細パラメータを調整
-
----
-
-## 使用例
-
-### 例1: BeginPlayでPrintString
-
-```
-1. create_blueprint("BP_Example", "Actor")
-2. add_blueprint_event_node("BP_Example", "ReceiveBeginPlay", [0, 0])
-3. add_blueprint_function_node("BP_Example", "PrintString", "KismetSystemLibrary", [300, 0])
-4. connect_blueprint_nodes(source=BeginPlay, target=PrintString, "then" → "execute")
-5. compile_blueprint("BP_Example")
+```json
+{
+    "success": false,
+    "error_code": 1200,
+    "error": "Blueprint not found: BP_Test at /Game/Test",
+    "details": {
+        "blueprint_name": "BP_Test",
+        "path": "/Game/Test",
+        "full_path": "/Game/Test/BP_Test.BP_Test"
+    }
+}
 ```
 
-### 例2: 物理キューブActor
-
-```
-1. create_blueprint("BP_PhysicsCube", "Actor")
-2. add_component_to_blueprint("BP_PhysicsCube", "CubeMesh", "StaticMeshComponent")
-3. set_static_mesh_properties("BP_PhysicsCube", "CubeMesh", "/Engine/BasicShapes/Cube.Cube")
-4. set_physics_properties("BP_PhysicsCube", "CubeMesh", simulate_physics=true)
-5. compile_blueprint("BP_PhysicsCube")
-```
-
-### 例3: Enhanced Inputセットアップ
+### Python側でのエラー処理
 
 ```python
-# 1. Input Action作成
-create_input_action("IA_Jump", value_type="Digital", path="/Game/Input")
-create_input_action("IA_Move", value_type="Axis2D", path="/Game/Input")
+from tools.error_codes import ErrorCode, parse_error_response
 
-# 2. Input Mapping Context作成
-create_input_mapping_context("IMC_Default", path="/Game/Input")
-
-# 3. ActionをIMCにマッピング
-add_action_to_mapping_context(
-    context_name="IMC_Default",
-    action_name="IA_Jump",
-    key="SpaceBar",
-    trigger_type="Pressed"
-)
-
-# 4. Character BlueprintにAddMappingContextノードを自動追加
-add_mapping_context_to_blueprint(
-    blueprint_name="BP_PlayerCharacter",
-    context_name="IMC_Default",
-    priority=0,
-    context_path="/Game/Input",
-    path="/Game/Characters"
-)
-
-# 5. コンパイル
-compile_blueprint("BP_PlayerCharacter", path="/Game/Characters")
+result = some_mcp_tool(...)
+if not result.get("success"):
+    error = parse_error_response(result)
+    if error.code == ErrorCode.BLUEPRINT_NOT_FOUND:
+        print(f"Blueprint見つからず: {error.details}")
 ```
 
-**生成されるノードチェーン**:
+---
+
+## UMG Widget ツール一覧
+
+### コアツール
+| ツール | 説明 |
+|--------|------|
+| `create_umg_widget_blueprint` | Widget Blueprint作成 |
+| `add_widget_to_viewport` | Viewportに追加 (PIE実行中) |
+
+### 基本ウィジェット
+| ツール | 説明 |
+|--------|------|
+| `add_text_to_widget` | TextBlock追加 |
+| `add_image_to_widget` | Image追加 |
+| `add_progressbar_to_widget` | ProgressBar追加 |
+
+### インタラクティブウィジェット
+| ツール | 説明 |
+|--------|------|
+| `add_button_to_widget` | Button追加 |
+| `add_slider_to_widget` | Slider追加 |
+| `add_checkbox_to_widget` | CheckBox追加 |
+| `add_combobox_to_widget` | ComboBox（ドロップダウン）追加 |
+| `add_editabletext_to_widget` | EditableText（テキスト入力）追加 |
+| `add_spinbox_to_widget` | SpinBox（数値入力）追加 |
+| `add_scrollbox_to_widget` | ScrollBox（スクロールコンテナ）追加 |
+
+### レイアウトツール
+| ツール | 説明 |
+|--------|------|
+| `add_vertical_box_to_widget` | VerticalBox追加 |
+| `add_horizontal_box_to_widget` | HorizontalBox追加 |
+| `set_widget_slot_property` | Canvas Slot設定 |
+| `reparent_widget_element` | 親変更 |
+| `remove_widget_element` | 要素削除 |
+
+### アニメーションツール
+| ツール | 説明 |
+|--------|------|
+| `create_widget_animation` | アニメーション作成 |
+| `add_animation_track` | トラック追加 |
+| `add_animation_keyframe` | キーフレーム追加 |
+| `get_widget_animations` | アニメーション一覧取得 |
+
+---
+
+## コマンドハンドラ構成 (18ファイル)
+
 ```
-BeginPlay → GetController → CastToPlayerController → GetEnhancedInputLocalPlayerSubsystem → AddMappingContext(IMC, Priority)
+SpirrowBridge.cpp                      ← メインルーター
+├── SpirrowBridgeEditorCommands.cpp    ← アクター操作
+├── SpirrowBridgeBlueprintCommands.cpp ← Blueprint操作（ルーター）
+│   ├── BlueprintCoreCommands.cpp      ← 作成/コンパイル/スポーン (6関数)
+│   ├── BlueprintComponentCommands.cpp ← コンポーネント/物理 (5関数)
+│   └── BlueprintPropertyCommands.cpp  ← クラススキャン/配列 (3関数)
+├── SpirrowBridgeBlueprintNodeCommands.cpp ← ノード操作（ルーター）
+│   ├── BlueprintNodeCoreCommands.cpp      ← 接続/検索/イベント/関数 (7関数)
+│   ├── BlueprintNodeVariableCommands.cpp  ← 変数/Get/Set/Self (6関数)
+│   └── BlueprintNodeControlFlowCommands.cpp ← Branch/Delay/Math (8関数)
+├── SpirrowBridgeUMGWidgetCommands.cpp     ← Widget追加（ルーター）
+│   ├── UMGWidgetCoreCommands.cpp          ← 作成/Viewport (3関数)
+│   ├── UMGWidgetBasicCommands.cpp         ← Text/Image/ProgressBar (4関数)
+│   └── UMGWidgetInteractiveCommands.cpp   ← Button/Slider等 (7関数)
+├── SpirrowBridgeUMGLayoutCommands.cpp     ← レイアウト操作
+├── SpirrowBridgeUMGAnimationCommands.cpp  ← アニメーション
+├── SpirrowBridgeUMGVariableCommands.cpp   ← Widget変数/バインディング
+├── SpirrowBridgeProjectCommands.cpp       ← プロジェクト操作
+├── SpirrowBridgeGASCommands.cpp           ← GAS
+├── SpirrowBridgeConfigCommands.cpp        ← Config操作
+├── SpirrowBridgeMaterialCommands.cpp      ← マテリアル
+└── SpirrowBridgeCommonUtils.cpp           ← 共通ユーティリティ + エラーコード
 ```
 
 ---
 
 ## 新しいコマンドの追加手順
 
-### アーキテクチャ概要
-
-```
-[Python MCP Server]
-       ↓ TCP
-[SpirrowBridge.cpp] ExecuteCommand() ← コマンドルーティング（メイン）
-       ↓
-[各CommandHandler] ← 18ファイル構成
-  - SpirrowBridgeEditorCommands.cpp      ← アクター操作
-  - SpirrowBridgeBlueprintCommands.cpp   ← Blueprint操作（ルーター）
-    ├─ BlueprintCoreCommands.cpp         ← 作成/コンパイル/スポーン
-    ├─ BlueprintComponentCommands.cpp    ← コンポーネント/物理
-    └─ BlueprintPropertyCommands.cpp     ← クラススキャン/配列
-  - SpirrowBridgeBlueprintNodeCommands.cpp ← ノード操作（ルーター）
-    ├─ BlueprintNodeCoreCommands.cpp     ← 接続/検索/イベント/関数
-    ├─ BlueprintNodeVariableCommands.cpp ← 変数/Get/Set/Self
-    └─ BlueprintNodeControlFlowCommands.cpp ← Branch/Delay/Math
-  - SpirrowBridgeUMGWidgetCommands.cpp   ← Widget追加
-  - SpirrowBridgeUMGLayoutCommands.cpp   ← レイアウト操作
-  - SpirrowBridgeUMGAnimationCommands.cpp ← アニメーション
-  - SpirrowBridgeUMGVariableCommands.cpp ← Widget変数/バインディング
-  - SpirrowBridgeProjectCommands.cpp     ← プロジェクト操作
-  - SpirrowBridgeGASCommands.cpp         ← GAS
-  - SpirrowBridgeConfigCommands.cpp      ← Config操作
-  - SpirrowBridgeMaterialCommands.cpp    ← マテリアル
-  - SpirrowBridgeCommonUtils.cpp         ← 共通ユーティリティ
-```
-
 ### チェックリスト（必須）
 
-新しいコマンドを追加する際は、以下の **すべてのファイル** を更新すること：
+| # | ファイル | 更新内容 |
+|---|----------|----------|
+| 1 | `Commands/SpirrowBridge*Commands.h` | 関数宣言 |
+| 2 | `Commands/SpirrowBridge*Commands.cpp` | 関数実装 |
+| 3 | `Commands/SpirrowBridge*Commands.cpp` | HandleCommand内ルーティング |
+| 4 | **`SpirrowBridge.cpp`** | **ExecuteCommand内ルーティング** ⚠️ |
+| 5 | `Python/tools/*_tools.py` | Python側ツール定義 |
 
-| # | ファイル | 更新内容 | 場所 |
-|---|----------|----------|------|
-| 1 | `Commands/SpirrowBridge*Commands.h` | 関数宣言 | private セクション |
-| 2 | `Commands/SpirrowBridge*Commands.cpp` | 関数実装 | ファイル末尾 |
-| 3 | `Commands/SpirrowBridge*Commands.cpp` | HandleCommand内ルーティング | switch/if文 |
-| 4 | **`SpirrowBridge.cpp`** | **ExecuteCommand内ルーティング** | **else if文** |
-| 5 | `Python/tools/*_tools.py` | Python側ツール定義 | @mcp.tool() |
-
-⚠️ **重要**: #4 を忘れると「Unknown command」エラーになる！
-
-### 追加例
-
-新しいコマンド `get_actor_components` を追加する場合：
-
-```cpp
-// 1. SpirrowBridgeEditorCommands.h
-private:
-    TSharedPtr<FJsonObject> HandleGetActorComponents(const TSharedPtr<FJsonObject>& Params);
-
-// 2. SpirrowBridgeEditorCommands.cpp (実装)
-TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleGetActorComponents(...) { ... }
-
-// 3. SpirrowBridgeEditorCommands.cpp (HandleCommand内)
-else if (CommandType == TEXT("get_actor_components"))
-{
-    return HandleGetActorComponents(Params);
-}
-
-// 4. SpirrowBridge.cpp (ExecuteCommand内) ← 忘れがち！
-else if (CommandType == TEXT("get_actors_in_level") || 
-         ...
-         CommandType == TEXT("get_actor_components") ||  // ← 追加
-         ...)
-{
-    ResultJson = EditorCommands->HandleCommand(CommandType, Params);
-}
-```
-
-```python
-# 5. Python/tools/editor_tools.py
-@mcp.tool()
-def get_actor_components(ctx: Context, name: str) -> Dict[str, Any]:
-    ...
-```
-
-### 過去の不具合事例
-
-#### 2024-12-14: get_actor_components "Unknown command" エラー
-
-**症状**: `get_actor_components` を呼び出すと "Unknown command: get_actor_components" エラー
-
-**原因**: 
-- SpirrowBridgeEditorCommands.h/cpp は正しく更新されていた
-- SpirrowBridge.cpp の ExecuteCommand 内のルーティングが漏れていた
-
-**教訓**:
-- コマンドハンドラ内の HandleCommand だけでなく、SpirrowBridge.cpp の ExecuteCommand も更新が必要
-- 「ソースコードは正しいのに動かない」場合、ルーティング漏れを疑う
+⚠️ **重要**: #4 を忘れると「Unknown command」エラー！
 
 ---
 
-## プラグインのビルドについて
+## テストの実行 🆕
 
-### ビルドが必要な場合
+### スモークテスト（クイック確認）
 
-- C++ ソースコードを変更した場合
-- ヘッダーファイル（.h）を変更した場合
-- 新しいファイルを追加した場合
+```powershell
+cd Python
+python tests/smoke_test.py
+```
 
-### ビルド手順
+### pytestによるテスト
 
-1. **UE エディタを閉じる**（必須）
-2. Visual Studio で `.sln` を開く
-3. **Build → Rebuild Solution**
-4. UE エディタを起動
+```powershell
+cd Python
+pip install -e ".[test]"
 
-⚠️ **Live Coding（Ctrl+Alt+F11）では新しい関数の追加は反映されない**
+# 全テスト
+python tests/run_tests.py
 
-### ビルドが反映されない場合
+# カテゴリ別
+python tests/run_tests.py -m umg
+python tests/run_tests.py -m blueprint
 
-以下のフォルダを削除してからビルド：
-- `Plugins/SpirrowBridge/Binaries`
-- `Plugins/SpirrowBridge/Intermediate`
-- プロジェクトルートの `Intermediate`
+# 詳細出力
+python tests/run_tests.py -v
+```
 
 ---
 
 ## rationale パラメータ（設計根拠の自動記録）
 
-### 概要
-
-主要なMCPツールには `rationale` パラメータがあります。
-設計判断の理由を記載すると、自動的にナレッジDBに蓄積されます。
-
 ### 対象ツール
 
-| ツール | カテゴリ | 理由 |
-|--------|----------|------|
-| `create_blueprint` | blueprint | BP設計の根幹 |
-| `add_component_to_blueprint` | component | コンポーネント選定理由 |
-| `set_physics_properties` | physics | 物理設定の意図 |
-| `spawn_actor` | level_design | アクター配置の意図 |
-| `set_actor_property` | actor_property | アクタープロパティ設定の意図 |
-| `set_actor_component_property` | component_property | コンポーネントプロパティ設定の意図 |
-| `add_blueprint_event_node` | blueprint_event | イベント使用の意図 |
-| `add_blueprint_function_node` | blueprint_logic | 関数呼び出しの理由 |
-| `add_blueprint_variable` | blueprint_variable | 変数の役割 |
-| `create_gameplay_effect` | gas_effect | GameplayEffect設計の意図（効果の用途、タグ戦略） |
-| `create_gameplay_ability` | gas_ability | GameplayAbility設計の意図（アビリティの役割、発動条件） |
-| `create_gas_character` | gas_character | GAS Character設計の意図（デフォルトAbilityとEffect選定理由） |
+| ツール | カテゴリ |
+|--------|----------|
+| `create_blueprint` | blueprint |
+| `add_component_to_blueprint` | component |
+| `set_physics_properties` | physics |
+| `spawn_actor` | level_design |
+| `add_blueprint_event_node` | blueprint_event |
+| `add_blueprint_function_node` | blueprint_logic |
+| `add_blueprint_variable` | blueprint_variable |
+| `create_gameplay_effect` | gas_effect |
+| `create_gameplay_ability` | gas_ability |
 
 ### 使用例
 
 ```python
-# 良い例: 設計判断の根拠を明記
 create_blueprint(
     name="BP_Enemy",
     parent_class="Character",
     rationale="敵キャラ用。AIControllerで制御し、NavMeshで移動するためCharacterベース"
 )
-
-add_component_to_blueprint(
-    blueprint_name="BP_Enemy",
-    component_type="CapsuleComponent",
-    component_name="HitBox",
-    rationale="攻撃判定用。RootのCapsuleとは別に、武器ヒット検出専用"
-)
-
-set_physics_properties(
-    blueprint_name="BP_Ball",
-    component_name="Mesh",
-    simulate_physics=True,
-    mass=10.0,
-    rationale="物理演算ボール。質量10kgで適度な弾み具合を実現"
-)
-
-spawn_actor(
-    name="EnemySpawnPoint_01",
-    type="TargetPoint",
-    location=[1000, 500, 100],
-    rationale="第1ウェーブの敵出現地点。プレイヤー初期位置から見えない位置"
-)
-
-# Blueprint ノード・変数
-add_blueprint_event_node(
-    blueprint_name="BP_Enemy",
-    event_name="ReceiveBeginPlay",
-    rationale="初期化処理。武器装備とAI起動を実行"
-)
-
-add_blueprint_function_node(
-    blueprint_name="BP_Player",
-    target="self",
-    function_name="TakeDamage",
-    rationale="ダメージ処理。HP減少とヒットエフェクトを再生"
-)
-
-add_blueprint_variable(
-    blueprint_name="BP_Enemy",
-    variable_name="CurrentHealth",
-    variable_type="Float",
-    rationale="現在のHP。0で死亡処理をトリガー"
-)
-
-# アクター・コンポーネントプロパティ
-set_actor_property(
-    name="MyLight",
-    property_name="bHidden",
-    property_value=False,
-    rationale="ゲーム開始時は表示。イベント発生で点灯させる"
-)
-
-set_actor_component_property(
-    actor_name="MyLight",
-    component_name="LightComponent0",
-    property_name="Intensity",
-    property_value=5000,
-    rationale="強調表示用。通常の2倍の明るさで注目を引く"
-)
-```
-
-### 書くべき内容
-
-- **なぜ**その選択をしたか
-- 他の選択肢を**なぜ却下**したか
-- 将来の**意図・拡張予定**
-
-### 書かなくていい場合
-
-- 機械的な操作（コンパイル、ノード接続など）
-- 自明な選択（プレイヤーキャラにPlayerControllerなど）
-- テスト・実験的な操作
-
-### ナレッジDBでの活用
-
-記録された rationale は、以下のように活用できます：
-
-```python
-# 過去の設計判断を検索
-search_knowledge("敵キャラ 設計", category="blueprint")
-
-# 物理設定の根拠を検索
-search_knowledge("質量 設定", category="physics")
 ```
 
 ---
 
 ## 更新履歴
 
-- 2026-01-03: Phase 0.6.5 BlueprintCommands分割完了。BlueprintCommands.cpp (95KB)→3分割、BlueprintNodeCommands.cpp (68KB)→3分割、最大ファイル26KBに削減。Commands合記18ファイル構成に
-- 2026-01-02: Enhanced Input Blueprint統合機能実装完了。add_mapping_context_to_blueprint（BeginPlayにAddMappingContextノードチェーン自動追加）、set_default_mapping_context（PlayerController/Character両対応）を追加
-- 2026-01-01: find_blueprint_nodes修正完了。node_typeをオプショナル化、全ノードタイプ対応（Event/Function/Variable/Branch/Sequence/Macro/InputAction/Self）、詳細情報返却（node_id, node_type, node_class, name, position, pins）
-- 2026-01-01: find_actors_by_name修正完了。レスポンス形式改善（success/pattern/count/actorsフィールド追加）でMCP表示問題を解決
-- 2026-01-01: Math/Comparisonノード動作確認完了。add_math_node (Add/Subtract/Multiply/Divide)、add_comparison_node (Greater/Less/Equal等) がFloat/Int両対応で動作OK。ピン名: A, B, ReturnValue
-- 2025-12-25: 制御フロー・ユーティリティノードツール追加（add_sequence_node, add_delay_node, add_print_string_node）
-- 2025-12-16: create_blueprint で UUserWidget を親クラスとして指定可能に。Widget Blueprint の自動生成に対応
-- 2025-12-15: GAS Phase 1-B 実装。GAS アセット一覧取得機能（list_gas_assets）を追加
-- 2025-12-15: GAS Phase 1-A 実装。Gameplay Tags 管理機能（add_gameplay_tags, list_gameplay_tags, remove_gameplay_tag）を追加
-- 2025-12-15: Config（ini）ファイル操作対応を追加。get_config_value, set_config_value, list_config_sections ツールを実装
-- 2025-12-15: ObjectProperty（アセット参照）対応を追加。`TObjectPtr<T>`, `TSoftObjectPtr<T>`, `TSubclassOf<T>` 型のプロパティ設定が可能に
-- 2025-12-15: set_actor_component_property ツールを追加、set_actor_property と合わせて rationale パラメータを追加
-- 2025-12-15: node_tools.py に rationale パラメータを追加（3ツール）
-- 2025-12-15: rationale パラメータ機能を追加（4ツール）
-- 2025-12-14: 新しいコマンド追加手順、ビルドガイドを追加
+- 2026-01-03: **Phase C完了** - テストフレームワーク作成、エラーハンドリング強化、error_codes.py追加
+- 2026-01-03: Phase 0.6.6 UMGWidgetCommands分割完了 (64KB→3分割)
+- 2026-01-03: Phase 0.6.5 BlueprintCommands分割完了 (95KB→3分割, 68KB→3分割)
+- 2026-01-02: Enhanced Input Blueprint統合機能実装
+- 2026-01-01: find_blueprint_nodes修正、Math/Comparisonノード動作確認
+- 2025-12-25: 制御フロー・ユーティリティノードツール追加
+- 2025-12-15: GAS機能実装、Config操作対応
 - 2025-12-03: 初版作成

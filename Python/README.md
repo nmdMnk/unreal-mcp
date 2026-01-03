@@ -1,6 +1,6 @@
 # Unreal MCP
 
-Model Context Protocol (MCP) を使用して Unreal Engine 5.5 と連携するための Python ブリッジです。
+Model Context Protocol (MCP) を使用して Unreal Engine 5.5+ と連携するための Python ブリッジです。
 
 ## セットアップ
 
@@ -21,7 +21,38 @@ Model Context Protocol (MCP) を使用して Unreal Engine 5.5 と連携する�
    uv pip install -e .
    ```
 
+5. （オプション）テスト用依存関係もインストール:
+   ```bash
+   uv pip install -e ".[test]"
+   ```
+
 この時点で、MCP クライアント（Claude Desktop、Cursor、Windsurf）を設定して Unreal MCP Server を使用できます。詳細は [MCP クライアントの設定](README.md#configuring-your-mcp-client) を参照してください。
+
+## テストの実行
+
+Unreal EditorでSpirrowBridgeプラグインが有効な状態で実行してください。
+
+### スモークテスト（クイック確認）
+
+```bash
+python tests/smoke_test.py
+```
+
+### pytestによるテスト
+
+```bash
+# 全テスト
+python tests/run_tests.py
+
+# カテゴリ別
+python tests/run_tests.py -m umg
+python tests/run_tests.py -m blueprint
+
+# 詳細出力
+python tests/run_tests.py -v
+```
+
+詳細は [tests/README.md](tests/README.md) を参照してください。
 
 ## 設定
 
