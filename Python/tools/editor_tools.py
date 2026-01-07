@@ -105,6 +105,8 @@ def register_editor_tools(mcp: FastMCP):
         type: str,
         location: List[float] = [0.0, 0.0, 0.0],
         rotation: List[float] = [0.0, 0.0, 0.0],
+        scale: List[float] = [1.0, 1.0, 1.0],
+        brush_size: List[float] = None,
         rationale: Optional[str] = None
     ) -> Dict[str, Any]:
         """Create a new actor in the current level.
@@ -112,13 +114,28 @@ def register_editor_tools(mcp: FastMCP):
         Args:
             ctx: The MCP context
             name: The name to give the new actor (must be unique)
-            type: The type of actor to create (e.g. StaticMeshActor, PointLight)
+            type: The type of actor to create. Supported types:
+                - Basic: StaticMeshActor, PointLight, SpotLight, DirectionalLight, CameraActor
+                - Volumes: NavMeshBoundsVolume, TriggerVolume, BlockingVolume, KillZVolume,
+                          PhysicsVolume, PostProcessVolume, AudioVolume, LightmassImportanceVolume
             location: The [x, y, z] world location to spawn at
             rotation: The [pitch, yaw, roll] rotation in degrees
+            scale: The [x, y, z] scale (default: [1, 1, 1]). For volumes, this scales the brush size.
+            brush_size: For Volume actors only: explicit [x, y, z] brush dimensions in units.
+                       If not provided, defaults to 200 * scale for each axis.
             rationale: Design rationale - why this actor is being spawned (auto-saved to knowledge base)
 
         Returns:
             Dict containing the created actor's properties
+
+        Example:
+            # Create a NavMesh volume covering a large area
+            spawn_actor(
+                name="NavMesh_Arena",
+                type="NavMeshBoundsVolume",
+                location=[0, 0, 100],
+                brush_size=[5000, 5000, 1000]
+            )
         """
         from unreal_mcp_server import get_unreal_connection
         from tools.rag_tools import record_rationale

@@ -4,6 +4,71 @@
 
 ---
 
+## 2026-01-07: Feature - Volume Actor Support in spawn_actor (v0.8.2)
+
+**概要**: `spawn_actor`コマンドで8種類のVolumeアクターを生成可能に
+
+**問題**:
+- Volumeアクターは単純な`SpawnActor`だけではBrush Geometryが生成されない
+- 結果としてDetailsパネルに「Brush Settings」が表示されず、機能しない
+
+**解決策**:
+- `UActorFactory::CreateBrushForVolumeActor`を使用して正しいBrush Geometryを生成
+- `UCubeBuilder`でサイズを設定してからVolumeに適用
+
+**対応したVolumeタイプ** (8種類):
+- `NavMeshBoundsVolume` - NavMeshのビルド範囲
+- `TriggerVolume` - トリガーイベント用
+- `BlockingVolume` - コリジョンブロック用
+- `KillZVolume` - 落下死亡用
+- `PhysicsVolume` - 物理設定用
+- `PostProcessVolume` - ポストプロセス用
+- `AudioVolume` - オーディオ設定用
+- `LightmassImportanceVolume` - ライトマス用
+
+**新パラメータ**:
+- `brush_size`: Volumeのサイズを明示的に指定 `[X, Y, Z]`
+- 未指定時は `200 * scale` がデフォルト
+
+**使用例**:
+```python
+# NavMeshボリュームを作成
+spawn_actor(
+    name="NavMesh_Arena",
+    type="NavMeshBoundsVolume",
+    location=[0, 0, 100],
+    brush_size=[5000, 5000, 1000]
+)
+
+# トリガーボリュームを作成
+spawn_actor(
+    name="TrapZone",
+    type="TriggerVolume",
+    location=[500, 0, 50],
+    brush_size=[300, 300, 200]
+)
+```
+
+**変更ファイル**:
+- `SpirrowBridgeEditorCommands.cpp` - Volumeアクター対応追加
+- `SpirrowBridgeCommonUtils.h` - `InvalidActorType`エラーコード追加
+- `editor_tools.py` - docstring更新、brush_size/scaleパラメータ追加
+
+**追加include**:
+- `NavMesh/NavMeshBoundsVolume.h`
+- `GameFramework/KillZVolume.h`
+- `Engine/TriggerVolume.h`
+- `Engine/BlockingVolume.h`
+- `GameFramework/PhysicsVolume.h`
+- `Engine/PostProcessVolume.h`
+- `Sound/AudioVolume.h`
+- `Lightmass/LightmassImportanceVolume.h`
+- `GameFramework/Volume.h`
+- `ActorFactories/ActorFactory.h`
+- `Builders/CubeBuilder.h`
+
+---
+
 ## 2026-01-07: BugFix - Blackboard BaseClass Not Set (v0.8.1)
 
 **概要**: `add_blackboard_key`の`base_class`パラメータが反映されない問題を修正

@@ -1,6 +1,6 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: Phase H (v0.8.1)
+> **バージョン**: Phase H (v0.8.2)
 > **ステータス**: Beta
 > **最終更新**: 2026-01-07
 
@@ -17,8 +17,8 @@
 | Enhanced Input | 5 | ✅ |
 | GAS | 8 | ✅ |
 | AI (BT/BB) | 17 | ✅ |
-| AI Perception | 6 | ✅ 🆕 |
-| EQS | 5 | ✅ 🆕 |
+| AI Perception | 6 | ✅ |
+| EQS | 5 | ✅ |
 | Material | 5 | ✅ |
 | Config | 3 | ✅ |
 | RAG | 4 | ✅ |
@@ -30,6 +30,10 @@
 
 ### Actor操作 (10)
 `get_actors_in_level`, `find_actors_by_name`, `spawn_actor`, `delete_actor`, `set_actor_transform`, `get_actor_properties`, `set_actor_property`, `set_actor_component_property`, `rename_actor`, `get_actor_components`
+
+**spawn_actor 対応タイプ:**
+- Basic: `StaticMeshActor`, `PointLight`, `SpotLight`, `DirectionalLight`, `CameraActor`
+- Volumes: `NavMeshBoundsVolume`, `TriggerVolume`, `BlockingVolume`, `KillZVolume`, `PhysicsVolume`, `PostProcessVolume`, `AudioVolume`, `LightmassImportanceVolume`
 
 ### Blueprint操作 (8)
 `create_blueprint`, `spawn_blueprint_actor`, `add_component_to_blueprint`, `set_static_mesh_properties`, `set_component_property`, `set_physics_properties`, `compile_blueprint`, `set_blueprint_property`
@@ -75,6 +79,13 @@
 ---
 
 ## 最新の更新
+
+### 2026-01-07: Volume Actor対応 (v0.8.2)
+- **spawn_actor Volume対応**: 8種類のVolumeアクターをspawn_actorで生成可能に
+  - NavMeshBoundsVolume, TriggerVolume, BlockingVolume, KillZVolume
+  - PhysicsVolume, PostProcessVolume, AudioVolume, LightmassImportanceVolume
+- **brush_size パラメータ追加**: Volumeのサイズを明示的に指定可能 `[X, Y, Z]`
+- UActorFactory::CreateBrushForVolumeActorを使用して正しいbrush geometryを生成
 
 ### 2026-01-07: Blackboard BaseClass Fix (v0.8.1)
 - **Blackboard BaseClass修正**: `add_blackboard_key`の`base_class`パラメータが正しく動作するよう修正

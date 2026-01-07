@@ -22,6 +22,19 @@
 #include "Engine/Blueprint.h"
 #include "Engine/BlueprintGeneratedClass.h"
 #include "EditorAssetLibrary.h"
+// Volume actors support
+#include "NavMesh/NavMeshBoundsVolume.h"
+#include "GameFramework/KillZVolume.h"
+#include "Engine/TriggerVolume.h"
+#include "Engine/BlockingVolume.h"
+#include "GameFramework/PhysicsVolume.h"
+#include "Engine/PostProcessVolume.h"
+#include "Sound/AudioVolume.h"
+#include "Lightmass/LightmassImportanceVolume.h"
+#include "GameFramework/Volume.h"
+// For creating brush geometry
+#include "ActorFactories/ActorFactory.h"
+#include "Builders/CubeBuilder.h"
 
 FSpirrowBridgeEditorCommands::FSpirrowBridgeEditorCommands()
 {
@@ -202,6 +215,9 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSpawnActor(const TSh
     FActorSpawnParameters SpawnParams;
     SpawnParams.Name = *ActorName;
 
+    // Check if this is a Volume actor type
+    bool bIsVolumeActor = false;
+    
     if (ActorType == TEXT("StaticMeshActor"))
     {
         NewActor = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), Location, Rotation, SpawnParams);
@@ -222,9 +238,71 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSpawnActor(const TSh
     {
         NewActor = World->SpawnActor<ACameraActor>(ACameraActor::StaticClass(), Location, Rotation, SpawnParams);
     }
+    // Volume actors (require brush geometry setup)
+    else if (ActorType == TEXT("NavMeshBoundsVolume"))
+    {
+        NewActor = World->SpawnActor<ANavMeshBoundsVolume>(ANavMeshBoundsVolume::StaticClass(), Location, Rotation, SpawnParams);
+        bIsVolumeActor = true;
+    }
+    else if (ActorType == TEXT("TriggerVolume"))
+    {
+        NewActor = World->SpawnActor<ATriggerVolume>(ATriggerVolume::StaticClass(), Location, Rotation, SpawnParams);
+        bIsVolumeActor = true;
+    }
+    else if (ActorType == TEXT("BlockingVolume"))
+    {
+        NewActor = World->SpawnActor<ABlockingVolume>(ABlockingVolume::StaticClass(), Location, Rotation, SpawnParams);
+        bIsVolumeActor = true;
+    }
+    else if (ActorType == TEXT("KillZVolume"))
+    {
+        NewActor = World->SpawnActor<AKillZVolume>(AKillZVolume::StaticClass(), Location, Rotation, SpawnParams);
+        bIsVolumeActor = true;
+    }
+    else if (ActorType == TEXT("PhysicsVolume"))
+    {
+        NewActor = World->SpawnActor<APhysicsVolume>(APhysicsVolume::StaticClass(), Location, Rotation, SpawnParams);
+        bIsVolumeActor = true;
+    }
+    else if (ActorType == TEXT("PostProcessVolume"))
+    {
+        NewActor = World->SpawnActor<APostProcessVolume>(APostProcessVolume::StaticClass(), Location, Rotation, SpawnParams);
+        bIsVolumeActor = true;
+    }
+    else if (ActorType == TEXT("AudioVolume"))
+    {
+        NewActor = World->SpawnActor<AAudioVolume>(AAudioVolume::StaticClass(), Location, Rotation, SpawnParams);
+        bIsVolumeActor = true;
+    }
+    else if (ActorType == TEXT("LightmassImportanceVolume"))
+    {
+        NewActor = World->SpawnActor<ALightmassImportanceVolume>(ALightmassImportanceVolume::StaticClass(), Location, Rotation, SpawnParams);
+        bIsVolumeActor = true;
+    }
     else
     {
-        return FSpirrowBridgeCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown actor type: %s"), *ActorType));
+        // Build list of supported types for error message
+        TSharedPtr<FJsonObject> Details = MakeShared<FJsonObject>();
+        Details->SetStringField(TEXT("requested_type"), ActorType);
+        TArray<TSharedPtr<FJsonValue>> SupportedTypes;
+        SupportedTypes.Add(MakeShared<FJsonValueString>(TEXT("StaticMeshActor")));
+        SupportedTypes.Add(MakeShared<FJsonValueString>(TEXT("PointLight")));
+        SupportedTypes.Add(MakeShared<FJsonValueString>(TEXT("SpotLight")));
+        SupportedTypes.Add(MakeShared<FJsonValueString>(TEXT("DirectionalLight")));
+        SupportedTypes.Add(MakeShared<FJsonValueString>(TEXT("CameraActor")));
+        SupportedTypes.Add(MakeShared<FJsonValueString>(TEXT("NavMeshBoundsVolume")));
+        SupportedTypes.Add(MakeShared<FJsonValueString>(TEXT("TriggerVolume")));
+        SupportedTypes.Add(MakeShared<FJsonValueString>(TEXT("BlockingVolume")));
+        SupportedTypes.Add(MakeShared<FJsonValueString>(TEXT("KillZVolume")));
+        SupportedTypes.Add(MakeShared<FJsonValueString>(TEXT("PhysicsVolume")));
+        SupportedTypes.Add(MakeShared<FJsonValueString>(TEXT("PostProcessVolume")));
+        SupportedTypes.Add(MakeShared<FJsonValueString>(TEXT("AudioVolume")));
+        SupportedTypes.Add(MakeShared<FJsonValueString>(TEXT("LightmassImportanceVolume")));
+        Details->SetArrayField(TEXT("supported_types"), SupportedTypes);
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::InvalidActorType,
+            FString::Printf(TEXT("Unknown actor type: %s"), *ActorType),
+            Details);
     }
 
     if (NewActor)
@@ -234,8 +312,54 @@ TSharedPtr<FJsonObject> FSpirrowBridgeEditorCommands::HandleSpawnActor(const TSh
         Transform.SetScale3D(Scale);
         NewActor->SetActorTransform(Transform);
 
+        // For Volume actors, create the brush geometry
+        if (bIsVolumeActor)
+        {
+            // Get brush size from params or use scale * default size
+            float BrushSizeX = 200.0f * Scale.X;
+            float BrushSizeY = 200.0f * Scale.Y;
+            float BrushSizeZ = 200.0f * Scale.Z;
+
+            // Check for explicit brush_size parameter
+            if (Params->HasField(TEXT("brush_size")))
+            {
+                FVector BrushSize = FSpirrowBridgeCommonUtils::GetVectorFromJson(Params, TEXT("brush_size"));
+                BrushSizeX = BrushSize.X;
+                BrushSizeY = BrushSize.Y;
+                BrushSizeZ = BrushSize.Z;
+            }
+
+            // Create brush geometry using UCubeBuilder
+            UCubeBuilder* CubeBuilder = Cast<UCubeBuilder>(GEditor->FindBrushBuilder(UCubeBuilder::StaticClass()));
+            if (CubeBuilder)
+            {
+                CubeBuilder->X = BrushSizeX;
+                CubeBuilder->Y = BrushSizeY;
+                CubeBuilder->Z = BrushSizeZ;
+
+                // Use UActorFactory::CreateBrushForVolumeActor to properly create the brush
+                AVolume* VolumeActor = Cast<AVolume>(NewActor);
+                if (VolumeActor)
+                {
+                    UActorFactory::CreateBrushForVolumeActor(VolumeActor, CubeBuilder);
+                    UE_LOG(LogTemp, Display, TEXT("Created brush geometry for Volume actor: %s (Size: %.0f x %.0f x %.0f)"), 
+                        *ActorName, BrushSizeX, BrushSizeY, BrushSizeZ);
+                }
+            }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("Failed to find CubeBuilder for Volume actor: %s"), *ActorName);
+            }
+        }
+
         // Return the created actor's details
-        return FSpirrowBridgeCommonUtils::ActorToJsonObject(NewActor, true);
+        TSharedPtr<FJsonObject> Result = FSpirrowBridgeCommonUtils::ActorToJsonObject(NewActor, true);
+        if (bIsVolumeActor)
+        {
+            Result->SetBoolField(TEXT("is_volume"), true);
+            Result->SetStringField(TEXT("note"), TEXT("Volume created with brush geometry. Use 'brush_size' parameter to specify custom size."));
+        }
+        return Result;
     }
 
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(TEXT("Failed to create actor"));

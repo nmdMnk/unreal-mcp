@@ -77,6 +77,7 @@ namespace ESpirrowErrorCode
     constexpr int32 PropertyNotFound = 1403;
     constexpr int32 PropertySetFailed = 1404;
     constexpr int32 ComponentCreationFailed = 1405;
+    constexpr int32 InvalidActorType = 1406;
 
     // GAS errors (1500-1599)
     constexpr int32 GameplayTagInvalid = 1500;
