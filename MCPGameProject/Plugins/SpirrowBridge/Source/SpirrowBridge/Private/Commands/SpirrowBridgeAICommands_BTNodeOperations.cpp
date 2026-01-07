@@ -106,6 +106,18 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleConnectBTNodes(
 		}
 	}
 
+	// 接続成功後、キャッシュからノードを削除（もうツリーに接続されたので）
+	FString BTAssetPath = BehaviorTree->GetPathName();
+	if (TMap<FString, UBTNode*>* NodeMap = PendingBTNodes.Find(BTAssetPath))
+	{
+		NodeMap->Remove(ChildNodeId);
+		// 空になったらマップ自体も削除
+		if (NodeMap->Num() == 0)
+		{
+			PendingBTNodes.Remove(BTAssetPath);
+		}
+	}
+
 	// 保存
 	BehaviorTree->MarkPackageDirty();
 	UPackage* Package = BehaviorTree->GetOutermost();

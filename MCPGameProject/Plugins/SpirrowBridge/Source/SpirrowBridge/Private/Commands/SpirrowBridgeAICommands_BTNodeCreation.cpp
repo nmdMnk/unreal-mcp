@@ -69,6 +69,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTCompositeNode(
 		NewNode->NodeName = NodeName;
 	}
 
+	// ノードIDを取得
+	FString NodeId = NewNode->GetName();
+
+	// キャッシュに登録（まだRootに接続されていないノードを後で検索できるように）
+	FString BTAssetPath = BehaviorTree->GetPathName();
+	PendingBTNodes.FindOrAdd(BTAssetPath).Add(NodeId, NewNode);
+
 	// 保存
 	BehaviorTree->MarkPackageDirty();
 	UPackage* Package = BehaviorTree->GetOutermost();
@@ -82,7 +89,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTCompositeNode(
 	TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject());
 	Result->SetBoolField(TEXT("success"), true);
 	Result->SetStringField(TEXT("behavior_tree_name"), BehaviorTreeName);
-	Result->SetStringField(TEXT("node_id"), NewNode->GetName());
+	Result->SetStringField(TEXT("node_id"), NodeId);
 	Result->SetStringField(TEXT("node_type"), NodeType);
 	Result->SetStringField(TEXT("node_class"), NodeClass->GetName());
 	if (!NodeName.IsEmpty())
@@ -147,6 +154,13 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTTaskNode(
 		NewTask->NodeName = NodeName;
 	}
 
+	// ノードIDを取得
+	FString NodeId = NewTask->GetName();
+
+	// キャッシュに登録（まだRootに接続されていないノードを後で検索できるように）
+	FString BTAssetPath = BehaviorTree->GetPathName();
+	PendingBTNodes.FindOrAdd(BTAssetPath).Add(NodeId, NewTask);
+
 	// 保存
 	BehaviorTree->MarkPackageDirty();
 	UPackage* Package = BehaviorTree->GetOutermost();
@@ -160,7 +174,7 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTTaskNode(
 	TSharedPtr<FJsonObject> Result = MakeShareable(new FJsonObject());
 	Result->SetBoolField(TEXT("success"), true);
 	Result->SetStringField(TEXT("behavior_tree_name"), BehaviorTreeName);
-	Result->SetStringField(TEXT("node_id"), NewTask->GetName());
+	Result->SetStringField(TEXT("node_id"), NodeId);
 	Result->SetStringField(TEXT("task_type"), TaskType);
 	Result->SetStringField(TEXT("node_class"), TaskClass->GetName());
 	if (!NodeName.IsEmpty())

@@ -4,6 +4,29 @@
 
 ---
 
+## 2026-01-07: BugFix - connect_bt_nodes Child Not Found
+
+**概要**: `connect_bt_nodes`でRoot未接続ノードを検索できない問題を修正
+
+**問題**:
+- `add_bt_composite_node`で作成したノードを`connect_bt_nodes`でRootに接続しようとすると`Child node not found`エラー
+- 原因: `FindBTNodeById`がRootNode以下のツリーのみを検索していた
+
+**修正内容**:
+- `PendingBTNodes`キャッシュを導入（作成済み・未接続ノードを一時保持）
+- `HandleAddBTCompositeNode` / `HandleAddBTTaskNode`: ノード作成後にキャッシュに登録
+- `FindBTNodeById`: まずキャッシュを検索、なければツリーを検索
+- `HandleConnectBTNodes`: 接続成功後にキャッシュから削除
+
+**変更ファイル (5ファイル)**:
+- `SpirrowBridgeAICommands.h` - PendingBTNodes宣言追加
+- `SpirrowBridgeAICommands.cpp` - static変数定義追加
+- `AICommands_BTNodeCreation.cpp` - キャッシュ登録処理
+- `AICommands_BTNodeHelpers.cpp` - キャッシュ検索処理
+- `AICommands_BTNodeOperations.cpp` - キャッシュ削除処理
+
+---
+
 ## 2026-01-06: Phase H - AIPerception & EQS
 
 **概要**: AI感知システムとEnvironment Query System操作11ツール追加

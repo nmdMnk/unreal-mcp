@@ -3,6 +3,9 @@
 #include "CoreMinimal.h"
 #include "Dom/JsonObject.h"
 
+// Forward declarations
+class UBTNode;
+
 /**
  * Handles AI-related commands for SpirrowBridge.
  * Includes BehaviorTree and Blackboard operations.
@@ -12,6 +15,13 @@ class SPIRROWBRIDGE_API FSpirrowBridgeAICommands
 public:
 	FSpirrowBridgeAICommands();
 	~FSpirrowBridgeAICommands();
+
+	/**
+	 * Cache for BT nodes that have been created but not yet connected to the tree.
+	 * Key: BehaviorTree asset path -> (NodeId -> Node pointer)
+	 * This is needed because FindBTNodeById can only search nodes connected to RootNode.
+	 */
+	static TMap<FString, TMap<FString, UBTNode*>> PendingBTNodes;
 
 	/**
 	 * Main command handler that routes to specific handlers.

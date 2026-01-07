@@ -68,6 +68,9 @@
 #include "Misc/PackageName.h"
 #include "Engine/Blueprint.h"
 
+// Static member definition: Cache for pending BT nodes (created but not yet connected)
+TMap<FString, TMap<FString, UBTNode*>> FSpirrowBridgeAICommands::PendingBTNodes;
+
 FSpirrowBridgeAICommands::FSpirrowBridgeAICommands()
 {
 }

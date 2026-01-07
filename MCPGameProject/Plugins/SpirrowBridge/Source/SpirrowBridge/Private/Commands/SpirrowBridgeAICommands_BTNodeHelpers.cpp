@@ -141,7 +141,20 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::BTNodeToJson(UBTNode* Node)
 
 UBTNode* FSpirrowBridgeAICommands::FindBTNodeById(UBehaviorTree* BehaviorTree, const FString& NodeId)
 {
-	if (!BehaviorTree || !BehaviorTree->RootNode) return nullptr;
+	if (!BehaviorTree) return nullptr;
+
+	// First, check the pending nodes cache (nodes created but not yet connected to tree)
+	FString BTAssetPath = BehaviorTree->GetPathName();
+	if (TMap<FString, UBTNode*>* NodeMap = PendingBTNodes.Find(BTAssetPath))
+	{
+		if (UBTNode** FoundNode = NodeMap->Find(NodeId))
+		{
+			return *FoundNode;
+		}
+	}
+
+	// If not in cache, search the connected tree
+	if (!BehaviorTree->RootNode) return nullptr;
 
 	// Recursive node search
 	TFunction<UBTNode*(UBTCompositeNode*)> SearchInComposite = [&](UBTCompositeNode* Composite) -> UBTNode*
