@@ -216,6 +216,15 @@ public:
     static bool SetObjectProperty(UObject* Object, const FString& PropertyName, 
                                  const TSharedPtr<FJsonValue>& Value, FString& OutErrorMessage);
     
+    /** Set a struct property value from JSON (internal helper) */
+    static bool SetStructPropertyValue(void* StructAddr, FStructProperty* StructProp,
+                                       const TSharedPtr<FJsonValue>& Value, FString& OutErrorMessage);
+    
+    /** Set individual struct field value (recursive helper) */
+    static bool SetStructFieldValue(void* StructAddr, UScriptStruct* ScriptStruct,
+                                    const FString& FieldName, const TSharedPtr<FJsonValue>& Value,
+                                    FString& OutErrorMessage);
+    
     // ============================================
     // Logging utilities
     // ============================================

@@ -4,6 +4,83 @@
 
 ---
 
+## 2026-01-07: BugFix - Blackboard BaseClass Not Set (v0.8.1)
+
+**概要**: `add_blackboard_key`の`base_class`パラメータが反映されない問題を修正
+
+**問題**:
+- `base_class="Actor"`を指定しても、Blackboardキーの BaseClass が `Object` のままだった
+- 結果として MoveTo タスクで Object型キー（TargetActor等）が選択肢に表示されなかった
+
+**原因**:
+- `FindObject<UClass>(nullptr, *BaseClass)`で`"Actor"`という短い名前では検索できなかった
+- 正しいパスは`/Script/Engine.Actor`
+
+**修正内容**:
+複数の検索方法を試行するように改善:
+```cpp
+// Method 1: 直接検索（フルパス用）
+FoundClass = FindObject<UClass>(nullptr, *BaseClass);
+
+// Method 2: /Script/Engine プレフィックス
+FString EnginePath = FString::Printf(TEXT("/Script/Engine.%s"), *BaseClass);
+FoundClass = FindObject<UClass>(nullptr, *EnginePath);
+
+// Method 3: /Script/CoreUObject プレフィックス
+FString CorePath = FString::Printf(TEXT("/Script/CoreUObject.%s"), *BaseClass);
+FoundClass = FindObject<UClass>(nullptr, *CorePath);
+
+// Method 4: StaticLoadClass フォールバック
+FoundClass = StaticLoadClass(UObject::StaticClass(), nullptr, *ClassPath);
+```
+
+**変更ファイル**:
+- `SpirrowBridgeAICommands_Blackboard.cpp` - BaseClass検索ロジック改善
+
+**検証**:
+- `add_blackboard_key(base_class="Actor")` → KeyType=Object, BaseClass=Actor ✅
+- MoveTo タスクで TargetActor キーが選択可能に ✅
+- `set_bt_node_property(property_name="BlackboardKey")` で設定反映 ✅
+
+---
+
+## 2026-01-07: Feature - Struct Property Support in SetObjectProperty
+
+**概要**: `SetObjectProperty`に構造体プロパティ対応を追加
+
+**対応構造体**:
+- `FBlackboardKeySelector` - BTノードのBlackboardKey設定（文字列 or オブジェクト入力）
+- `FVector` / `FVector2D` / `FRotator` - 座標・回転（配列 or オブジェクト入力）
+- `FLinearColor` / `FColor` - 色（配列 or オブジェクト入力）
+- `FAIDataProviderFloatValue` / `FAIDataProviderIntValue` / `FAIDataProviderBoolValue` - EQS用
+- `FTransform` - トランスフォーム（オブジェクト入力）
+- 汎用構造体 - リフレクションによるフィールド単位の設定
+
+**追加プロパティタイプ**:
+- `FNameProperty` - FName型
+- `FDoubleProperty` - double型（UE5）
+
+**使用例**:
+```python
+# BlackboardKey設定（文字列）
+set_bt_node_property(node_id="...", property_name="BlackboardKey", property_value="TargetLocation")
+
+# BlackboardKey設定（オブジェクト）
+set_bt_node_property(node_id="...", property_name="BlackboardKey", property_value={"SelectedKeyName": "TargetActor"})
+
+# Vector設定（配列）
+set_actor_property(name="...", property_name="Location", property_value=[100, 200, 300])
+```
+
+**変更ファイル**:
+- `SpirrowBridgeCommonUtils.h` - `SetStructPropertyValue`, `SetStructFieldValue` 宣言追加
+- `SpirrowBridgeCommonUtils.cpp` - 構造体対応実装（約480行追加）
+
+**既知の制限解消**:
+- `set_eqs_test_property`でStruct型（FAIDataProviderFloatValue）が対応可能に
+
+---
+
 ## 2026-01-07: BugFix - connect_bt_nodes Child Not Found
 
 **概要**: `connect_bt_nodes`でRoot未接続ノードを検索できない問題を修正

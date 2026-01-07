@@ -208,21 +208,47 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBlackboardKey(
 	// Object/Classタイプの場合、BaseClassを設定
 	if (!BaseClass.IsEmpty())
 	{
-		if (UBlackboardKeyType_Object* ObjectType = Cast<UBlackboardKeyType_Object>(NewEntry.KeyType))
+		// Try to find the class by various methods
+		UClass* FoundClass = nullptr;
+		
+		// Method 1: Try direct lookup (works for full paths like /Script/Engine.Actor)
+		FoundClass = FindObject<UClass>(nullptr, *BaseClass);
+		
+		// Method 2: Try with /Script/Engine prefix for common Engine classes
+		if (!FoundClass)
 		{
-			UClass* FoundClass = FindObject<UClass>(nullptr, *BaseClass);
-			if (FoundClass)
+			FString EnginePath = FString::Printf(TEXT("/Script/Engine.%s"), *BaseClass);
+			FoundClass = FindObject<UClass>(nullptr, *EnginePath);
+		}
+		
+		// Method 3: Try with /Script/CoreUObject prefix
+		if (!FoundClass)
+		{
+			FString CorePath = FString::Printf(TEXT("/Script/CoreUObject.%s"), *BaseClass);
+			FoundClass = FindObject<UClass>(nullptr, *CorePath);
+		}
+		
+		// Method 4: Use StaticLoadClass as fallback
+		if (!FoundClass)
+		{
+			FString ClassPath = FString::Printf(TEXT("/Script/Engine.%s"), *BaseClass);
+			FoundClass = StaticLoadClass(UObject::StaticClass(), nullptr, *ClassPath);
+		}
+		
+		if (FoundClass)
+		{
+			if (UBlackboardKeyType_Object* ObjectType = Cast<UBlackboardKeyType_Object>(NewEntry.KeyType))
 			{
 				ObjectType->BaseClass = FoundClass;
 			}
-		}
-		else if (UBlackboardKeyType_Class* ClassType = Cast<UBlackboardKeyType_Class>(NewEntry.KeyType))
-		{
-			UClass* FoundClass = FindObject<UClass>(nullptr, *BaseClass);
-			if (FoundClass)
+			else if (UBlackboardKeyType_Class* ClassType = Cast<UBlackboardKeyType_Class>(NewEntry.KeyType))
 			{
 				ClassType->BaseClass = FoundClass;
 			}
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Could not find class: %s for Blackboard key BaseClass"), *BaseClass);
 		}
 	}
 

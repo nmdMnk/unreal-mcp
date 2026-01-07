@@ -110,6 +110,10 @@ cd Python && python tests/run_tests.py
 
 ## 📋 バージョン
 
+**v0.8.1 (Beta)** - 2026-01-07
+- Blackboard BaseClass修正 - `base_class="Actor"`が正しく動作
+- 構造体プロパティ対応 (FBlackboardKeySelector等)
+
 **v0.8.0 (Beta)** - 2026-01-06
 - Phase H: AIPerception & EQS対応 (11ツール追加)
 - AI システム完全対応 (合計28ツール)

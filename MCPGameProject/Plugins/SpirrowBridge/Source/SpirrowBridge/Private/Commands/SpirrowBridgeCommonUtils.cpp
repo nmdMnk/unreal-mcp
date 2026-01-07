@@ -30,6 +30,10 @@
 #include "UObject/SoftObjectPath.h"
 #include "UObject/UObjectGlobals.h"
 
+// Struct types for specialized handling
+#include "BehaviorTree/BehaviorTreeTypes.h"      // FBlackboardKeySelector
+#include "DataProviders/AIDataProvider.h"        // FAIDataProviderFloatValue, FAIDataProviderIntValue, FAIDataProviderBoolValue
+
 // ============================================
 // JSON Response Utilities  
 // ============================================
@@ -956,6 +960,40 @@ bool FSpirrowBridgeCommonUtils::SetObjectProperty(UObject* Object, const FString
             return false;
         }
     }
+    // ============================================
+    // FStructProperty handling
+    // ============================================
+    else if (FStructProperty* StructProp = CastField<FStructProperty>(Property))
+    {
+        return SetStructPropertyValue(PropertyAddr, StructProp, Value, OutErrorMessage);
+    }
+    // ============================================
+    // FNameProperty handling
+    // ============================================
+    else if (FNameProperty* NameProp = CastField<FNameProperty>(Property))
+    {
+        if (Value->Type == EJson::String)
+        {
+            FName NameValue = FName(*Value->AsString());
+            NameProp->SetPropertyValue(PropertyAddr, NameValue);
+            UE_LOG(LogTemp, Display, TEXT("Set name property %s to: %s"), *PropertyName, *NameValue.ToString());
+            return true;
+        }
+        else
+        {
+            OutErrorMessage = FString::Printf(TEXT("Name property %s requires a string value"), *PropertyName);
+            return false;
+        }
+    }
+    // ============================================
+    // FDoubleProperty handling (UE5)
+    // ============================================
+    else if (FDoubleProperty* DoubleProp = CastField<FDoubleProperty>(Property))
+    {
+        DoubleProp->SetPropertyValue(PropertyAddr, Value->AsNumber());
+        UE_LOG(LogTemp, Display, TEXT("Set double property %s to: %f"), *PropertyName, Value->AsNumber());
+        return true;
+    }
 
     OutErrorMessage = FString::Printf(TEXT("Unsupported property type: %s for property %s"),
                                     *Property->GetClass()->GetName(), *PropertyName);
@@ -1234,4 +1272,480 @@ void FSpirrowBridgeCommonUtils::LogCommandWarning(const FString& CommandName, co
 void FSpirrowBridgeCommonUtils::LogCommandInfo(const FString& CommandName, const FString& Message)
 {
     UE_LOG(LogSpirrowBridge, Display, TEXT("[%s] %s"), *CommandName, *Message);
-} 
+}
+
+// ============================================
+// Struct Property utilities
+// ============================================
+
+bool FSpirrowBridgeCommonUtils::SetStructPropertyValue(void* StructAddr, FStructProperty* StructProp,
+                                                       const TSharedPtr<FJsonValue>& Value, FString& OutErrorMessage)
+{
+    if (!StructAddr || !StructProp)
+    {
+        OutErrorMessage = TEXT("Invalid struct address or property");
+        return false;
+    }
+
+    UScriptStruct* ScriptStruct = StructProp->Struct;
+    if (!ScriptStruct)
+    {
+        OutErrorMessage = TEXT("Invalid script struct");
+        return false;
+    }
+
+    FString StructName = ScriptStruct->GetName();
+    UE_LOG(LogTemp, Display, TEXT("SetStructPropertyValue: Processing struct type '%s'"), *StructName);
+
+    // ============================================
+    // Handle FBlackboardKeySelector (BehaviorTree)
+    // ============================================
+    if (StructName == TEXT("BlackboardKeySelector"))
+    {
+        FBlackboardKeySelector* KeySelector = static_cast<FBlackboardKeySelector*>(StructAddr);
+        
+        // Handle string input: just set SelectedKeyName
+        if (Value->Type == EJson::String)
+        {
+            KeySelector->SelectedKeyName = FName(*Value->AsString());
+            UE_LOG(LogTemp, Display, TEXT("Set FBlackboardKeySelector.SelectedKeyName to: %s"), 
+                   *KeySelector->SelectedKeyName.ToString());
+            return true;
+        }
+        // Handle object input: parse SelectedKeyName field
+        else if (Value->Type == EJson::Object)
+        {
+            const TSharedPtr<FJsonObject>& JsonObj = Value->AsObject();
+            
+            // SelectedKeyName (required)
+            if (JsonObj->HasField(TEXT("SelectedKeyName")))
+            {
+                FString KeyName;
+                if (JsonObj->TryGetStringField(TEXT("SelectedKeyName"), KeyName))
+                {
+                    KeySelector->SelectedKeyName = FName(*KeyName);
+                    UE_LOG(LogTemp, Display, TEXT("Set FBlackboardKeySelector.SelectedKeyName to: %s"), *KeyName);
+                }
+            }
+            
+            return true;
+        }
+        else
+        {
+            OutErrorMessage = TEXT("FBlackboardKeySelector requires a string or object with SelectedKeyName");
+            return false;
+        }
+    }
+    // ============================================
+    // Handle FVector
+    // ============================================
+    else if (StructName == TEXT("Vector"))
+    {
+        FVector* VectorPtr = static_cast<FVector*>(StructAddr);
+        
+        if (Value->Type == EJson::Array)
+        {
+            const TArray<TSharedPtr<FJsonValue>>& JsonArray = Value->AsArray();
+            if (JsonArray.Num() >= 3)
+            {
+                VectorPtr->X = JsonArray[0]->AsNumber();
+                VectorPtr->Y = JsonArray[1]->AsNumber();
+                VectorPtr->Z = JsonArray[2]->AsNumber();
+                UE_LOG(LogTemp, Display, TEXT("Set FVector to: (%f, %f, %f)"), VectorPtr->X, VectorPtr->Y, VectorPtr->Z);
+                return true;
+            }
+        }
+        else if (Value->Type == EJson::Object)
+        {
+            const TSharedPtr<FJsonObject>& JsonObj = Value->AsObject();
+            if (JsonObj->HasField(TEXT("X"))) VectorPtr->X = JsonObj->GetNumberField(TEXT("X"));
+            if (JsonObj->HasField(TEXT("Y"))) VectorPtr->Y = JsonObj->GetNumberField(TEXT("Y"));
+            if (JsonObj->HasField(TEXT("Z"))) VectorPtr->Z = JsonObj->GetNumberField(TEXT("Z"));
+            UE_LOG(LogTemp, Display, TEXT("Set FVector to: (%f, %f, %f)"), VectorPtr->X, VectorPtr->Y, VectorPtr->Z);
+            return true;
+        }
+        OutErrorMessage = TEXT("FVector requires an array [X, Y, Z] or object {X, Y, Z}");
+        return false;
+    }
+    // ============================================
+    // Handle FVector2D
+    // ============================================
+    else if (StructName == TEXT("Vector2D"))
+    {
+        FVector2D* Vector2DPtr = static_cast<FVector2D*>(StructAddr);
+        
+        if (Value->Type == EJson::Array)
+        {
+            const TArray<TSharedPtr<FJsonValue>>& JsonArray = Value->AsArray();
+            if (JsonArray.Num() >= 2)
+            {
+                Vector2DPtr->X = JsonArray[0]->AsNumber();
+                Vector2DPtr->Y = JsonArray[1]->AsNumber();
+                UE_LOG(LogTemp, Display, TEXT("Set FVector2D to: (%f, %f)"), Vector2DPtr->X, Vector2DPtr->Y);
+                return true;
+            }
+        }
+        else if (Value->Type == EJson::Object)
+        {
+            const TSharedPtr<FJsonObject>& JsonObj = Value->AsObject();
+            if (JsonObj->HasField(TEXT("X"))) Vector2DPtr->X = JsonObj->GetNumberField(TEXT("X"));
+            if (JsonObj->HasField(TEXT("Y"))) Vector2DPtr->Y = JsonObj->GetNumberField(TEXT("Y"));
+            UE_LOG(LogTemp, Display, TEXT("Set FVector2D to: (%f, %f)"), Vector2DPtr->X, Vector2DPtr->Y);
+            return true;
+        }
+        OutErrorMessage = TEXT("FVector2D requires an array [X, Y] or object {X, Y}");
+        return false;
+    }
+    // ============================================
+    // Handle FRotator
+    // ============================================
+    else if (StructName == TEXT("Rotator"))
+    {
+        FRotator* RotatorPtr = static_cast<FRotator*>(StructAddr);
+        
+        if (Value->Type == EJson::Array)
+        {
+            const TArray<TSharedPtr<FJsonValue>>& JsonArray = Value->AsArray();
+            if (JsonArray.Num() >= 3)
+            {
+                RotatorPtr->Pitch = JsonArray[0]->AsNumber();
+                RotatorPtr->Yaw = JsonArray[1]->AsNumber();
+                RotatorPtr->Roll = JsonArray[2]->AsNumber();
+                UE_LOG(LogTemp, Display, TEXT("Set FRotator to: (Pitch=%f, Yaw=%f, Roll=%f)"), 
+                       RotatorPtr->Pitch, RotatorPtr->Yaw, RotatorPtr->Roll);
+                return true;
+            }
+        }
+        else if (Value->Type == EJson::Object)
+        {
+            const TSharedPtr<FJsonObject>& JsonObj = Value->AsObject();
+            if (JsonObj->HasField(TEXT("Pitch"))) RotatorPtr->Pitch = JsonObj->GetNumberField(TEXT("Pitch"));
+            if (JsonObj->HasField(TEXT("Yaw"))) RotatorPtr->Yaw = JsonObj->GetNumberField(TEXT("Yaw"));
+            if (JsonObj->HasField(TEXT("Roll"))) RotatorPtr->Roll = JsonObj->GetNumberField(TEXT("Roll"));
+            UE_LOG(LogTemp, Display, TEXT("Set FRotator to: (Pitch=%f, Yaw=%f, Roll=%f)"), 
+                   RotatorPtr->Pitch, RotatorPtr->Yaw, RotatorPtr->Roll);
+            return true;
+        }
+        OutErrorMessage = TEXT("FRotator requires an array [Pitch, Yaw, Roll] or object {Pitch, Yaw, Roll}");
+        return false;
+    }
+    // ============================================
+    // Handle FLinearColor
+    // ============================================
+    else if (StructName == TEXT("LinearColor"))
+    {
+        FLinearColor* ColorPtr = static_cast<FLinearColor*>(StructAddr);
+        
+        if (Value->Type == EJson::Array)
+        {
+            const TArray<TSharedPtr<FJsonValue>>& JsonArray = Value->AsArray();
+            if (JsonArray.Num() >= 3)
+            {
+                ColorPtr->R = JsonArray[0]->AsNumber();
+                ColorPtr->G = JsonArray[1]->AsNumber();
+                ColorPtr->B = JsonArray[2]->AsNumber();
+                ColorPtr->A = JsonArray.Num() >= 4 ? JsonArray[3]->AsNumber() : 1.0f;
+                UE_LOG(LogTemp, Display, TEXT("Set FLinearColor to: (R=%f, G=%f, B=%f, A=%f)"), 
+                       ColorPtr->R, ColorPtr->G, ColorPtr->B, ColorPtr->A);
+                return true;
+            }
+        }
+        else if (Value->Type == EJson::Object)
+        {
+            const TSharedPtr<FJsonObject>& JsonObj = Value->AsObject();
+            if (JsonObj->HasField(TEXT("R"))) ColorPtr->R = JsonObj->GetNumberField(TEXT("R"));
+            if (JsonObj->HasField(TEXT("G"))) ColorPtr->G = JsonObj->GetNumberField(TEXT("G"));
+            if (JsonObj->HasField(TEXT("B"))) ColorPtr->B = JsonObj->GetNumberField(TEXT("B"));
+            if (JsonObj->HasField(TEXT("A"))) ColorPtr->A = JsonObj->GetNumberField(TEXT("A"));
+            UE_LOG(LogTemp, Display, TEXT("Set FLinearColor to: (R=%f, G=%f, B=%f, A=%f)"), 
+                   ColorPtr->R, ColorPtr->G, ColorPtr->B, ColorPtr->A);
+            return true;
+        }
+        OutErrorMessage = TEXT("FLinearColor requires an array [R, G, B, A] or object {R, G, B, A}");
+        return false;
+    }
+    // ============================================
+    // Handle FColor
+    // ============================================
+    else if (StructName == TEXT("Color"))
+    {
+        FColor* ColorPtr = static_cast<FColor*>(StructAddr);
+        
+        if (Value->Type == EJson::Array)
+        {
+            const TArray<TSharedPtr<FJsonValue>>& JsonArray = Value->AsArray();
+            if (JsonArray.Num() >= 3)
+            {
+                ColorPtr->R = static_cast<uint8>(JsonArray[0]->AsNumber());
+                ColorPtr->G = static_cast<uint8>(JsonArray[1]->AsNumber());
+                ColorPtr->B = static_cast<uint8>(JsonArray[2]->AsNumber());
+                ColorPtr->A = JsonArray.Num() >= 4 ? static_cast<uint8>(JsonArray[3]->AsNumber()) : 255;
+                UE_LOG(LogTemp, Display, TEXT("Set FColor to: (R=%d, G=%d, B=%d, A=%d)"), 
+                       ColorPtr->R, ColorPtr->G, ColorPtr->B, ColorPtr->A);
+                return true;
+            }
+        }
+        else if (Value->Type == EJson::Object)
+        {
+            const TSharedPtr<FJsonObject>& JsonObj = Value->AsObject();
+            if (JsonObj->HasField(TEXT("R"))) ColorPtr->R = static_cast<uint8>(JsonObj->GetNumberField(TEXT("R")));
+            if (JsonObj->HasField(TEXT("G"))) ColorPtr->G = static_cast<uint8>(JsonObj->GetNumberField(TEXT("G")));
+            if (JsonObj->HasField(TEXT("B"))) ColorPtr->B = static_cast<uint8>(JsonObj->GetNumberField(TEXT("B")));
+            if (JsonObj->HasField(TEXT("A"))) ColorPtr->A = static_cast<uint8>(JsonObj->GetNumberField(TEXT("A")));
+            UE_LOG(LogTemp, Display, TEXT("Set FColor to: (R=%d, G=%d, B=%d, A=%d)"), 
+                   ColorPtr->R, ColorPtr->G, ColorPtr->B, ColorPtr->A);
+            return true;
+        }
+        OutErrorMessage = TEXT("FColor requires an array [R, G, B, A] (0-255) or object {R, G, B, A}");
+        return false;
+    }
+    // ============================================
+    // Handle FAIDataProviderFloatValue (EQS scoring)
+    // ============================================
+    else if (StructName == TEXT("AIDataProviderFloatValue"))
+    {
+        FAIDataProviderFloatValue* DataProviderPtr = static_cast<FAIDataProviderFloatValue*>(StructAddr);
+        
+        if (Value->Type == EJson::Number)
+        {
+            DataProviderPtr->DefaultValue = Value->AsNumber();
+            UE_LOG(LogTemp, Display, TEXT("Set FAIDataProviderFloatValue.DefaultValue to: %f"), 
+                   DataProviderPtr->DefaultValue);
+            return true;
+        }
+        else if (Value->Type == EJson::Object)
+        {
+            const TSharedPtr<FJsonObject>& JsonObj = Value->AsObject();
+            if (JsonObj->HasField(TEXT("DefaultValue")))
+            {
+                DataProviderPtr->DefaultValue = JsonObj->GetNumberField(TEXT("DefaultValue"));
+            }
+            else if (JsonObj->HasField(TEXT("Value")))
+            {
+                DataProviderPtr->DefaultValue = JsonObj->GetNumberField(TEXT("Value"));
+            }
+            UE_LOG(LogTemp, Display, TEXT("Set FAIDataProviderFloatValue.DefaultValue to: %f"), 
+                   DataProviderPtr->DefaultValue);
+            return true;
+        }
+        OutErrorMessage = TEXT("FAIDataProviderFloatValue requires a number or object with DefaultValue");
+        return false;
+    }
+    // ============================================
+    // Handle FAIDataProviderIntValue
+    // ============================================
+    else if (StructName == TEXT("AIDataProviderIntValue"))
+    {
+        FAIDataProviderIntValue* DataProviderPtr = static_cast<FAIDataProviderIntValue*>(StructAddr);
+        
+        if (Value->Type == EJson::Number)
+        {
+            DataProviderPtr->DefaultValue = static_cast<int32>(Value->AsNumber());
+            UE_LOG(LogTemp, Display, TEXT("Set FAIDataProviderIntValue.DefaultValue to: %d"), 
+                   DataProviderPtr->DefaultValue);
+            return true;
+        }
+        else if (Value->Type == EJson::Object)
+        {
+            const TSharedPtr<FJsonObject>& JsonObj = Value->AsObject();
+            if (JsonObj->HasField(TEXT("DefaultValue")))
+            {
+                DataProviderPtr->DefaultValue = static_cast<int32>(JsonObj->GetNumberField(TEXT("DefaultValue")));
+            }
+            else if (JsonObj->HasField(TEXT("Value")))
+            {
+                DataProviderPtr->DefaultValue = static_cast<int32>(JsonObj->GetNumberField(TEXT("Value")));
+            }
+            UE_LOG(LogTemp, Display, TEXT("Set FAIDataProviderIntValue.DefaultValue to: %d"), 
+                   DataProviderPtr->DefaultValue);
+            return true;
+        }
+        OutErrorMessage = TEXT("FAIDataProviderIntValue requires a number or object with DefaultValue");
+        return false;
+    }
+    // ============================================
+    // Handle FAIDataProviderBoolValue
+    // ============================================
+    else if (StructName == TEXT("AIDataProviderBoolValue"))
+    {
+        FAIDataProviderBoolValue* DataProviderPtr = static_cast<FAIDataProviderBoolValue*>(StructAddr);
+        
+        if (Value->Type == EJson::Boolean)
+        {
+            DataProviderPtr->DefaultValue = Value->AsBool();
+            UE_LOG(LogTemp, Display, TEXT("Set FAIDataProviderBoolValue.DefaultValue to: %s"), 
+                   DataProviderPtr->DefaultValue ? TEXT("true") : TEXT("false"));
+            return true;
+        }
+        else if (Value->Type == EJson::Object)
+        {
+            const TSharedPtr<FJsonObject>& JsonObj = Value->AsObject();
+            if (JsonObj->HasField(TEXT("DefaultValue")))
+            {
+                DataProviderPtr->DefaultValue = JsonObj->GetBoolField(TEXT("DefaultValue"));
+            }
+            else if (JsonObj->HasField(TEXT("Value")))
+            {
+                DataProviderPtr->DefaultValue = JsonObj->GetBoolField(TEXT("Value"));
+            }
+            UE_LOG(LogTemp, Display, TEXT("Set FAIDataProviderBoolValue.DefaultValue to: %s"), 
+                   DataProviderPtr->DefaultValue ? TEXT("true") : TEXT("false"));
+            return true;
+        }
+        OutErrorMessage = TEXT("FAIDataProviderBoolValue requires a boolean or object with DefaultValue");
+        return false;
+    }
+    // ============================================
+    // Handle FTransform
+    // ============================================
+    else if (StructName == TEXT("Transform"))
+    {
+        FTransform* TransformPtr = static_cast<FTransform*>(StructAddr);
+        
+        if (Value->Type == EJson::Object)
+        {
+            const TSharedPtr<FJsonObject>& JsonObj = Value->AsObject();
+            
+            // Location
+            if (JsonObj->HasField(TEXT("Location")) || JsonObj->HasField(TEXT("Translation")))
+            {
+                const TSharedPtr<FJsonValue>& LocValue = JsonObj->HasField(TEXT("Location")) 
+                    ? JsonObj->TryGetField(TEXT("Location")) 
+                    : JsonObj->TryGetField(TEXT("Translation"));
+                if (LocValue->Type == EJson::Array)
+                {
+                    const TArray<TSharedPtr<FJsonValue>>& LocArray = LocValue->AsArray();
+                    if (LocArray.Num() >= 3)
+                    {
+                        TransformPtr->SetLocation(FVector(
+                            LocArray[0]->AsNumber(), LocArray[1]->AsNumber(), LocArray[2]->AsNumber()));
+                    }
+                }
+            }
+            
+            // Rotation
+            if (JsonObj->HasField(TEXT("Rotation")))
+            {
+                const TSharedPtr<FJsonValue>& RotValue = JsonObj->TryGetField(TEXT("Rotation"));
+                if (RotValue->Type == EJson::Array)
+                {
+                    const TArray<TSharedPtr<FJsonValue>>& RotArray = RotValue->AsArray();
+                    if (RotArray.Num() >= 3)
+                    {
+                        TransformPtr->SetRotation(FQuat(FRotator(
+                            RotArray[0]->AsNumber(), RotArray[1]->AsNumber(), RotArray[2]->AsNumber())));
+                    }
+                }
+            }
+            
+            // Scale
+            if (JsonObj->HasField(TEXT("Scale")) || JsonObj->HasField(TEXT("Scale3D")))
+            {
+                const TSharedPtr<FJsonValue>& ScaleValue = JsonObj->HasField(TEXT("Scale")) 
+                    ? JsonObj->TryGetField(TEXT("Scale")) 
+                    : JsonObj->TryGetField(TEXT("Scale3D"));
+                if (ScaleValue->Type == EJson::Array)
+                {
+                    const TArray<TSharedPtr<FJsonValue>>& ScaleArray = ScaleValue->AsArray();
+                    if (ScaleArray.Num() >= 3)
+                    {
+                        TransformPtr->SetScale3D(FVector(
+                            ScaleArray[0]->AsNumber(), ScaleArray[1]->AsNumber(), ScaleArray[2]->AsNumber()));
+                    }
+                }
+            }
+            
+            UE_LOG(LogTemp, Display, TEXT("Set FTransform"));
+            return true;
+        }
+        OutErrorMessage = TEXT("FTransform requires an object with Location/Rotation/Scale arrays");
+        return false;
+    }
+    // ============================================
+    // Generic struct handling via reflection (fallback)
+    // ============================================
+    else if (Value->Type == EJson::Object)
+    {
+        const TSharedPtr<FJsonObject>& JsonObj = Value->AsObject();
+        
+        UE_LOG(LogTemp, Display, TEXT("Attempting generic struct handling for '%s'"), *StructName);
+        
+        // Iterate through JSON fields and set corresponding struct properties
+        bool bSuccess = true;
+        for (const auto& Pair : JsonObj->Values)
+        {
+            FString FieldError;
+            if (!SetStructFieldValue(StructAddr, ScriptStruct, Pair.Key, Pair.Value, FieldError))
+            {
+                UE_LOG(LogTemp, Warning, TEXT("Failed to set struct field '%s': %s"), *Pair.Key, *FieldError);
+                // Continue trying other fields, but mark as partial success
+            }
+        }
+        
+        return bSuccess;
+    }
+
+    OutErrorMessage = FString::Printf(TEXT("Struct type '%s' requires a JSON object for field mapping"), *StructName);
+    return false;
+}
+
+bool FSpirrowBridgeCommonUtils::SetStructFieldValue(void* StructAddr, UScriptStruct* ScriptStruct,
+                                                    const FString& FieldName, const TSharedPtr<FJsonValue>& Value,
+                                                    FString& OutErrorMessage)
+{
+    if (!StructAddr || !ScriptStruct)
+    {
+        OutErrorMessage = TEXT("Invalid struct address or script struct");
+        return false;
+    }
+
+    // Find the property in the struct
+    FProperty* Property = ScriptStruct->FindPropertyByName(*FieldName);
+    if (!Property)
+    {
+        OutErrorMessage = FString::Printf(TEXT("Field '%s' not found in struct '%s'"), *FieldName, *ScriptStruct->GetName());
+        return false;
+    }
+
+    void* PropertyAddr = Property->ContainerPtrToValuePtr<void>(StructAddr);
+
+    // Handle basic types
+    if (FBoolProperty* BoolProp = CastField<FBoolProperty>(Property))
+    {
+        BoolProp->SetPropertyValue(PropertyAddr, Value->AsBool());
+        return true;
+    }
+    else if (FIntProperty* IntProp = CastField<FIntProperty>(Property))
+    {
+        IntProp->SetPropertyValue(PropertyAddr, static_cast<int32>(Value->AsNumber()));
+        return true;
+    }
+    else if (FFloatProperty* FloatProp = CastField<FFloatProperty>(Property))
+    {
+        FloatProp->SetPropertyValue(PropertyAddr, static_cast<float>(Value->AsNumber()));
+        return true;
+    }
+    else if (FDoubleProperty* DoubleProp = CastField<FDoubleProperty>(Property))
+    {
+        DoubleProp->SetPropertyValue(PropertyAddr, Value->AsNumber());
+        return true;
+    }
+    else if (FStrProperty* StrProp = CastField<FStrProperty>(Property))
+    {
+        StrProp->SetPropertyValue(PropertyAddr, Value->AsString());
+        return true;
+    }
+    else if (FNameProperty* NameProp = CastField<FNameProperty>(Property))
+    {
+        NameProp->SetPropertyValue(PropertyAddr, FName(*Value->AsString()));
+        return true;
+    }
+    else if (FStructProperty* NestedStructProp = CastField<FStructProperty>(Property))
+    {
+        // Recursive struct handling
+        return SetStructPropertyValue(PropertyAddr, NestedStructProp, Value, OutErrorMessage);
+    }
+
+    OutErrorMessage = FString::Printf(TEXT("Unsupported field type for '%s'"), *FieldName);
+    return false;
+}

@@ -827,7 +827,12 @@ def register_ai_tools(mcp: FastMCP):
 			behavior_tree_name: Name of the target BehaviorTree
 			node_id: ID of the node to modify
 			property_name: Name of the property to set
-			property_value: Value to set (type depends on property - bool/int/float/string/object)
+			property_value: Value to set. Supported types:
+				- Basic: bool, int, float, string
+				- BlackboardKey: string (key name) or {"SelectedKeyName": "..."}  
+				- Vector: [X, Y, Z] or {"X": ..., "Y": ..., "Z": ...}
+				- Rotator: [Pitch, Yaw, Roll]
+				- Color: [R, G, B, A]
 			path: Content browser path where the BehaviorTree is located
 
 		Returns:
@@ -846,12 +851,20 @@ def register_ai_tools(mcp: FastMCP):
 				property_value=3.0
 			)
 
-			# Set blackboard key on a MoveTo task
+			# Set blackboard key on a MoveTo task (simple string)
 			set_bt_node_property(
 				behavior_tree_name="BT_Enemy",
 				node_id="BTTask_MoveTo_0",
 				property_name="BlackboardKey",
-				property_value={"SelectedKeyName": "TargetLocation"}
+				property_value="TargetLocation"
+			)
+
+			# Set blackboard key with detailed object
+			set_bt_node_property(
+				behavior_tree_name="BT_Enemy",
+				node_id="BTTask_MoveTo_0",
+				property_name="BlackboardKey",
+				property_value={"SelectedKeyName": "TargetActor"}
 			)
 
 			# Set acceptable radius

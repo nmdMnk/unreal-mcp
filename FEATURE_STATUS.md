@@ -1,8 +1,8 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: Phase H
+> **バージョン**: Phase H (v0.8.1)
 > **ステータス**: Beta
-> **最終更新**: 2026-01-06
+> **最終更新**: 2026-01-07
 
 ---
 
@@ -76,7 +76,15 @@
 
 ## 最新の更新
 
-### Phase H (2026-01-06) 🆕
+### 2026-01-07: Blackboard BaseClass Fix (v0.8.1)
+- **Blackboard BaseClass修正**: `add_blackboard_key`の`base_class`パラメータが正しく動作するよう修正
+  - `Actor`等の短い名前でクラス検索が可能に（複数の検索方法を試行）
+  - MoveTo タスクで Object型キーが選択可能に
+- **構造体プロパティ対応**: `SetObjectProperty`に`FBlackboardKeySelector`, `FVector`, `FAIDataProviderFloatValue`等の構造体対応追加
+- BTノードのBlackboardKey設定が可能に
+- EQS Testの`set_eqs_test_property`でStruct型対応
+
+### Phase H (2026-01-06)
 - **AI Perception (6ツール)**: AIPerceptionComponent、Sight/Hearing/Damage Sense設定、StimuliSource
 - **EQS (5ツール)**: Environment Query System、Generator/Test操作
 - NavigationSystem依存追加
