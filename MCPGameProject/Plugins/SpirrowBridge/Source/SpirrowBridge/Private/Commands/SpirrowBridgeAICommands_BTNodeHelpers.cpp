@@ -50,6 +50,9 @@
 #include "EditorAssetLibrary.h"
 #include "Engine/Blueprint.h"
 
+// For C++ class search
+#include "UObject/UObjectIterator.h"
+
 // ===== Phase G: BT Node Operation Helper Functions =====
 
 UClass* FSpirrowBridgeAICommands::GetBTCompositeNodeClass(const FString& TypeString)
@@ -62,6 +65,7 @@ UClass* FSpirrowBridgeAICommands::GetBTCompositeNodeClass(const FString& TypeStr
 
 UClass* FSpirrowBridgeAICommands::GetBTTaskNodeClass(const FString& TypeString)
 {
+	// 1. Standard tasks (hardcoded)
 	if (TypeString == TEXT("BTTask_MoveTo")) return UBTTask_MoveTo::StaticClass();
 	if (TypeString == TEXT("BTTask_MoveDirectlyToward")) return UBTTask_MoveDirectlyToward::StaticClass();
 	if (TypeString == TEXT("BTTask_Wait")) return UBTTask_Wait::StaticClass();
@@ -72,7 +76,34 @@ UClass* FSpirrowBridgeAICommands::GetBTTaskNodeClass(const FString& TypeString)
 	if (TypeString == TEXT("BTTask_RunBehavior")) return UBTTask_RunBehavior::StaticClass();
 	if (TypeString == TEXT("BTTask_RunBehaviorDynamic")) return UBTTask_RunBehaviorDynamic::StaticClass();
 
-	// Custom BP task search
+	// 2. Full path specification (e.g., "/Script/TrapxTrapCpp.BTTask_ChaseTarget")
+	if (TypeString.StartsWith(TEXT("/Script/")))
+	{
+		UClass* FoundClass = LoadClass<UBTTaskNode>(nullptr, *TypeString);
+		if (FoundClass)
+		{
+			return FoundClass;
+		}
+	}
+
+	// 3. Class name only - search all modules
+	{
+		FString ClassNameWithU = TypeString.StartsWith(TEXT("U")) ? TypeString : FString::Printf(TEXT("U%s"), *TypeString);
+
+		for (TObjectIterator<UClass> It; It; ++It)
+		{
+			UClass* Class = *It;
+			if (Class->GetName() == ClassNameWithU || Class->GetName() == TypeString)
+			{
+				if (Class->IsChildOf(UBTTaskNode::StaticClass()))
+				{
+					return Class;
+				}
+			}
+		}
+	}
+
+	// 4. Custom BP task search (fallback)
 	FString BlueprintPath = FString::Printf(TEXT("/Game/AI/Tasks/%s.%s"), *TypeString, *TypeString);
 	UBlueprint* Blueprint = Cast<UBlueprint>(UEditorAssetLibrary::LoadAsset(BlueprintPath));
 	if (Blueprint && Blueprint->GeneratedClass)
@@ -85,6 +116,7 @@ UClass* FSpirrowBridgeAICommands::GetBTTaskNodeClass(const FString& TypeString)
 
 UClass* FSpirrowBridgeAICommands::GetBTDecoratorClass(const FString& TypeString)
 {
+	// 1. Standard decorators (hardcoded)
 	if (TypeString == TEXT("BTDecorator_Blackboard")) return UBTDecorator_Blackboard::StaticClass();
 	if (TypeString == TEXT("BTDecorator_CompareBBEntries")) return UBTDecorator_CompareBBEntries::StaticClass();
 	if (TypeString == TEXT("BTDecorator_ConditionalLoop")) return UBTDecorator_ConditionalLoop::StaticClass();
@@ -98,7 +130,34 @@ UClass* FSpirrowBridgeAICommands::GetBTDecoratorClass(const FString& TypeString)
 	if (TypeString == TEXT("BTDecorator_TagCooldown")) return UBTDecorator_TagCooldown::StaticClass();
 	if (TypeString == TEXT("BTDecorator_TimeLimit")) return UBTDecorator_TimeLimit::StaticClass();
 
-	// Custom BP decorator search
+	// 2. Full path specification (e.g., "/Script/ProjectName.BTDecorator_Custom")
+	if (TypeString.StartsWith(TEXT("/Script/")))
+	{
+		UClass* FoundClass = LoadClass<UBTDecorator>(nullptr, *TypeString);
+		if (FoundClass)
+		{
+			return FoundClass;
+		}
+	}
+
+	// 3. Class name only - search all modules
+	{
+		FString ClassNameWithU = TypeString.StartsWith(TEXT("U")) ? TypeString : FString::Printf(TEXT("U%s"), *TypeString);
+
+		for (TObjectIterator<UClass> It; It; ++It)
+		{
+			UClass* Class = *It;
+			if (Class->GetName() == ClassNameWithU || Class->GetName() == TypeString)
+			{
+				if (Class->IsChildOf(UBTDecorator::StaticClass()))
+				{
+					return Class;
+				}
+			}
+		}
+	}
+
+	// 4. Custom BP decorator search (fallback)
 	FString BlueprintPath = FString::Printf(TEXT("/Game/AI/Decorators/%s.%s"), *TypeString, *TypeString);
 	UBlueprint* Blueprint = Cast<UBlueprint>(UEditorAssetLibrary::LoadAsset(BlueprintPath));
 	if (Blueprint && Blueprint->GeneratedClass)
@@ -111,11 +170,39 @@ UClass* FSpirrowBridgeAICommands::GetBTDecoratorClass(const FString& TypeString)
 
 UClass* FSpirrowBridgeAICommands::GetBTServiceClass(const FString& TypeString)
 {
+	// 1. Standard services (hardcoded)
 	if (TypeString == TEXT("BTService_BlackboardBase")) return UBTService_BlackboardBase::StaticClass();
 	if (TypeString == TEXT("BTService_DefaultFocus")) return UBTService_DefaultFocus::StaticClass();
 	if (TypeString == TEXT("BTService_RunEQS")) return UBTService_RunEQS::StaticClass();
 
-	// Custom BP service search
+	// 2. Full path specification (e.g., "/Script/ProjectName.BTService_Custom")
+	if (TypeString.StartsWith(TEXT("/Script/")))
+	{
+		UClass* FoundClass = LoadClass<UBTService>(nullptr, *TypeString);
+		if (FoundClass)
+		{
+			return FoundClass;
+		}
+	}
+
+	// 3. Class name only - search all modules
+	{
+		FString ClassNameWithU = TypeString.StartsWith(TEXT("U")) ? TypeString : FString::Printf(TEXT("U%s"), *TypeString);
+
+		for (TObjectIterator<UClass> It; It; ++It)
+		{
+			UClass* Class = *It;
+			if (Class->GetName() == ClassNameWithU || Class->GetName() == TypeString)
+			{
+				if (Class->IsChildOf(UBTService::StaticClass()))
+				{
+					return Class;
+				}
+			}
+		}
+	}
+
+	// 4. Custom BP service search (fallback)
 	FString BlueprintPath = FString::Printf(TEXT("/Game/AI/Services/%s.%s"), *TypeString, *TypeString);
 	UBlueprint* Blueprint = Cast<UBlueprint>(UEditorAssetLibrary::LoadAsset(BlueprintPath));
 	if (Blueprint && Blueprint->GeneratedClass)
