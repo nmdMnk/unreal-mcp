@@ -1,8 +1,8 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: Phase H (v0.8.3)
+> **バージョン**: Phase H (v0.8.6)
 > **ステータス**: Beta
-> **最終更新**: 2026-01-08
+> **最終更新**: 2026-01-09
 
 ---
 
@@ -16,13 +16,13 @@
 | UMG Widget | 29 | ✅ |
 | Enhanced Input | 5 | ✅ |
 | GAS | 8 | ✅ |
-| AI (BT/BB) | 17 | ✅ |
+| AI (BT/BB) | 20 | ✅ |
 | AI Perception | 6 | ✅ |
 | EQS | 5 | ✅ |
 | Material | 5 | ✅ |
 | Config | 3 | ✅ |
 | RAG | 4 | ✅ |
-| **合計** | **108** | |
+| **合計** | **111** | |
 
 ---
 
@@ -55,10 +55,12 @@
 ### GAS (8)
 `add_gameplay_tags`, `list_gameplay_tags`, `remove_gameplay_tag`, `list_gas_assets`, `create_gameplay_effect`, `create_gameplay_ability`, `create_gas_character`, `set_ability_system_defaults`
 
-### AI - BehaviorTree/Blackboard (17)
+### AI - BehaviorTree/Blackboard (20)
 - **Blackboard (4)**: `create_blackboard`, `add_blackboard_key`, `remove_blackboard_key`, `list_blackboard_keys`
 - **BehaviorTree (3)**: `create_behavior_tree`, `set_behavior_tree_blackboard`, `get_behavior_tree_structure`
 - **BTノード操作 (8)**: `add_bt_composite_node`, `add_bt_task_node`, `add_bt_decorator_node`, `add_bt_service_node`, `connect_bt_nodes`, `set_bt_node_property`, `delete_bt_node`, `list_bt_node_types`
+- **BTノード位置 (2)**: `set_bt_node_position`, `auto_layout_bt`
+- **BTデバッグ (1)**: `list_bt_nodes` 🆕
 - **ユーティリティ (1)**: `list_ai_assets`
 
 ### AI Perception (6) 🆕
@@ -79,6 +81,31 @@
 ---
 
 ## 最新の更新
+
+### 2026-01-09: BTノード自動位置計算 (v0.8.6) 🆕
+- **自動レイアウト機能**: `parent_node_id` 指定時に自動的に最適位置を計算
+  - 親ノードの下に自動配置（Y + 150px）
+  - 兄弟ノードがあれば横にオフセット（X + 300px × n）
+  - `node_position` 手動指定も引き続き可能
+- **対象ツール**: `add_bt_composite_node`, `add_bt_task_node`
+
+### 2026-01-09: BT Bug Fixes & list_bt_nodes (v0.8.5)
+- **新ツール追加**:
+  - `list_bt_nodes`: BT内の全ノード一覧と階層構造を取得（デバッグ用）
+- **バグ修正**:
+  - `delete_bt_node`: ノード削除処理を強化（子接続解除、Decorator/Service同時削除、RuntimeNode GC対応）
+  - `add_bt_decorator_node`: デバッグログ追加（Decorator重複付与調査用）
+- **内部改善**:
+  - `FinalizeAndSaveBTGraph`: UpdateAsset前後のデバッグログ追加（Verbose）
+
+### 2026-01-09: BT Node Position & Auto Layout (v0.8.4)
+- **新ツール追加**:
+  - `set_bt_node_position`: 個別ノードの位置設定
+  - `auto_layout_bt`: BT全体の自動レイアウト
+- **既存ツール拡張**:
+  - `add_bt_composite_node`: `node_position` パラメータ追加
+  - `add_bt_task_node`: `node_position` パラメータ追加
+- **自動レイアウト機能**: 階層構造に基づく再帰的位置計算、デコレータ/サービスの位置も考慮
 
 ### 2026-01-08: BehaviorTree Graph-Based Node Creation (v0.8.3)
 - **Graph-Based実装に全面移行**: BTノード作成をUE Editor Graph APIベースに変更
@@ -124,6 +151,45 @@
 - Blueprint/UMGコマンド分割リファクタリング
 
 > 詳細な更新履歴: [Docs/CHANGELOG.md](Docs/CHANGELOG.md)
+
+---
+
+## 重要な注意事項
+
+### BehaviorTree ノードの自動位置計算 🆕
+
+**v0.8.6 以降**: BTノード作成時に `parent_node_id` を指定すると、**自動的に最適な位置が計算されます**。
+
+```python
+# 位置指定不要！自動的に配置される
+add_bt_composite_node(
+    behavior_tree_name="BT_Example",
+    node_type="Selector",
+    parent_node_id="Root"  # ← これだけでOK
+)
+```
+
+**自動計算ルール**:
+- Y位置: 親ノード + 150px
+- X位置: 兄弟ノードの数 × 300px
+
+**手動で位置指定する場合**:
+```python
+add_bt_composite_node(
+    behavior_tree_name="BT_Example",
+    node_type="Selector",
+    parent_node_id="Root",
+    node_position=[0, 200]  # 手動指定も可能
+)
+```
+
+**後から再レイアウトする場合**:
+```python
+auto_layout_bt(
+    behavior_tree_name="BT_Example",
+    path="/Game/AI/BehaviorTrees"
+)
+```
 
 ---
 

@@ -416,7 +416,11 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("connect_bt_nodes") ||
                      CommandType == TEXT("set_bt_node_property") ||
                      CommandType == TEXT("delete_bt_node") ||
-                     CommandType == TEXT("list_bt_node_types"))
+                     CommandType == TEXT("list_bt_node_types") ||
+                     // BT Node Position Commands
+                     CommandType == TEXT("set_bt_node_position") ||
+                     CommandType == TEXT("auto_layout_bt") ||
+                     CommandType == TEXT("list_bt_nodes"))
             {
                 ResultJson = AICommands->HandleCommand(CommandType, Params);
             }

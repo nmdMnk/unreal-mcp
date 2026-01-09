@@ -413,7 +413,8 @@ def register_ai_tools(mcp: FastMCP):
 		parent_node_id: str = "",
 		path: str = "/Game/AI/BehaviorTrees",
 		node_name: Optional[str] = None,
-		child_index: int = -1
+		child_index: int = -1,
+		node_position: Optional[List[int]] = None
 	) -> Dict[str, Any]:
 		"""
 		Add a composite node (Selector/Sequence/SimpleParallel) to a BehaviorTree.
@@ -431,6 +432,7 @@ def register_ai_tools(mcp: FastMCP):
 			path: Content browser path where the BehaviorTree is located
 			node_name: Optional display name for the node in the editor
 			child_index: Index to insert at (-1 = append to end)
+			node_position: Optional [X, Y] position in the graph editor (default: [0, 0])
 
 		Returns:
 			Dict containing:
@@ -475,6 +477,8 @@ def register_ai_tools(mcp: FastMCP):
 			}
 			if node_name:
 				params["node_name"] = node_name
+			if node_position:
+				params["node_position"] = node_position
 
 			logger.info(f"Adding composite node ({node_type}) to BT '{behavior_tree_name}'")
 			response = unreal.send_command("add_bt_composite_node", params)
@@ -496,7 +500,8 @@ def register_ai_tools(mcp: FastMCP):
 		parent_node_id: str,
 		path: str = "/Game/AI/BehaviorTrees",
 		node_name: Optional[str] = None,
-		child_index: int = -1
+		child_index: int = -1,
+		node_position: Optional[List[int]] = None
 	) -> Dict[str, Any]:
 		"""
 		Add a task node to a BehaviorTree.
@@ -525,6 +530,7 @@ def register_ai_tools(mcp: FastMCP):
 			path: Content browser path where the BehaviorTree is located
 			node_name: Optional display name for the node in the editor
 			child_index: Index to insert at (-1 = append to end)
+			node_position: Optional [X, Y] position in the graph editor (default: [0, 0])
 
 		Returns:
 			Dict containing:
@@ -569,6 +575,8 @@ def register_ai_tools(mcp: FastMCP):
 			}
 			if node_name:
 				params["node_name"] = node_name
+			if node_position:
+				params["node_position"] = node_position
 
 			logger.info(f"Adding task node ({task_type}) to BT '{behavior_tree_name}'")
 			response = unreal.send_command("add_bt_task_node", params)
@@ -1034,6 +1042,214 @@ def register_ai_tools(mcp: FastMCP):
 
 		except Exception as e:
 			logger.error(f"Error listing BT node types: {e}")
+			return {"success": False, "error": str(e)}
+
+	# ===== BT Node Position Tools =====
+
+	@mcp.tool()
+	def set_bt_node_position(
+		ctx: Context,
+		behavior_tree_name: str,
+		node_id: str,
+		position: List[int],
+		path: str = "/Game/AI/BehaviorTrees"
+	) -> Dict[str, Any]:
+		"""
+		Set the position of a BehaviorTree node in the graph editor.
+
+		This allows positioning nodes for better visual organization in the BT editor.
+
+		Args:
+			behavior_tree_name: Name of the target BehaviorTree
+			node_id: ID of the node to move (e.g., "BTComposite_Selector_0"), or "Root"
+			position: [X, Y] position in the graph editor
+			path: Content browser path where the BehaviorTree is located
+
+		Returns:
+			Dict containing:
+			- success: Whether the operation succeeded
+			- behavior_tree_name: Name of the BehaviorTree
+			- node_id: ID of the moved node
+			- position: [X, Y] final position
+
+		Examples:
+			# Position a Selector node
+			set_bt_node_position(
+				behavior_tree_name="BT_Enemy",
+				node_id="BTComposite_Selector_0",
+				position=[0, 150]
+			)
+
+			# Position the Root node
+			set_bt_node_position(
+				behavior_tree_name="BT_Enemy",
+				node_id="Root",
+				position=[0, 0]
+			)
+		"""
+		from unreal_mcp_server import get_unreal_connection
+
+		try:
+			unreal = get_unreal_connection()
+			if not unreal:
+				return {"success": False, "error": "Failed to connect to Unreal Engine"}
+
+			params = {
+				"behavior_tree_name": behavior_tree_name,
+				"node_id": node_id,
+				"position": position,
+				"path": path
+			}
+
+			logger.info(f"Setting position of node '{node_id}' to {position}")
+			response = unreal.send_command("set_bt_node_position", params)
+
+			if response and response.get("success"):
+				logger.info(f"Node position set successfully")
+
+			return response or {"success": False, "error": "No response from Unreal Engine"}
+
+		except Exception as e:
+			logger.error(f"Error setting BT node position: {e}")
+			return {"success": False, "error": str(e)}
+
+	@mcp.tool()
+	def auto_layout_bt(
+		ctx: Context,
+		behavior_tree_name: str,
+		path: str = "/Game/AI/BehaviorTrees",
+		horizontal_spacing: int = 300,
+		vertical_spacing: int = 150
+	) -> Dict[str, Any]:
+		"""
+		Automatically layout a BehaviorTree graph for better visual organization.
+
+		This positions all nodes in a hierarchical tree structure starting from the Root.
+		Nodes are arranged based on their parent-child relationships with proper spacing.
+
+		Args:
+			behavior_tree_name: Name of the target BehaviorTree
+			path: Content browser path where the BehaviorTree is located
+			horizontal_spacing: Horizontal spacing between sibling nodes (default: 300)
+			vertical_spacing: Vertical spacing between parent and child nodes (default: 150)
+
+		Returns:
+			Dict containing:
+			- success: Whether the operation succeeded
+			- behavior_tree_name: Name of the BehaviorTree
+			- nodes_layouted: Number of nodes that were positioned
+			- horizontal_spacing: Spacing used
+			- vertical_spacing: Spacing used
+
+		Examples:
+			# Auto-layout with default spacing
+			auto_layout_bt(behavior_tree_name="BT_Enemy")
+
+			# Auto-layout with custom spacing
+			auto_layout_bt(
+				behavior_tree_name="BT_Enemy",
+				horizontal_spacing=400,
+				vertical_spacing=200
+			)
+
+		Recommended Layout Values:
+			- Root: (0, 0)
+			- First level children: Y = 150
+			- Second level: Y = 300
+			- Third level: Y = 450
+			- Sibling spacing: X = 300
+		"""
+		from unreal_mcp_server import get_unreal_connection
+
+		try:
+			unreal = get_unreal_connection()
+			if not unreal:
+				return {"success": False, "error": "Failed to connect to Unreal Engine"}
+
+			params = {
+				"behavior_tree_name": behavior_tree_name,
+				"path": path,
+				"horizontal_spacing": horizontal_spacing,
+				"vertical_spacing": vertical_spacing
+			}
+
+			logger.info(f"Auto-layouting BT '{behavior_tree_name}'")
+			response = unreal.send_command("auto_layout_bt", params)
+
+			if response and response.get("success"):
+				logger.info(f"BT layout complete: {response.get('nodes_layouted')} nodes positioned")
+
+			return response or {"success": False, "error": "No response from Unreal Engine"}
+
+		except Exception as e:
+			logger.error(f"Error auto-layouting BT: {e}")
+			return {"success": False, "error": str(e)}
+
+	@mcp.tool()
+	def list_bt_nodes(
+		ctx: Context,
+		behavior_tree_name: str,
+		path: str = "/Game/AI/BehaviorTrees"
+	) -> Dict[str, Any]:
+		"""
+		List all nodes in a BehaviorTree with their hierarchy and relationships.
+
+		This tool is useful for debugging BehaviorTree structure and verifying
+		node connections, decorators, and services.
+
+		Args:
+			behavior_tree_name: Name of the BehaviorTree to inspect
+			path: Content browser path where the BehaviorTree is located
+
+		Returns:
+			Dict containing:
+			- success: Whether the operation succeeded
+			- behavior_tree_name: Name of the BehaviorTree
+			- root_node: Root node info (id, type, position, children)
+			- nodes: List of all nodes with:
+				- id: Unique node identifier
+				- type: Node type (Composite, Task, Decorator, Service)
+				- class: Class name (e.g., BTComposite_Selector)
+				- name: Custom node name (if set)
+				- position: [X, Y] position in graph
+				- parent: Parent node ID
+				- children: List of child node IDs
+				- decorators: List of attached decorator IDs
+				- services: List of attached service IDs
+				- attached_to: (For Decorator/Service) Parent node ID
+			- total_nodes: Total number of nodes (excluding Root)
+
+		Examples:
+			# Get all nodes in a BehaviorTree
+			list_bt_nodes(behavior_tree_name="BT_Enemy")
+
+			# Check structure after building
+			result = list_bt_nodes(behavior_tree_name="BT_AIFighter")
+			for node in result["nodes"]:
+				print(f"{node['id']}: {node['type']} - children: {node.get('children', [])}")
+		"""
+		from unreal_mcp_server import get_unreal_connection
+
+		try:
+			unreal = get_unreal_connection()
+			if not unreal:
+				return {"success": False, "error": "Failed to connect to Unreal Engine"}
+
+			params = {
+				"behavior_tree_name": behavior_tree_name,
+				"path": path
+			}
+
+			logger.info(f"Listing nodes in BT '{behavior_tree_name}'")
+			response = unreal.send_command("list_bt_nodes", params)
+
+			if response and response.get("success"):
+				logger.info(f"Found {response.get('total_nodes', 0)} nodes in BT")
+
+			return response or {"success": False, "error": "No response from Unreal Engine"}
+
+		except Exception as e:
+			logger.error(f"Error listing BT nodes: {e}")
 			return {"success": False, "error": str(e)}
 
 	# ===== Utility Tools =====

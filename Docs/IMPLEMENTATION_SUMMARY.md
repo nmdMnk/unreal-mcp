@@ -2,7 +2,7 @@
 
 C++ 実装の全体像。新しいセッション開始時の参照用。
 
-> **最終更新**: 2026-01-06 | **バージョン**: Phase H
+> **最終更新**: 2026-01-09 | **バージョン**: Phase H (v0.8.6)
 
 ---
 
@@ -48,7 +48,7 @@ C++ 実装の全体像。新しいセッション開始時の参照用。
 | `AICommands_Blackboard` | 11 KB | Blackboard操作 |
 | `AICommands_BehaviorTree` | 8.5 KB | BehaviorTree操作 |
 | `AICommands_BTNodeHelpers` | 8 KB | BTノードヘルパー |
-| `AICommands_BTNodeCreation` | 12 KB | BTノード追加 |
+| `AICommands_BTNodeCreation` | 14 KB | BTノード追加 + 自動位置計算 |
 | `AICommands_BTNodeOperations` | 15 KB | BTノード操作 |
 
 #### AI Perception & EQS 系 (Phase H)
@@ -158,6 +158,33 @@ Blueprint/BlueprintNode/UMGWidget/AICommands は内部で更に分割ファイ�
 ---
 
 ## UE 5.6+ API互換性
+
+### BTノード自動位置計算 (v0.8.6)
+
+`AICommands_BTNodeCreation.cpp` にヘルパー関数を追加:
+
+```cpp
+// レイアウト定数
+static constexpr int32 BT_HORIZONTAL_SPACING = 300;
+static constexpr int32 BT_VERTICAL_SPACING = 150;
+
+// 親ノードの既存子ノード数を取得
+static int32 GetExistingChildCount(UBehaviorTreeGraphNode* ParentNode);
+
+// 子ノードの自動位置を計算
+static void CalculateChildNodePosition(
+    UBehaviorTreeGraphNode* ParentNode,
+    int32& OutPosX,
+    int32& OutPosY);
+```
+
+**動作**:
+- `parent_node_id` 指定時に自動計算
+- Y = 親Y + 150px
+- X = 親X + (兄弟数 × 300px)
+- `node_position` 手動指定で上書き可能
+
+---
 
 ### Decorator格納方式の変更
 

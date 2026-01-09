@@ -148,6 +148,19 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleCommand(
 	{
 		return HandleListBTNodeTypes(Params);
 	}
+	// BT Node Position commands
+	else if (CommandType == TEXT("set_bt_node_position"))
+	{
+		return HandleSetBTNodePosition(Params);
+	}
+	else if (CommandType == TEXT("auto_layout_bt"))
+	{
+		return HandleAutoLayoutBT(Params);
+	}
+	else if (CommandType == TEXT("list_bt_nodes"))
+	{
+		return HandleListBTNodes(Params);
+	}
 
 	return FSpirrowBridgeCommonUtils::CreateErrorResponse(
 		ESpirrowErrorCode::UnknownCommand,

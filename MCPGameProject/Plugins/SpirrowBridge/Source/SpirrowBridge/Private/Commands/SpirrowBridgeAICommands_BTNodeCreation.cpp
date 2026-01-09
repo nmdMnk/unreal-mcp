@@ -130,15 +130,130 @@ static bool ConnectGraphNodes(UBehaviorTreeGraphNode* ParentGraphNode, UBehavior
 }
 
 /**
+ * Generate a unique node name based on class name and existing node count
+ */
+static FName GenerateUniqueNodeName(UBehaviorTreeGraph* BTGraph, UClass* NodeClass)
+{
+	FString BaseClassName = NodeClass->GetName();
+
+	// Count existing nodes of the same class
+	int32 Index = 0;
+	for (UEdGraphNode* Node : BTGraph->Nodes)
+	{
+		UBehaviorTreeGraphNode* BTGraphNode = Cast<UBehaviorTreeGraphNode>(Node);
+		if (BTGraphNode && BTGraphNode->NodeInstance &&
+			BTGraphNode->NodeInstance->GetClass() == NodeClass)
+		{
+			Index++;
+		}
+	}
+
+	// Generate unique name like "BTComposite_Selector_1"
+	return FName(*FString::Printf(TEXT("%s_%d"), *BaseClassName, Index));
+}
+
+// ===== Auto Position Calculation =====
+
+// レイアウト定数
+static constexpr int32 BT_HORIZONTAL_SPACING = 300;
+static constexpr int32 BT_VERTICAL_SPACING = 150;
+static constexpr int32 BT_NODE_WIDTH = 200;  // ノードの概算幅
+
+/**
+ * 親ノードの既存の子ノード数を取得
+ */
+static int32 GetExistingChildCount(UBehaviorTreeGraphNode* ParentNode)
+{
+	int32 Count = 0;
+	for (UEdGraphPin* Pin : ParentNode->Pins)
+	{
+		if (Pin->Direction == EGPD_Output)
+		{
+			Count = Pin->LinkedTo.Num();
+			break;
+		}
+	}
+	return Count;
+}
+
+/**
+ * 子ノードの自動位置を計算
+ * 親ノードの位置と既存の兄弟ノード数から、新しいノードの位置を計算
+ */
+static void CalculateChildNodePosition(
+	UBehaviorTreeGraphNode* ParentNode,
+	int32& OutPosX,
+	int32& OutPosY)
+{
+	if (!ParentNode)
+	{
+		OutPosX = 0;
+		OutPosY = BT_VERTICAL_SPACING;
+		return;
+	}
+
+	// 親の位置を基準にする
+	int32 ParentX = ParentNode->NodePosX;
+	int32 ParentY = ParentNode->NodePosY;
+
+	// 既存の子ノード数を取得
+	int32 ExistingChildren = GetExistingChildCount(ParentNode);
+
+	// Y位置: 親の下
+	OutPosY = ParentY + BT_VERTICAL_SPACING;
+
+	// X位置: 子の数に応じて横にずらす
+	// 0番目の子 → 親と同じX
+	// 1番目以降 → 右にオフセット
+	if (ExistingChildren == 0)
+	{
+		// 最初の子は親の真下
+		OutPosX = ParentX;
+	}
+	else
+	{
+		// 2番目以降は右にずらす
+		// 最終的にはauto_layout_btで再配置されることを想定
+		OutPosX = ParentX + (ExistingChildren * BT_HORIZONTAL_SPACING);
+	}
+}
+
+/**
  * Finalize and save the BehaviorTree graph
  */
 static void FinalizeAndSaveBTGraph(UBehaviorTreeGraph* BTGraph, UBehaviorTree* BehaviorTree)
 {
+	// ★ デバッグログ: UpdateAsset前の状態 ★
+	UE_LOG(LogTemp, Verbose, TEXT("=== Before UpdateAsset ==="));
+	for (UEdGraphNode* Node : BTGraph->Nodes)
+	{
+		UBehaviorTreeGraphNode* BTNode = Cast<UBehaviorTreeGraphNode>(Node);
+		if (BTNode)
+		{
+			UE_LOG(LogTemp, Verbose, TEXT("Node: %s, Decorators: %d"),
+				BTNode->NodeInstance ? *BTNode->NodeInstance->GetName() : TEXT("null"),
+				BTNode->Decorators.Num());
+		}
+	}
+
 	// Notify graph changed
 	BTGraph->NotifyGraphChanged();
 
 	// Rebuild runtime tree
 	BTGraph->UpdateAsset();
+
+	// ★ デバッグログ: UpdateAsset後の状態 ★
+	UE_LOG(LogTemp, Verbose, TEXT("=== After UpdateAsset ==="));
+	for (UEdGraphNode* Node : BTGraph->Nodes)
+	{
+		UBehaviorTreeGraphNode* BTNode = Cast<UBehaviorTreeGraphNode>(Node);
+		if (BTNode)
+		{
+			UE_LOG(LogTemp, Verbose, TEXT("Node: %s, Decorators: %d"),
+				BTNode->NodeInstance ? *BTNode->NodeInstance->GetName() : TEXT("null"),
+				BTNode->Decorators.Num());
+		}
+	}
 
 	// Mark package dirty
 	BehaviorTree->MarkPackageDirty();
@@ -175,6 +290,28 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTCompositeNode(
 	FString NodeName;
 	FSpirrowBridgeCommonUtils::GetOptionalString(
 		Params, TEXT("node_name"), NodeName, TEXT(""));
+
+	// ★ parent_node_id パラメータ（問題1修正）★
+	FString ParentNodeId;
+	FSpirrowBridgeCommonUtils::GetOptionalString(
+		Params, TEXT("parent_node_id"), ParentNodeId, TEXT(""));
+
+	double ChildIndexDouble = -1.0;
+	FSpirrowBridgeCommonUtils::GetOptionalNumber(
+		Params, TEXT("child_index"), ChildIndexDouble, -1.0);
+	int32 ChildIndex = static_cast<int32>(ChildIndexDouble);
+
+	// node_position パラメータ（オプション）
+	int32 NodePosX = 0;
+	int32 NodePosY = 0;
+	bool bHasPosition = false;
+	const TArray<TSharedPtr<FJsonValue>>* PositionArray = nullptr;
+	if (Params->TryGetArrayField(TEXT("node_position"), PositionArray) && PositionArray && PositionArray->Num() >= 2)
+	{
+		NodePosX = static_cast<int32>((*PositionArray)[0]->AsNumber());
+		NodePosY = static_cast<int32>((*PositionArray)[1]->AsNumber());
+		bHasPosition = true;
+	}
 
 	// BehaviorTree取得
 	UBehaviorTree* BehaviorTree = FindBehaviorTreeAsset(BehaviorTreeName, Path);
@@ -213,11 +350,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTCompositeNode(
 		FGraphNodeCreator<UBehaviorTreeGraphNode_SimpleParallel> NodeCreator(*BTGraph);
 		UBehaviorTreeGraphNode_SimpleParallel* ParallelNode = NodeCreator.CreateNode();
 
+		// ★ ユニークな名前を生成（問題3修正）★
+		FName UniqueName = GenerateUniqueNodeName(BTGraph, NodeClass);
+
 		// ランタイムノード作成（★Outer は GraphNode に★）
 		UBTCompositeNode* RuntimeNode = NewObject<UBTCompositeNode>(
 			ParallelNode,           // ★重要: GraphNode を Outer に★
 			NodeClass,
-			NAME_None,
+			UniqueName,             // ★ユニークな名前を使用★
 			RF_Transactional        // ★重要: RF_Transactional フラグ★
 		);
 
@@ -242,11 +382,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTCompositeNode(
 		FGraphNodeCreator<UBehaviorTreeGraphNode_Composite> NodeCreator(*BTGraph);
 		UBehaviorTreeGraphNode_Composite* CompositeNode = NodeCreator.CreateNode();
 
+		// ★ ユニークな名前を生成（問題3修正）★
+		FName UniqueName = GenerateUniqueNodeName(BTGraph, NodeClass);
+
 		// ランタイムノード作成
 		UBTCompositeNode* RuntimeNode = NewObject<UBTCompositeNode>(
 			CompositeNode,
 			NodeClass,
-			NAME_None,
+			UniqueName,             // ★ユニークな名前を使用★
 			RF_Transactional
 		);
 
@@ -273,6 +416,43 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTCompositeNode(
 			TEXT("Failed to create composite graph node"));
 	}
 
+	// ★ 親ノード取得（位置計算と接続の両方で使う）★
+	UBehaviorTreeGraphNode* ParentGraphNode = nullptr;
+	if (!ParentNodeId.IsEmpty())
+	{
+		if (ParentNodeId.Equals(TEXT("Root"), ESearchCase::IgnoreCase))
+		{
+			ParentGraphNode = FindRootGraphNode(BTGraph);
+		}
+		else
+		{
+			ParentGraphNode = FindGraphNodeById(BTGraph, ParentNodeId);
+		}
+	}
+
+	// ★ ノード位置を設定（自動計算または手動指定）★
+	if (bHasPosition)
+	{
+		// ユーザー指定の位置を使用
+		GraphNode->NodePosX = NodePosX;
+		GraphNode->NodePosY = NodePosY;
+	}
+	else if (ParentGraphNode)
+	{
+		// ★ 自動位置計算: 親ノードから相対位置を計算 ★
+		CalculateChildNodePosition(ParentGraphNode, NodePosX, NodePosY);
+		GraphNode->NodePosX = NodePosX;
+		GraphNode->NodePosY = NodePosY;
+		bHasPosition = true;  // レスポンスに含めるため
+	}
+
+	// ★ 親ノードへの自動接続（問題1修正）★
+	bool bConnected = false;
+	if (ParentGraphNode && GraphNode)
+	{
+		bConnected = ConnectGraphNodes(ParentGraphNode, GraphNode);
+	}
+
 	// ★ グラフ更新と保存 ★
 	FinalizeAndSaveBTGraph(BTGraph, BehaviorTree);
 
@@ -287,7 +467,19 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTCompositeNode(
 	{
 		Result->SetStringField(TEXT("node_name"), NodeName);
 	}
-	Result->SetStringField(TEXT("message"), TEXT("Composite node created. Use connect_bt_nodes to attach to parent."));
+	if (bHasPosition)
+	{
+		TArray<TSharedPtr<FJsonValue>> PosArray;
+		PosArray.Add(MakeShareable(new FJsonValueNumber(NodePosX)));
+		PosArray.Add(MakeShareable(new FJsonValueNumber(NodePosY)));
+		Result->SetArrayField(TEXT("node_position"), PosArray);
+	}
+	if (!ParentNodeId.IsEmpty())
+	{
+		Result->SetStringField(TEXT("parent_node_id"), ParentNodeId);
+		Result->SetBoolField(TEXT("connected"), bConnected);
+	}
+	Result->SetStringField(TEXT("message"), bConnected ? TEXT("Composite node created and connected to parent.") : TEXT("Composite node created. Use connect_bt_nodes to attach to parent."));
 	return Result;
 }
 
@@ -312,6 +504,28 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTTaskNode(
 	FString NodeName;
 	FSpirrowBridgeCommonUtils::GetOptionalString(
 		Params, TEXT("node_name"), NodeName, TEXT(""));
+
+	// ★ parent_node_id パラメータ（問題1修正）★
+	FString ParentNodeId;
+	FSpirrowBridgeCommonUtils::GetOptionalString(
+		Params, TEXT("parent_node_id"), ParentNodeId, TEXT(""));
+
+	double ChildIndexDouble = -1.0;
+	FSpirrowBridgeCommonUtils::GetOptionalNumber(
+		Params, TEXT("child_index"), ChildIndexDouble, -1.0);
+	int32 ChildIndex = static_cast<int32>(ChildIndexDouble);
+
+	// node_position パラメータ（オプション）
+	int32 NodePosX = 0;
+	int32 NodePosY = 0;
+	bool bHasPosition = false;
+	const TArray<TSharedPtr<FJsonValue>>* PositionArray = nullptr;
+	if (Params->TryGetArrayField(TEXT("node_position"), PositionArray) && PositionArray && PositionArray->Num() >= 2)
+	{
+		NodePosX = static_cast<int32>((*PositionArray)[0]->AsNumber());
+		NodePosY = static_cast<int32>((*PositionArray)[1]->AsNumber());
+		bHasPosition = true;
+	}
 
 	// BehaviorTree取得
 	UBehaviorTree* BehaviorTree = FindBehaviorTreeAsset(BehaviorTreeName, Path);
@@ -352,11 +566,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTTaskNode(
 		FGraphNodeCreator<UBehaviorTreeGraphNode_SubtreeTask> NodeCreator(*BTGraph);
 		UBehaviorTreeGraphNode_SubtreeTask* SubtreeNode = NodeCreator.CreateNode();
 
+		// ★ ユニークな名前を生成（問題3修正）★
+		FName UniqueName = GenerateUniqueNodeName(BTGraph, TaskClass);
+
 		// ランタイムノード作成
 		UBTTaskNode* RuntimeNode = NewObject<UBTTaskNode>(
 			SubtreeNode,
 			TaskClass,
-			NAME_None,
+			UniqueName,             // ★ユニークな名前を使用★
 			RF_Transactional
 		);
 
@@ -378,11 +595,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTTaskNode(
 		FGraphNodeCreator<UBehaviorTreeGraphNode_Task> NodeCreator(*BTGraph);
 		UBehaviorTreeGraphNode_Task* TaskNode = NodeCreator.CreateNode();
 
+		// ★ ユニークな名前を生成（問題3修正）★
+		FName UniqueName = GenerateUniqueNodeName(BTGraph, TaskClass);
+
 		// ランタイムノード作成
 		UBTTaskNode* RuntimeNode = NewObject<UBTTaskNode>(
 			TaskNode,
 			TaskClass,
-			NAME_None,
+			UniqueName,             // ★ユニークな名前を使用★
 			RF_Transactional
 		);
 
@@ -407,6 +627,43 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTTaskNode(
 			TEXT("Failed to create task graph node"));
 	}
 
+	// ★ 親ノード取得（位置計算と接続の両方で使う）★
+	UBehaviorTreeGraphNode* ParentGraphNode = nullptr;
+	if (!ParentNodeId.IsEmpty())
+	{
+		if (ParentNodeId.Equals(TEXT("Root"), ESearchCase::IgnoreCase))
+		{
+			ParentGraphNode = FindRootGraphNode(BTGraph);
+		}
+		else
+		{
+			ParentGraphNode = FindGraphNodeById(BTGraph, ParentNodeId);
+		}
+	}
+
+	// ★ ノード位置を設定（自動計算または手動指定）★
+	if (bHasPosition)
+	{
+		// ユーザー指定の位置を使用
+		GraphNode->NodePosX = NodePosX;
+		GraphNode->NodePosY = NodePosY;
+	}
+	else if (ParentGraphNode)
+	{
+		// ★ 自動位置計算: 親ノードから相対位置を計算 ★
+		CalculateChildNodePosition(ParentGraphNode, NodePosX, NodePosY);
+		GraphNode->NodePosX = NodePosX;
+		GraphNode->NodePosY = NodePosY;
+		bHasPosition = true;  // レスポンスに含めるため
+	}
+
+	// ★ 親ノードへの自動接続（問題1修正）★
+	bool bConnected = false;
+	if (ParentGraphNode && GraphNode)
+	{
+		bConnected = ConnectGraphNodes(ParentGraphNode, GraphNode);
+	}
+
 	// ★ グラフ更新と保存 ★
 	FinalizeAndSaveBTGraph(BTGraph, BehaviorTree);
 
@@ -421,7 +678,19 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTTaskNode(
 	{
 		Result->SetStringField(TEXT("node_name"), NodeName);
 	}
-	Result->SetStringField(TEXT("message"), TEXT("Task node created. Use connect_bt_nodes to attach to parent."));
+	if (bHasPosition)
+	{
+		TArray<TSharedPtr<FJsonValue>> PosArray;
+		PosArray.Add(MakeShareable(new FJsonValueNumber(NodePosX)));
+		PosArray.Add(MakeShareable(new FJsonValueNumber(NodePosY)));
+		Result->SetArrayField(TEXT("node_position"), PosArray);
+	}
+	if (!ParentNodeId.IsEmpty())
+	{
+		Result->SetStringField(TEXT("parent_node_id"), ParentNodeId);
+		Result->SetBoolField(TEXT("connected"), bConnected);
+	}
+	Result->SetStringField(TEXT("message"), bConnected ? TEXT("Task node created and connected to parent.") : TEXT("Task node created. Use connect_bt_nodes to attach to parent."));
 	return Result;
 }
 
@@ -492,11 +761,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTDecoratorNode(
 	FGraphNodeCreator<UBehaviorTreeGraphNode_Decorator> NodeCreator(*BTGraph);
 	UBehaviorTreeGraphNode_Decorator* DecoratorGraphNode = NodeCreator.CreateNode();
 
+	// ★ ユニークな名前を生成（問題3修正）★
+	FName UniqueName = GenerateUniqueNodeName(BTGraph, DecoratorClass);
+
 	// ランタイムノード作成
 	UBTDecorator* RuntimeDecorator = NewObject<UBTDecorator>(
 		DecoratorGraphNode,
 		DecoratorClass,
-		NAME_None,
+		UniqueName,             // ★ユニークな名前を使用★
 		RF_Transactional
 	);
 
@@ -515,6 +787,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTDecoratorNode(
 	DecoratorGraphNode->ParentNode = Cast<UAIGraphNode>(TargetGraphNode);
 
 	FString NodeId = RuntimeDecorator->GetName();
+
+	// ★ デバッグログ追加（問題1調査）★
+	UE_LOG(LogTemp, Display, TEXT("Added decorator %s to graph node %s (Decorators count: %d)"),
+		*NodeId, *TargetNodeId, TargetGraphNode->Decorators.Num());
 
 	// ★ グラフ更新と保存 ★
 	FinalizeAndSaveBTGraph(BTGraph, BehaviorTree);
@@ -609,11 +885,14 @@ TSharedPtr<FJsonObject> FSpirrowBridgeAICommands::HandleAddBTServiceNode(
 	FGraphNodeCreator<UBehaviorTreeGraphNode_Service> NodeCreator(*BTGraph);
 	UBehaviorTreeGraphNode_Service* ServiceGraphNode = NodeCreator.CreateNode();
 
+	// ★ ユニークな名前を生成（問題3修正）★
+	FName UniqueName = GenerateUniqueNodeName(BTGraph, ServiceClass);
+
 	// ランタイムノード作成
 	UBTService* RuntimeService = NewObject<UBTService>(
 		ServiceGraphNode,
 		ServiceClass,
-		NAME_None,
+		UniqueName,             // ★ユニークな名前を使用★
 		RF_Transactional
 	);
 

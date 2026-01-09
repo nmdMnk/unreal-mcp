@@ -132,6 +132,21 @@ private:
 	 */
 	TSharedPtr<FJsonObject> HandleListBTNodeTypes(const TSharedPtr<FJsonObject>& Params);
 
+	/**
+	 * Set the position of a BT node in the graph editor.
+	 */
+	TSharedPtr<FJsonObject> HandleSetBTNodePosition(const TSharedPtr<FJsonObject>& Params);
+
+	/**
+	 * Automatically layout the entire BehaviorTree graph.
+	 */
+	TSharedPtr<FJsonObject> HandleAutoLayoutBT(const TSharedPtr<FJsonObject>& Params);
+
+	/**
+	 * List all nodes in a BehaviorTree with their hierarchy and relationships.
+	 */
+	TSharedPtr<FJsonObject> HandleListBTNodes(const TSharedPtr<FJsonObject>& Params);
+
 	// ===== BT Node Operation Helpers =====
 
 	/**
