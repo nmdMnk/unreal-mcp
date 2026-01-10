@@ -1,8 +1,8 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: Phase H (v0.8.7)
+> **バージョン**: Phase H (v0.8.8)
 > **ステータス**: Beta
-> **最終更新**: 2026-01-10
+> **最終更新**: 2026-01-11
 
 ---
 
@@ -11,7 +11,7 @@
 | カテゴリ | ツール数 | 状態 |
 |---------|---------|------|
 | Actor操作 | 10 | ✅ |
-| Blueprint操作 | 8 | ✅ |
+| Blueprint操作 | 13 | ✅ |
 | BPノードグラフ | 9 | ✅ |
 | UMG Widget | 30 | ✅ |
 | Enhanced Input | 8 | ✅ |
@@ -22,7 +22,7 @@
 | Material | 5 | ✅ |
 | Config | 3 | ✅ |
 | RAG | 4 | ✅ |
-| **合計** | **116** | |
+| **合計** | **121** | |
 
 ---
 
@@ -35,8 +35,8 @@
 - Basic: `StaticMeshActor`, `PointLight`, `SpotLight`, `DirectionalLight`, `CameraActor`
 - Volumes: `NavMeshBoundsVolume`, `TriggerVolume`, `BlockingVolume`, `KillZVolume`, `PhysicsVolume`, `PostProcessVolume`, `AudioVolume`, `LightmassImportanceVolume`
 
-### Blueprint操作 (8)
-`create_blueprint`, `spawn_blueprint_actor`, `add_component_to_blueprint`, `set_static_mesh_properties`, `set_component_property`, `set_physics_properties`, `compile_blueprint`, `set_blueprint_property`
+### Blueprint操作 (13)
+`create_blueprint`, `spawn_blueprint_actor`, `add_component_to_blueprint`, `set_static_mesh_properties`, `set_component_property`, `set_physics_properties`, `compile_blueprint`, `set_blueprint_property`, `create_data_asset` 🆕, `set_class_property` 🆕, `set_object_property` 🆕, `get_blueprint_properties` 🆕, `set_struct_property` 🆕
 
 ### BPノードグラフ (9)
 `add_blueprint_event_node`, `add_blueprint_input_action_node`, `add_blueprint_function_node`, `connect_blueprint_nodes`, `disconnect_blueprint_nodes` 🆕, `add_blueprint_variable`, `add_blueprint_get_self_component_reference`, `add_blueprint_self_reference`, `find_blueprint_nodes`
@@ -89,7 +89,62 @@
 
 ## 最新の更新
 
-### 2026-01-10: MCP機能拡張 (v0.8.7) 🆕
+### 2026-01-11: DataAsset & プロパティ操作強化 (v0.8.8) 🆕
+
+**新規ツール追加 (5ツール)**:
+
+| ツール | 機能 | 優先度 |
+|--------|------|--------|
+| `create_data_asset` | UDataAsset派生クラスのインスタンスをContent Browserに作成 | 最優先 |
+| `set_class_property` | TSubclassOf単体プロパティにクラス参照を設定 | 高 |
+| `set_object_property` | UObject*/TObjectPtrプロパティにアセット参照を設定 | 高 |
+| `get_blueprint_properties` | Blueprintの設定可能なプロパティと型を一覧取得 | 中 |
+| `set_struct_property` | 構造体配列の個別要素を部分更新 | 中 |
+
+**使用例**:
+```python
+# DataAsset作成
+create_data_asset(
+    name="DA_Pistol",
+    parent_class="/Script/TrapxTrapCpp.UFirearmData",
+    path="/Game/Data/Weapons"
+)
+
+# クラス参照設定
+set_class_property(
+    blueprint_name="BP_Spawner",
+    property_name="EnemyClass",
+    class_path="/Game/Blueprints/BP_Enemy.BP_Enemy_C"
+)
+
+# アセット参照設定
+set_object_property(
+    blueprint_name="BP_PlayerCharacter",
+    property_name="DefaultWeaponData",
+    asset_path="/Game/Data/DA_Pistol.DA_Pistol"
+)
+
+# プロパティ一覧取得
+get_blueprint_properties(blueprint_name="BP_PlayerCharacter")
+
+# 構造体配列の部分更新
+set_struct_property(
+    blueprint_name="BP_PlayerCharacter",
+    property_name="InventorySlots",
+    index=0,
+    values={"MaxCount": 10, "WeaponData": "/Game/Data/DA_Pistol.DA_Pistol"}
+)
+```
+
+**解決する課題**:
+- DataAssetのMCP経由作成が可能に
+- TSubclassOf単体プロパティ設定（配列版は既存）
+- UObject*/TObjectPtr参照設定
+- 構造体配列の部分更新（全体置換ではなく）
+
+---
+
+### 2026-01-10: MCP機能拡張 (v0.8.7)
 
 **UMG Widget機能強化**:
 - `get_widget_element_property`: Widget要素の任意プロパティ値を取得（ネストプロパティ対応）

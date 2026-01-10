@@ -877,4 +877,408 @@ def register_blueprint_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    # ===== New Property Tools (v0.8.8) =====
+
+    @mcp.tool()
+    def create_data_asset(
+        ctx: Context,
+        name: str,
+        parent_class: str,
+        path: str = "/Game/Data",
+        initial_values: Dict[str, Any] = {}
+    ) -> Dict[str, Any]:
+        """
+        Create a new DataAsset instance in the Content Browser.
+
+        This tool creates instances of UDataAsset-derived classes, which are
+        commonly used for data-driven design (game configuration, weapon stats, etc.).
+
+        Args:
+            name: Name of the data asset (e.g., "DA_Pistol", "DA_EnemyConfig")
+            parent_class: The UDataAsset-derived class to instantiate.
+                         Can be specified as:
+                         - Simple name: "PrimaryDataAsset", "FirearmData"
+                         - Full path: "/Script/TrapxTrapCpp.UFirearmData"
+            path: Content browser path for the asset (default: "/Game/Data")
+            initial_values: Optional dict of property names to values to set on creation
+
+        Returns:
+            Dict containing:
+            - success: bool
+            - asset_path: Full path to created asset
+            - name: Asset name
+            - parent_class: Resolved parent class name
+
+        Example:
+            # Create a simple DataAsset
+            create_data_asset(
+                name="DA_BossConfig",
+                parent_class="PrimaryDataAsset",
+                path="/Game/Data/Enemies"
+            )
+
+            # Create a custom DataAsset with initial values
+            create_data_asset(
+                name="DA_Pistol",
+                parent_class="/Script/TrapxTrapCpp.UFirearmData",
+                path="/Game/TrapxTrap/Data/Weapons",
+                initial_values={"WeaponName": "Pistol", "BaseDamage": 25}
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "name": name,
+                "parent_class": parent_class,
+                "path": path
+            }
+
+            if initial_values:
+                params["initial_values"] = initial_values
+
+            logger.info(f"Creating DataAsset '{name}' of type '{parent_class}' at '{path}'")
+            response = unreal.send_command("create_data_asset", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Create DataAsset response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error creating DataAsset: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def set_class_property(
+        ctx: Context,
+        blueprint_name: str,
+        property_name: str,
+        class_path: str,
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Set a TSubclassOf property to a class reference.
+
+        This tool sets single class reference properties (not arrays).
+        For arrays of class references, use set_blueprint_class_array instead.
+
+        Args:
+            blueprint_name: Name of the target Blueprint (e.g., "BP_Spawner")
+            property_name: Name of the TSubclassOf property (e.g., "SpawnClass")
+            class_path: Full path to the class.
+                       For Blueprints: "/Game/Blueprints/BP_Enemy.BP_Enemy_C"
+                       For C++ classes: "/Script/Engine.Actor"
+                       Use "None" or empty string to clear the reference
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Dict containing success status and set values
+
+        Example:
+            # Set a Blueprint class reference
+            set_class_property(
+                blueprint_name="BP_Spawner",
+                property_name="EnemyClass",
+                class_path="/Game/Blueprints/Enemies/BP_Zombie.BP_Zombie_C",
+                path="/Game/Blueprints/Systems"
+            )
+
+            # Set a C++ class reference
+            set_class_property(
+                blueprint_name="BP_GameMode",
+                property_name="DefaultPawnClass",
+                class_path="/Script/Engine.DefaultPawn"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "property_name": property_name,
+                "class_path": class_path,
+                "path": path
+            }
+
+            logger.info(f"Setting class property '{property_name}' on '{blueprint_name}' to '{class_path}'")
+            response = unreal.send_command("set_class_property", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Set class property response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error setting class property: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def set_object_property(
+        ctx: Context,
+        blueprint_name: str,
+        property_name: str,
+        asset_path: str,
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Set a UObject/TObjectPtr property to an asset reference.
+
+        This tool sets object reference properties to point to assets like
+        DataAssets, Materials, Textures, StaticMeshes, etc.
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            property_name: Name of the object property to set
+            asset_path: Full path to the asset.
+                       Format: "/Game/Path/AssetName.AssetName"
+                       Use "None" or empty string to clear the reference
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Dict containing success status and set values
+
+        Example:
+            # Set a DataAsset reference
+            set_object_property(
+                blueprint_name="BP_PlayerCharacter",
+                property_name="DefaultWeaponData",
+                asset_path="/Game/Data/Weapons/DA_Pistol.DA_Pistol",
+                path="/Game/Blueprints/Characters"
+            )
+
+            # Set a Material reference
+            set_object_property(
+                blueprint_name="BP_Trap",
+                property_name="TrapMaterial",
+                asset_path="/Game/Materials/M_Trap.M_Trap"
+            )
+
+            # Clear a reference
+            set_object_property(
+                blueprint_name="BP_Enemy",
+                property_name="OptionalData",
+                asset_path="None"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "property_name": property_name,
+                "asset_path": asset_path,
+                "path": path
+            }
+
+            logger.info(f"Setting object property '{property_name}' on '{blueprint_name}' to '{asset_path}'")
+            response = unreal.send_command("set_object_property", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Set object property response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error setting object property: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def get_blueprint_properties(
+        ctx: Context,
+        blueprint_name: str,
+        path: str = "/Game/Blueprints",
+        include_inherited: bool = True,
+        category_filter: str = None
+    ) -> Dict[str, Any]:
+        """
+        Get a list of all configurable properties on a Blueprint.
+
+        This tool is useful for discovering what properties can be set on a Blueprint
+        and their types before using set_blueprint_property or other property tools.
+
+        Args:
+            blueprint_name: Name of the Blueprint to inspect
+            path: Content browser path where the blueprint is located
+            include_inherited: Include properties from parent classes (default: True)
+            category_filter: Only return properties in this category (optional)
+
+        Returns:
+            Dict containing:
+            - success: bool
+            - blueprint_name: str
+            - properties: List of property info objects, each containing:
+                - name: Property name
+                - type: Friendly type name (e.g., "TSubclassOf<AActor>", "Int32")
+                - cpp_type: C++ type string
+                - category: Property category
+                - default_value: Current default value as string
+                - is_editable: Can be edited in the editor
+                - is_blueprint_visible: Visible to Blueprints
+                - is_blueprint_read_only: Read-only in Blueprints
+                - owner_class: Class that defines this property
+            - total: Total count of properties
+
+        Example:
+            # Get all properties
+            get_blueprint_properties(
+                blueprint_name="BP_PlayerCharacter",
+                path="/Game/Blueprints/Characters"
+            )
+
+            # Get only properties in "Combat" category
+            get_blueprint_properties(
+                blueprint_name="BP_Enemy",
+                category_filter="Combat"
+            )
+
+            # Get only Blueprint-defined properties (not inherited)
+            get_blueprint_properties(
+                blueprint_name="BP_Weapon",
+                include_inherited=False
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "path": path,
+                "include_inherited": include_inherited
+            }
+
+            if category_filter:
+                params["category_filter"] = category_filter
+
+            logger.info(f"Getting properties for Blueprint '{blueprint_name}'")
+            response = unreal.send_command("get_blueprint_properties", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Found {response.get('total', 0)} properties")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error getting Blueprint properties: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def set_struct_property(
+        ctx: Context,
+        blueprint_name: str,
+        property_name: str,
+        index: int,
+        values: Dict[str, Any],
+        path: str = "/Game/Blueprints"
+    ) -> Dict[str, Any]:
+        """
+        Update specific fields of a struct array element (partial update).
+
+        Unlike set_struct_array_property which replaces the entire array,
+        this tool updates only the specified fields of a single array element.
+
+        Args:
+            blueprint_name: Name of the target Blueprint
+            property_name: Name of the struct array property
+            index: Array index to update (0-based)
+            values: Dict of field names to new values (only specified fields are updated)
+                   - For class references: Use full path "/Game/BP.BP_C"
+                   - For object references: Use full path "/Game/Asset.Asset"
+                   - For numbers: Use int or float
+                   - For strings: Use string
+                   - For bools: Use true/false
+            path: Content browser path where the blueprint is located
+
+        Returns:
+            Dict containing:
+            - success: bool
+            - updated_fields: List of successfully updated field names
+            - updated_fields_count: Number of fields updated
+            - errors: List of any errors encountered (if any)
+
+        Example:
+            # Update only specific fields of inventory slot 0
+            set_struct_property(
+                blueprint_name="BP_PlayerCharacter",
+                property_name="InventorySlots",
+                index=0,
+                values={
+                    "MaxCount": 10,
+                    "CooldownTime": 3.0,
+                    "WeaponData": "/Game/Data/DA_Pistol.DA_Pistol"
+                },
+                path="/Game/Blueprints/Characters"
+            )
+
+            # Update a single field
+            set_struct_property(
+                blueprint_name="BP_Enemy",
+                property_name="AbilitySlots",
+                index=2,
+                values={"IsEnabled": False}
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                logger.error("Failed to connect to Unreal Engine")
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "blueprint_name": blueprint_name,
+                "property_name": property_name,
+                "index": index,
+                "values": values,
+                "path": path
+            }
+
+            logger.info(f"Updating struct property '{property_name}[{index}]' on '{blueprint_name}' with {len(values)} fields")
+            response = unreal.send_command("set_struct_property", params)
+
+            if not response:
+                logger.error("No response from Unreal Engine")
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Set struct property response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error setting struct property: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("Blueprint tools registered successfully") 

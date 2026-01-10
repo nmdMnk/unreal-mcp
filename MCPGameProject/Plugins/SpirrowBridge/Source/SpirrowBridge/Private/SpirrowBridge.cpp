@@ -281,7 +281,13 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("duplicate_blueprint") ||
                      CommandType == TEXT("get_blueprint_graph") ||
                      CommandType == TEXT("set_blueprint_class_array") ||
-                     CommandType == TEXT("set_struct_array_property"))
+                     CommandType == TEXT("set_struct_array_property") ||
+                     // New property commands (v0.8.8)
+                     CommandType == TEXT("create_data_asset") ||
+                     CommandType == TEXT("set_class_property") ||
+                     CommandType == TEXT("set_object_property") ||
+                     CommandType == TEXT("get_blueprint_properties") ||
+                     CommandType == TEXT("set_struct_property"))
             {
                 ResultJson = BlueprintCommands->HandleCommand(CommandType, Params);
             }
