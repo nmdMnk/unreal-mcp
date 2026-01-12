@@ -13,12 +13,18 @@
 #include "UObject/SavePackage.h"
 #include "EditorAssetLibrary.h"
 #include "Engine/Blueprint.h"
+#include "Engine/Texture2D.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "K2Node_Event.h"
 #include "K2Node_CallFunction.h"
 #include "K2Node_DynamicCast.h"
 #include "EdGraphSchema_K2.h"
+#include "Factories/TextureFactory.h"
+#include "Misc/Base64.h"
+#include "Misc/FileHelper.h"
+#include "Misc/App.h"
+#include "HAL/PlatformFileManager.h"
 
 FSpirrowBridgeProjectCommands::FSpirrowBridgeProjectCommands()
 {
@@ -65,6 +71,31 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleCommand(const FStri
     else if (CommandType == TEXT("set_default_mapping_context"))
     {
         return HandleSetDefaultMappingContext(Params);
+    }
+    // Asset utility commands
+    else if (CommandType == TEXT("asset_exists"))
+    {
+        return HandleAssetExists(Params);
+    }
+    else if (CommandType == TEXT("create_content_folder"))
+    {
+        return HandleCreateContentFolder(Params);
+    }
+    else if (CommandType == TEXT("list_assets_in_folder"))
+    {
+        return HandleListAssetsInFolder(Params);
+    }
+    else if (CommandType == TEXT("import_texture"))
+    {
+        return HandleImportTexture(Params);
+    }
+    else if (CommandType == TEXT("get_project_info"))
+    {
+        return HandleGetProjectInfo(Params);
+    }
+    else if (CommandType == TEXT("find_asset_references"))
+    {
+        return HandleFindAssetReferences(Params);
     }
 
     return FSpirrowBridgeCommonUtils::CreateErrorResponse(
@@ -950,5 +981,336 @@ TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleRemoveActionFromMap
     }
     ResultObj->SetNumberField(TEXT("removed_count"), RemovedCount);
 
+    return ResultObj;
+}
+
+// ===== Asset Exists =====
+TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleAssetExists(const TSharedPtr<FJsonObject>& Params)
+{
+    FString AssetPath;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("asset_path"), AssetPath))
+    {
+        return Error;
+    }
+
+    bool bExists = UEditorAssetLibrary::DoesAssetExist(AssetPath);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
+    ResultObj->SetBoolField(TEXT("exists"), bExists);
+    ResultObj->SetStringField(TEXT("asset_path"), AssetPath);
+    return ResultObj;
+}
+
+// ===== Create Content Folder =====
+TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleCreateContentFolder(const TSharedPtr<FJsonObject>& Params)
+{
+    FString FolderPath;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("folder_path"), FolderPath))
+    {
+        return Error;
+    }
+
+    bool bSuccess = UEditorAssetLibrary::MakeDirectory(FolderPath);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), bSuccess);
+    ResultObj->SetStringField(TEXT("folder_path"), FolderPath);
+
+    if (!bSuccess)
+    {
+        ResultObj->SetStringField(TEXT("error"), TEXT("Failed to create folder. It may already exist or the path is invalid."));
+    }
+
+    return ResultObj;
+}
+
+// ===== List Assets In Folder =====
+TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleListAssetsInFolder(const TSharedPtr<FJsonObject>& Params)
+{
+    FString FolderPath;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("folder_path"), FolderPath))
+    {
+        return Error;
+    }
+
+    FString ClassFilter;
+    bool bRecursive = false;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("class_filter"), ClassFilter, TEXT(""));
+    FSpirrowBridgeCommonUtils::GetOptionalBool(Params, TEXT("recursive"), bRecursive, false);
+
+    FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+    IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+
+    TArray<FAssetData> AssetList;
+    AssetRegistry.GetAssetsByPath(FName(*FolderPath), AssetList, bRecursive);
+
+    TArray<TSharedPtr<FJsonValue>> AssetsArray;
+    for (const FAssetData& Asset : AssetList)
+    {
+        FString AssetClassName = Asset.AssetClassPath.GetAssetName().ToString();
+
+        // Apply class filter if specified
+        if (!ClassFilter.IsEmpty())
+        {
+            if (!AssetClassName.Contains(ClassFilter))
+            {
+                continue;
+            }
+        }
+
+        TSharedPtr<FJsonObject> AssetObj = MakeShared<FJsonObject>();
+        AssetObj->SetStringField(TEXT("name"), Asset.AssetName.ToString());
+        AssetObj->SetStringField(TEXT("path"), Asset.GetObjectPathString());
+        AssetObj->SetStringField(TEXT("class"), AssetClassName);
+        AssetsArray.Add(MakeShared<FJsonValueObject>(AssetObj));
+    }
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
+    ResultObj->SetArrayField(TEXT("assets"), AssetsArray);
+    ResultObj->SetNumberField(TEXT("count"), AssetsArray.Num());
+    ResultObj->SetStringField(TEXT("folder_path"), FolderPath);
+    return ResultObj;
+}
+
+// ===== Import Texture =====
+TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleImportTexture(const TSharedPtr<FJsonObject>& Params)
+{
+    FString Source, AssetName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("source"), Source))
+    {
+        return Error;
+    }
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("asset_name"), AssetName))
+    {
+        return Error;
+    }
+
+    FString SourceType, DestinationPath, Compression, LodGroup;
+    bool bSRGB = true;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("source_type"), SourceType, TEXT("file"));
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("destination_path"), DestinationPath, TEXT("/Game/Textures"));
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("compression"), Compression, TEXT("Default"));
+    FSpirrowBridgeCommonUtils::GetOptionalBool(Params, TEXT("srgb"), bSRGB, true);
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("lod_group"), LodGroup, TEXT("World"));
+
+    FString SourceFilePath = Source;
+    FString TempFilePath;
+    bool bDeleteTempFile = false;
+
+    // Handle Base64 input
+    if (SourceType.Equals(TEXT("base64"), ESearchCase::IgnoreCase))
+    {
+        TArray<uint8> DecodedData;
+        if (!FBase64::Decode(Source, DecodedData))
+        {
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::InvalidParameter,
+                TEXT("Failed to decode Base64 data"));
+        }
+
+        // Create temp directory if it doesn't exist
+        FString TempDir = FPaths::ProjectSavedDir() / TEXT("Temp");
+        IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
+        if (!PlatformFile.DirectoryExists(*TempDir))
+        {
+            PlatformFile.CreateDirectory(*TempDir);
+        }
+
+        // Write to temp file
+        TempFilePath = TempDir / AssetName + TEXT(".png");
+        if (!FFileHelper::SaveArrayToFile(DecodedData, *TempFilePath))
+        {
+            return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+                ESpirrowErrorCode::OperationFailed,
+                TEXT("Failed to write temporary file for Base64 data"));
+        }
+
+        SourceFilePath = TempFilePath;
+        bDeleteTempFile = true;
+    }
+
+    // Check if source file exists
+    if (!FPaths::FileExists(SourceFilePath))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetNotFound,
+            FString::Printf(TEXT("Source file not found: %s"), *SourceFilePath));
+    }
+
+    // Create package for the texture
+    FString PackagePath = DestinationPath / AssetName;
+    UPackage* Package = CreatePackage(*PackagePath);
+    if (!Package)
+    {
+        if (bDeleteTempFile && !TempFilePath.IsEmpty())
+        {
+            IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
+            PlatformFile.DeleteFile(*TempFilePath);
+        }
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetCreationFailed,
+            TEXT("Failed to create package for texture"));
+    }
+    Package->FullyLoad();
+
+    // Use UTextureFactory for direct import (GameThread-safe, no TaskGraph issues)
+    UTextureFactory* TextureFactory = NewObject<UTextureFactory>();
+    TextureFactory->AddToRoot(); // Prevent GC during import
+    TextureFactory->SuppressImportOverwriteDialog();
+
+    bool bCancelled = false;
+    UTexture2D* ImportedTexture = Cast<UTexture2D>(
+        TextureFactory->ImportObject(
+            UTexture2D::StaticClass(),
+            Package,
+            *AssetName,
+            RF_Public | RF_Standalone,
+            SourceFilePath,
+            nullptr,
+            bCancelled
+        )
+    );
+
+    TextureFactory->RemoveFromRoot(); // Allow GC
+
+    // Clean up temp file if needed
+    if (bDeleteTempFile && !TempFilePath.IsEmpty())
+    {
+        IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
+        PlatformFile.DeleteFile(*TempFilePath);
+    }
+
+    // Check import result
+    if (!ImportedTexture || bCancelled)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetCreationFailed,
+            TEXT("Failed to import texture"));
+    }
+    if (ImportedTexture)
+    {
+        ImportedTexture->SRGB = bSRGB;
+
+        // Set compression settings
+        if (Compression.Equals(TEXT("Normalmap"), ESearchCase::IgnoreCase))
+        {
+            ImportedTexture->CompressionSettings = TC_Normalmap;
+        }
+        else if (Compression.Equals(TEXT("Masks"), ESearchCase::IgnoreCase))
+        {
+            ImportedTexture->CompressionSettings = TC_Masks;
+        }
+        else if (Compression.Equals(TEXT("Grayscale"), ESearchCase::IgnoreCase))
+        {
+            ImportedTexture->CompressionSettings = TC_Grayscale;
+        }
+        else if (Compression.Equals(TEXT("UserInterface2D"), ESearchCase::IgnoreCase) ||
+                 Compression.Equals(TEXT("UI"), ESearchCase::IgnoreCase))
+        {
+            ImportedTexture->CompressionSettings = TC_EditorIcon;
+        }
+        else if (Compression.Equals(TEXT("BC7"), ESearchCase::IgnoreCase))
+        {
+            ImportedTexture->CompressionSettings = TC_BC7;
+        }
+        // Default is TC_Default
+
+        // Set LOD group
+        if (LodGroup.Equals(TEXT("UI"), ESearchCase::IgnoreCase))
+        {
+            ImportedTexture->LODGroup = TEXTUREGROUP_UI;
+        }
+        else if (LodGroup.Equals(TEXT("WorldNormalMap"), ESearchCase::IgnoreCase))
+        {
+            ImportedTexture->LODGroup = TEXTUREGROUP_WorldNormalMap;
+        }
+        else if (LodGroup.Equals(TEXT("Lightmap"), ESearchCase::IgnoreCase))
+        {
+            ImportedTexture->LODGroup = TEXTUREGROUP_Lightmap;
+        }
+        else if (LodGroup.Equals(TEXT("Shadowmap"), ESearchCase::IgnoreCase))
+        {
+            ImportedTexture->LODGroup = TEXTUREGROUP_Shadowmap;
+        }
+        // Default is TEXTUREGROUP_World
+
+        ImportedTexture->UpdateResource();
+        ImportedTexture->MarkPackageDirty();
+
+        // Save the texture (PackagePath already defined above)
+        FString PackageFileName = FPackageName::LongPackageNameToFilename(PackagePath, FPackageName::GetAssetPackageExtension());
+        FSavePackageArgs SaveArgs;
+        SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
+        UPackage::SavePackage(ImportedTexture->GetOutermost(), ImportedTexture, *PackageFileName, SaveArgs);
+    }
+
+    FString AssetPath = DestinationPath / AssetName + TEXT(".") + AssetName;
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
+    ResultObj->SetStringField(TEXT("asset_path"), AssetPath);
+    ResultObj->SetStringField(TEXT("asset_name"), AssetName);
+    ResultObj->SetStringField(TEXT("destination_path"), DestinationPath);
+    ResultObj->SetStringField(TEXT("source_type"), SourceType);
+    return ResultObj;
+}
+
+// ===== Get Project Info =====
+TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleGetProjectInfo(const TSharedPtr<FJsonObject>& Params)
+{
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
+
+    ResultObj->SetStringField(TEXT("project_name"), FApp::GetProjectName());
+    ResultObj->SetStringField(TEXT("engine_version"), FEngineVersion::Current().ToString());
+    ResultObj->SetStringField(TEXT("project_dir"), FPaths::ProjectDir());
+    ResultObj->SetStringField(TEXT("content_dir"), FPaths::ProjectContentDir());
+    ResultObj->SetStringField(TEXT("saved_dir"), FPaths::ProjectSavedDir());
+
+    return ResultObj;
+}
+
+// ===== Find Asset References =====
+TSharedPtr<FJsonObject> FSpirrowBridgeProjectCommands::HandleFindAssetReferences(const TSharedPtr<FJsonObject>& Params)
+{
+    FString AssetPath;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("asset_path"), AssetPath))
+    {
+        return Error;
+    }
+
+    FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+    IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+
+    // Get referencers (assets that reference this asset)
+    TArray<FAssetIdentifier> Referencers;
+    FAssetIdentifier AssetId = FAssetIdentifier(FName(*AssetPath));
+    AssetRegistry.GetReferencers(AssetId, Referencers);
+
+    TArray<TSharedPtr<FJsonValue>> ReferencersArray;
+    for (const FAssetIdentifier& Ref : Referencers)
+    {
+        ReferencersArray.Add(MakeShared<FJsonValueString>(Ref.ToString()));
+    }
+
+    // Get dependencies (assets that this asset references)
+    TArray<FAssetIdentifier> Dependencies;
+    AssetRegistry.GetDependencies(AssetId, Dependencies);
+
+    TArray<TSharedPtr<FJsonValue>> DependenciesArray;
+    for (const FAssetIdentifier& Dep : Dependencies)
+    {
+        DependenciesArray.Add(MakeShared<FJsonValueString>(Dep.ToString()));
+    }
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetBoolField(TEXT("success"), true);
+    ResultObj->SetStringField(TEXT("asset_path"), AssetPath);
+    ResultObj->SetArrayField(TEXT("referencers"), ReferencersArray);
+    ResultObj->SetNumberField(TEXT("referencers_count"), ReferencersArray.Num());
+    ResultObj->SetArrayField(TEXT("dependencies"), DependenciesArray);
+    ResultObj->SetNumberField(TEXT("dependencies_count"), DependenciesArray.Num());
     return ResultObj;
 }

@@ -1298,17 +1298,22 @@ def register_blueprint_tools(mcp: FastMCP):
         Args:
             asset_name: Name of the DataAsset (e.g., "DA_Pistol")
             property_name: Name of the property to set
-            property_value: Value to set. Supports:
-                           - Basic types: int, float, bool, string
-                           - Class references: "/Game/BP.BP_C" for TSubclassOf
-                           - Object references: "/Game/Asset.Asset" for UObject*
+            property_value: Value to set. See supported types below.
             path: Content browser path where the DataAsset is located (default: "/Game/Data")
+
+        Supported Property Types:
+            - int/float/bool: Direct values (50, 3.14, True)
+            - FString/FText/FName: String values ("Hello")
+            - TSubclassOf<T>: Class path with "_C" suffix ("/Game/BP.BP_C")
+            - TObjectPtr<T>/UObject*: Asset path ("/Game/Asset.Asset")
+            - TSoftObjectPtr<T>: Same as object reference
+            - Enum: String name or integer value
 
         Returns:
             Dict containing success status and asset info
 
         Example:
-            # Set a simple property
+            # Set basic types
             set_data_asset_property(
                 asset_name="DA_Pistol",
                 property_name="BaseDamage",
@@ -1316,25 +1321,40 @@ def register_blueprint_tools(mcp: FastMCP):
                 path="/Game/Data/Weapons"
             )
 
-            # Set a class reference (TSubclassOf)
+            # Set UTexture2D* (icon, image)
+            set_data_asset_property(
+                asset_name="DA_Pistol",
+                property_name="WeaponIcon",
+                property_value="/Game/Textures/UI/T_Pistol_Icon.T_Pistol_Icon",
+                path="/Game/Data/Weapons"
+            )
+
+            # Set TSubclassOf<AActor>
             set_data_asset_property(
                 asset_name="DA_Pistol",
                 property_name="ProjectileClass",
                 property_value="/Game/Blueprints/BP_Bullet.BP_Bullet_C"
             )
 
-            # Set an object reference (UObject*)
+            # Set USoundBase* (audio)
             set_data_asset_property(
                 asset_name="DA_Pistol",
                 property_name="FireSound",
                 property_value="/Game/Audio/SFX_Fire.SFX_Fire"
             )
 
-            # Set a string property
+            # Set UStaticMesh*
             set_data_asset_property(
                 asset_name="DA_Pistol",
-                property_name="WeaponName",
-                property_value="Standard Pistol"
+                property_name="WeaponMesh",
+                property_value="/Game/Meshes/SM_Pistol.SM_Pistol"
+            )
+
+            # Clear reference (set to null)
+            set_data_asset_property(
+                asset_name="DA_Pistol",
+                property_name="OptionalTexture",
+                property_value="None"  # or "null" or "nullptr"
             )
         """
         from unreal_mcp_server import get_unreal_connection
@@ -1364,6 +1384,75 @@ def register_blueprint_tools(mcp: FastMCP):
 
         except Exception as e:
             error_msg = f"Error setting DataAsset property: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def batch_set_properties(
+        ctx: Context,
+        asset_name: str,
+        properties: Dict[str, Any],
+        path: str = "/Game/Data",
+        asset_type: str = "dataasset"
+    ) -> Dict[str, Any]:
+        """
+        Set multiple properties on an asset in a single operation.
+
+        More efficient than calling set_data_asset_property multiple times.
+
+        Args:
+            asset_name: Name of the asset (e.g., "DA_Pistol")
+            properties: Dictionary of property names to values
+            path: Content browser path (default: "/Game/Data")
+            asset_type: Type of asset - "dataasset" (default)
+
+        Returns:
+            Dict containing:
+            - success: True if all properties were set successfully
+            - succeeded_count: Number of properties set
+            - failed_count: Number of properties that failed
+            - succeeded: List of property names that succeeded
+            - failed: List of error messages for failed properties
+
+        Example:
+            # Set multiple properties at once
+            batch_set_properties(
+                asset_name="DA_Pistol",
+                properties={
+                    "WeaponName": "Combat Pistol",
+                    "BaseDamage": 50,
+                    "FireRate": 0.25,
+                    "WeaponIcon": "/Game/Textures/T_Pistol.T_Pistol",
+                    "ProjectileClass": "/Game/BP/BP_Bullet.BP_Bullet_C"
+                },
+                path="/Game/Data/Weapons"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "asset_name": asset_name,
+                "properties": properties,
+                "path": path,
+                "asset_type": asset_type
+            }
+
+            logger.info(f"Batch setting {len(properties)} properties on '{asset_name}'")
+            response = unreal.send_command("batch_set_properties", params)
+
+            if not response:
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Batch set properties response: {response.get('succeeded_count', 0)} succeeded, {response.get('failed_count', 0)} failed")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error batch setting properties: {e}"
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 

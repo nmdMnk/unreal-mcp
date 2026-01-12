@@ -1,8 +1,8 @@
 # spirrow-unrealwise 機能ステータス
 
-> **バージョン**: Phase H (v0.8.8)
+> **バージョン**: Phase I (v0.8.9)
 > **ステータス**: Beta
-> **最終更新**: 2026-01-11
+> **最終更新**: 2026-01-12
 
 ---
 
@@ -11,7 +11,7 @@
 | カテゴリ | ツール数 | 状態 |
 |---------|---------|------|
 | Actor操作 | 10 | ✅ |
-| Blueprint操作 | 14 | ✅ |
+| Blueprint操作 | 15 | ✅ |
 | BPノードグラフ | 9 | ✅ |
 | UMG Widget | 30 | ✅ |
 | Enhanced Input | 8 | ✅ |
@@ -21,8 +21,9 @@
 | EQS | 5 | ✅ |
 | Material | 5 | ✅ |
 | Config | 3 | ✅ |
+| Asset Utility | 7 | ✅ 🆕 |
 | RAG | 4 | ✅ |
-| **合計** | **122** | |
+| **合計** | **130** | |
 
 ---
 
@@ -35,8 +36,8 @@
 - Basic: `StaticMeshActor`, `PointLight`, `SpotLight`, `DirectionalLight`, `CameraActor`
 - Volumes: `NavMeshBoundsVolume`, `TriggerVolume`, `BlockingVolume`, `KillZVolume`, `PhysicsVolume`, `PostProcessVolume`, `AudioVolume`, `LightmassImportanceVolume`
 
-### Blueprint操作 (14)
-`create_blueprint`, `spawn_blueprint_actor`, `add_component_to_blueprint`, `set_static_mesh_properties`, `set_component_property`, `set_physics_properties`, `compile_blueprint`, `set_blueprint_property`, `create_data_asset` 🆕, `set_class_property` 🆕, `set_object_property` 🆕, `get_blueprint_properties` 🆕, `set_struct_property` 🆕, `set_data_asset_property` 🆕
+### Blueprint操作 (15)
+`create_blueprint`, `spawn_blueprint_actor`, `add_component_to_blueprint`, `set_static_mesh_properties`, `set_component_property`, `set_physics_properties`, `compile_blueprint`, `set_blueprint_property`, `create_data_asset`, `set_class_property`, `set_object_property`, `get_blueprint_properties`, `set_struct_property`, `set_data_asset_property`, `batch_set_properties` 🆕
 
 ### BPノードグラフ (9)
 `add_blueprint_event_node`, `add_blueprint_input_action_node`, `add_blueprint_function_node`, `connect_blueprint_nodes`, `disconnect_blueprint_nodes` 🆕, `add_blueprint_variable`, `add_blueprint_get_self_component_reference`, `add_blueprint_self_reference`, `find_blueprint_nodes`
@@ -82,12 +83,42 @@
 ### Config (3)
 `get_config_value`, `set_config_value`, `list_config_sections`
 
+### Asset Utility (7) 🆕
+`asset_exists`, `create_content_folder`, `list_assets_in_folder`, `import_texture`, `get_project_info`, `find_asset_references`, `delete_asset`
+
+**import_texture特徴:**
+- ファイルパスまたはBase64データからインポート
+- 圧縮設定、sRGB、LODグループ指定可能
+- 画像生成AI連携に対応
+
 ### RAG知識ベース (4)
 `search_knowledge`, `add_knowledge`, `list_knowledge`, `delete_knowledge`
 
 ---
 
 ## 最新の更新
+
+### 2026-01-12: Asset Utility & Batch Operations (v0.8.9) 🆕
+
+**新規ツール追加 (8ツール)**:
+
+| ツール | 機能 | 優先度 |
+|--------|------|--------|
+| `import_texture` | テクスチャインポート（ファイル/Base64対応） | 最優先 |
+| `asset_exists` | アセット存在確認 | 高 |
+| `create_content_folder` | Content Browserフォルダ作成 | 高 |
+| `list_assets_in_folder` | フォルダ内アセット一覧取得 | 高 |
+| `get_project_info` | プロジェクト情報取得 | 中 |
+| `find_asset_references` | アセット参照・依存関係検索 | 中 |
+| `batch_set_properties` | 複数プロパティ一括設定 | 高 |
+
+**バグ修正**:
+- `import_texture`: TaskGraphクラッシュ修正（ImportAssetTasks → UTextureFactory直接インポート）
+  - 原因: ImportAssetTasksが非GameThreadでアセット操作を実行
+  - 解決: UTextureFactory::ImportObjectでGameThread上で同期実行
+
+**ドキュメント改善**:
+- `set_data_asset_property`: UTexture2D*, USoundBase*, UStaticMesh*などのオブジェクト参照設定例を追加
 
 ### 2026-01-11: DataAsset & プロパティ操作強化 (v0.8.8) 🆕
 

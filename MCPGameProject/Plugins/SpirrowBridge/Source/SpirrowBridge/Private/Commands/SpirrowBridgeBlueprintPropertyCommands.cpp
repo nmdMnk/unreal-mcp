@@ -61,6 +61,10 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleCommand(c
     {
         return HandleSetDataAssetProperty(Params);
     }
+    else if (CommandType == TEXT("batch_set_properties"))
+    {
+        return HandleBatchSetProperties(Params);
+    }
 
     return nullptr;
 }
@@ -1257,5 +1261,86 @@ TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleSetDataAs
     Result->SetStringField(TEXT("asset_name"), AssetName);
     Result->SetStringField(TEXT("property_name"), PropertyName);
     Result->SetStringField(TEXT("asset_path"), FullPath);
+    return Result;
+}
+
+// ===== Batch Set Properties =====
+TSharedPtr<FJsonObject> FSpirrowBridgeBlueprintPropertyCommands::HandleBatchSetProperties(const TSharedPtr<FJsonObject>& Params)
+{
+    FString AssetName;
+    if (auto Error = FSpirrowBridgeCommonUtils::ValidateRequiredString(Params, TEXT("asset_name"), AssetName))
+    {
+        return Error;
+    }
+
+    const TSharedPtr<FJsonObject>* PropertiesObj = nullptr;
+    if (!Params->TryGetObjectField(TEXT("properties"), PropertiesObj))
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::MissingRequiredParam,
+            TEXT("Missing required parameter: properties"));
+    }
+
+    FString Path, AssetType;
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("path"), Path, TEXT("/Game/Data"));
+    FSpirrowBridgeCommonUtils::GetOptionalString(Params, TEXT("asset_type"), AssetType, TEXT("dataasset"));
+
+    // Load asset
+    FString FullPath = Path / AssetName + TEXT(".") + AssetName;
+    UObject* Asset = UEditorAssetLibrary::LoadAsset(FullPath);
+    if (!Asset)
+    {
+        return FSpirrowBridgeCommonUtils::CreateErrorResponse(
+            ESpirrowErrorCode::AssetNotFound,
+            FString::Printf(TEXT("Asset not found: %s"), *FullPath));
+    }
+
+    // Set all properties
+    TArray<FString> SuccessProperties;
+    TArray<FString> FailedProperties;
+
+    for (const auto& Pair : (*PropertiesObj)->Values)
+    {
+        FString ErrorMsg;
+        if (FSpirrowBridgeCommonUtils::SetObjectProperty(Asset, Pair.Key, Pair.Value, ErrorMsg))
+        {
+            SuccessProperties.Add(Pair.Key);
+        }
+        else
+        {
+            FailedProperties.Add(FString::Printf(TEXT("%s: %s"), *Pair.Key, *ErrorMsg));
+        }
+    }
+
+    // Save
+    Asset->MarkPackageDirty();
+    UPackage* Package = Asset->GetOutermost();
+    FString PackageFileName = FPackageName::LongPackageNameToFilename(
+        Package->GetName(), FPackageName::GetAssetPackageExtension());
+    FSavePackageArgs SaveArgs;
+    SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
+    UPackage::SavePackage(Package, Asset, *PackageFileName, SaveArgs);
+
+    // Build result
+    TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+    Result->SetBoolField(TEXT("success"), FailedProperties.Num() == 0);
+    Result->SetStringField(TEXT("asset_path"), FullPath);
+    Result->SetNumberField(TEXT("succeeded_count"), SuccessProperties.Num());
+    Result->SetNumberField(TEXT("failed_count"), FailedProperties.Num());
+
+    TArray<TSharedPtr<FJsonValue>> SucceededArray;
+    for (const FString& PropName : SuccessProperties)
+    {
+        SucceededArray.Add(MakeShared<FJsonValueString>(PropName));
+    }
+    Result->SetArrayField(TEXT("succeeded"), SucceededArray);
+
+    TArray<TSharedPtr<FJsonValue>> FailedArray;
+    for (const FString& ErrorStr : FailedProperties)
+    {
+        FailedArray.Add(MakeShared<FJsonValueString>(ErrorStr));
+    }
+    Result->SetArrayField(TEXT("failed"), FailedArray);
+
     return Result;
 }

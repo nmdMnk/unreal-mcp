@@ -378,4 +378,311 @@ def register_project_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
+    # ===== Asset Utility Tools =====
+
+    @mcp.tool()
+    def asset_exists(
+        ctx: Context,
+        asset_path: str
+    ) -> Dict[str, Any]:
+        """
+        Check if an asset exists at the specified path.
+
+        Args:
+            asset_path: Full content browser path to the asset
+                        (e.g., "/Game/Textures/T_Icon.T_Icon")
+
+        Returns:
+            Dict with 'exists' boolean indicating if the asset exists
+
+        Example:
+            asset_exists(asset_path="/Game/Data/Weapons/DA_Pistol.DA_Pistol")
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {"asset_path": asset_path}
+
+            logger.info(f"Checking if asset exists: '{asset_path}'")
+            response = unreal.send_command("asset_exists", params)
+
+            if not response:
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Asset exists response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error checking asset existence: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def create_content_folder(
+        ctx: Context,
+        folder_path: str
+    ) -> Dict[str, Any]:
+        """
+        Create a folder in the Content Browser.
+
+        Args:
+            folder_path: Full content path for the folder
+                         (e.g., "/Game/Data/Weapons")
+
+        Returns:
+            Dict with success status
+
+        Note:
+            Creates all intermediate folders if they don't exist.
+
+        Example:
+            create_content_folder(folder_path="/Game/TrapxTrap/UI/Icons")
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {"folder_path": folder_path}
+
+            logger.info(f"Creating content folder: '{folder_path}'")
+            response = unreal.send_command("create_content_folder", params)
+
+            if not response:
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Create folder response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error creating content folder: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def list_assets_in_folder(
+        ctx: Context,
+        folder_path: str,
+        class_filter: str = None,
+        recursive: bool = False
+    ) -> Dict[str, Any]:
+        """
+        List all assets in a content browser folder.
+
+        Args:
+            folder_path: Content browser path (e.g., "/Game/Textures")
+            class_filter: Filter by asset class name (e.g., "Texture2D", "Blueprint", "DataAsset")
+            recursive: Include assets in subfolders (default: False)
+
+        Returns:
+            Dict with list of assets containing name, path, and class for each
+
+        Example:
+            list_assets_in_folder(
+                folder_path="/Game/Data/Weapons",
+                class_filter="DataAsset",
+                recursive=True
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "folder_path": folder_path,
+                "recursive": recursive
+            }
+            if class_filter:
+                params["class_filter"] = class_filter
+
+            logger.info(f"Listing assets in folder: '{folder_path}'")
+            response = unreal.send_command("list_assets_in_folder", params)
+
+            if not response:
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"List assets response: found {response.get('count', 0)} assets")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error listing assets in folder: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def import_texture(
+        ctx: Context,
+        source: str,
+        asset_name: str,
+        destination_path: str = "/Game/Textures",
+        source_type: str = "file",
+        compression: str = "Default",
+        srgb: bool = True,
+        lod_group: str = "World"
+    ) -> Dict[str, Any]:
+        """
+        Import a texture file into the Content Browser.
+
+        Args:
+            source: File path (for source_type="file") or Base64 string (for source_type="base64")
+            asset_name: Name for the imported texture asset (e.g., "T_Icon_Weapon")
+            destination_path: Content browser path (default: "/Game/Textures")
+            source_type: "file" or "base64" (default: "file")
+            compression: Compression setting - "Default", "Normalmap", "Masks", "Grayscale", "UI", "BC7"
+            srgb: Whether texture is sRGB (default: True, set False for normal maps)
+            lod_group: LOD group - "World", "WorldNormalMap", "UI", "Lightmap", "Shadowmap"
+
+        Returns:
+            Dict with success status and imported asset path
+
+        Example:
+            # Import from file
+            import_texture(
+                source="C:/Assets/weapon_icon.png",
+                asset_name="T_Icon_Pistol",
+                destination_path="/Game/Textures/UI"
+            )
+
+            # Import normal map
+            import_texture(
+                source="C:/Assets/brick_normal.png",
+                asset_name="T_Brick_N",
+                compression="Normalmap",
+                srgb=False
+            )
+
+            # Import from Base64 (for AI-generated images)
+            import_texture(
+                source=base64_image_data,
+                source_type="base64",
+                asset_name="T_Generated",
+                destination_path="/Game/Generated"
+            )
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "source": source,
+                "asset_name": asset_name,
+                "destination_path": destination_path,
+                "source_type": source_type,
+                "compression": compression,
+                "srgb": srgb,
+                "lod_group": lod_group
+            }
+
+            logger.info(f"Importing texture '{asset_name}' to '{destination_path}'")
+            response = unreal.send_command("import_texture", params)
+
+            if not response:
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Import texture response: {response}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error importing texture: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def get_project_info(
+        ctx: Context
+    ) -> Dict[str, Any]:
+        """
+        Get information about the current Unreal project.
+
+        Returns:
+            Dict containing:
+            - project_name: Name of the project
+            - engine_version: Unreal Engine version
+            - project_dir: Project directory path
+            - content_dir: Content directory path
+            - saved_dir: Saved directory path
+
+        Example:
+            info = get_project_info()
+            print(f"Project: {info['project_name']}, UE {info['engine_version']}")
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            logger.info("Getting project info")
+            response = unreal.send_command("get_project_info", {})
+
+            if not response:
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Project info: {response.get('project_name', 'Unknown')}")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error getting project info: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
+    @mcp.tool()
+    def find_asset_references(
+        ctx: Context,
+        asset_path: str
+    ) -> Dict[str, Any]:
+        """
+        Find assets that reference the specified asset (and assets it depends on).
+
+        Args:
+            asset_path: Full content browser path to the asset
+                        (e.g., "/Game/Textures/T_Icon")
+
+        Returns:
+            Dict containing:
+            - referencers: List of assets that reference this asset
+            - referencers_count: Number of referencers
+            - dependencies: List of assets this asset depends on
+            - dependencies_count: Number of dependencies
+
+        Example:
+            refs = find_asset_references(asset_path="/Game/Data/DA_Pistol")
+            print(f"Referenced by {refs['referencers_count']} assets")
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {"asset_path": asset_path}
+
+            logger.info(f"Finding references for asset: '{asset_path}'")
+            response = unreal.send_command("find_asset_references", params)
+
+            if not response:
+                return {"success": False, "message": "No response from Unreal Engine"}
+
+            logger.info(f"Found {response.get('referencers_count', 0)} referencers, {response.get('dependencies_count', 0)} dependencies")
+            return response
+
+        except Exception as e:
+            error_msg = f"Error finding asset references: {e}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
+
     logger.info("Project tools registered successfully") 

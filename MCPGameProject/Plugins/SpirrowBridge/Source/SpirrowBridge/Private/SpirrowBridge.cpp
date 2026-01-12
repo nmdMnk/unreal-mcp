@@ -288,7 +288,9 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("set_object_property") ||
                      CommandType == TEXT("get_blueprint_properties") ||
                      CommandType == TEXT("set_struct_property") ||
-                     CommandType == TEXT("set_data_asset_property"))
+                     CommandType == TEXT("set_data_asset_property") ||
+                     // Batch operations (v0.8.9)
+                     CommandType == TEXT("batch_set_properties"))
             {
                 ResultJson = BlueprintCommands->HandleCommand(CommandType, Params);
             }
@@ -332,7 +334,14 @@ FString USpirrowBridge::ExecuteCommand(const FString& CommandType, const TShared
                      CommandType == TEXT("remove_action_from_mapping_context") ||
                      CommandType == TEXT("delete_asset") ||
                      CommandType == TEXT("add_mapping_context_to_blueprint") ||
-                     CommandType == TEXT("set_default_mapping_context"))
+                     CommandType == TEXT("set_default_mapping_context") ||
+                     // Asset utility commands
+                     CommandType == TEXT("asset_exists") ||
+                     CommandType == TEXT("create_content_folder") ||
+                     CommandType == TEXT("list_assets_in_folder") ||
+                     CommandType == TEXT("import_texture") ||
+                     CommandType == TEXT("get_project_info") ||
+                     CommandType == TEXT("find_asset_references"))
             {
                 ResultJson = ProjectCommands->HandleCommand(CommandType, Params);
             }

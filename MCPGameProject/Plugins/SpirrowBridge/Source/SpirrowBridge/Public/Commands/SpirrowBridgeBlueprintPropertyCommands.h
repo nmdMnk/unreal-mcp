@@ -28,6 +28,9 @@ private:
     TSharedPtr<FJsonObject> HandleSetStructProperty(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleSetDataAssetProperty(const TSharedPtr<FJsonObject>& Params);
 
+    // Batch operations (v0.8.9)
+    TSharedPtr<FJsonObject> HandleBatchSetProperties(const TSharedPtr<FJsonObject>& Params);
+
     // Helper function for property type names
     static FString GetPropertyTypeName(FProperty* Property);
 };

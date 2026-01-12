@@ -32,4 +32,12 @@ private:
     // Enhanced Input Blueprint integration handlers
     TSharedPtr<FJsonObject> HandleAddMappingContextToBlueprint(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleSetDefaultMappingContext(const TSharedPtr<FJsonObject>& Params);
+
+    // Asset utility handlers
+    TSharedPtr<FJsonObject> HandleAssetExists(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleCreateContentFolder(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleListAssetsInFolder(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleImportTexture(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleGetProjectInfo(const TSharedPtr<FJsonObject>& Params);
+    TSharedPtr<FJsonObject> HandleFindAssetReferences(const TSharedPtr<FJsonObject>& Params);
 }; 
